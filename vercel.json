@@ -7,20 +7,6 @@
   "framework": null,
   "public": false,
   "regions": ["gru1"],
-  "env": {
-    "NEXT_PUBLIC_SUPABASE_URL": "@supabase-url",
-    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "@supabase-anon-key",
-    "NEXT_PUBLIC_GATEWAY_URL": "@gateway-url",
-    "NEXT_PUBLIC_GATEWAY_HTTP_URL": "@gateway-http-url"
-  },
-  "build": {
-    "env": {
-      "NEXT_PUBLIC_SUPABASE_URL": "@supabase-url",
-      "NEXT_PUBLIC_SUPABASE_ANON_KEY": "@supabase-anon-key",
-      "NEXT_PUBLIC_GATEWAY_URL": "@gateway-url",
-      "NEXT_PUBLIC_GATEWAY_HTTP_URL": "@gateway-http-url"
-    }
-  },
   "headers": [
     {
       "source": "/(.*)",
