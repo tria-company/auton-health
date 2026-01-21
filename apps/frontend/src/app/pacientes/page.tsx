@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNotifications } from '@/components/shared/NotificationSystem';
 import { Plus, Search, MoreVertical, Edit, Trash2, Phone, Mail, MapPin, Calendar, Grid3X3, List, Link2, Copy, User, Trash, FileText, CheckCircle, Clock, Loader2 } from 'lucide-react';
 import { PatientForm } from '@/components/patients/PatientForm';
+import { supabase } from '@/lib/supabase';
 import './pacientes.css';
 
 // Tipos locais para pacientes - apenas campos da tabela patients
@@ -189,28 +190,30 @@ export default function PatientsPage() {
     try {
       console.log('📤 Enviando dados do paciente:', patientData);
       
-      const response = await fetch('/api/patients', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify(patientData),
-      });
-
-      console.log('📥 Resposta recebida:', {
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('❌ Erro na resposta:', errorData);
-        throw new Error(errorData.error || `Erro ${response.status}: ${response.statusText}`);
+      // Buscar usuário autenticado
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user) {
+        throw new Error('Usuário não autenticado');
       }
 
-      const result = await response.json();
+      // Criar paciente no Supabase
+      const { data: result, error: insertError } = await supabase
+        .from('pacientes')
+        .insert({
+          ...patientData,
+          user_id: user.id,
+        })
+        .select()
+        .single();
+
+      console.log('📥 Resposta recebida:', { result, insertError });
+
+      if (insertError || !result) {
+        console.error('❌ Erro na resposta:', insertError);
+        throw new Error(insertError?.message || 'Erro ao criar paciente');
+      }
+
       console.log('✅ Paciente criado com sucesso:', result);
 
       setShowForm(false);
@@ -313,28 +316,53 @@ export default function PatientsPage() {
   const handleSendAnamneseEmail = async (patientId: string) => {
     setSendingAnamnese(patientId);
     try {
-      const response = await fetch('/api/anamnese-inicial', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          patient_id: patientId
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Erro ao enviar anamnese');
+      // Buscar usuário autenticado
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user) {
+        throw new Error('Usuário não autenticado');
       }
 
-      const result = await response.json();
-      showSuccess(
-        result.emailSent 
-          ? 'Anamnese enviada por email com sucesso!'
-          : 'Anamnese criada com sucesso!',
-        'Anamnese Enviada'
-      );
+      // Criar ou atualizar anamnese inicial no Supabase
+      const { data: existingAnamnese } = await supabase
+        .from('anamnese_inicial')
+        .select('*')
+        .eq('paciente_id', patientId)
+        .single();
+
+      let anamneseResult;
+      
+      if (existingAnamnese) {
+        // Atualizar existente
+        const { data, error } = await supabase
+          .from('anamnese_inicial')
+          .update({ 
+            status: 'PENDENTE',
+            updated_at: new Date().toISOString()
+          })
+          .eq('paciente_id', patientId)
+          .select()
+          .single();
+        
+        if (error) throw error;
+        anamneseResult = data;
+      } else {
+        // Criar nova
+        const { data, error } = await supabase
+          .from('anamnese_inicial')
+          .insert({
+            paciente_id: patientId,
+            user_id: user.id,
+            status: 'PENDENTE'
+          })
+          .select()
+          .single();
+        
+        if (error) throw error;
+        anamneseResult = data;
+      }
+
+      showSuccess('Anamnese criada com sucesso!', 'Anamnese Enviada');
       
       // Recarregar lista de pacientes para atualizar status
       fetchPatients(pagination.page, searchTerm, statusFilter, false);

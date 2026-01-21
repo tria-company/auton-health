@@ -17,6 +17,7 @@ import {
   BarChart3,
   PieChart
 } from 'lucide-react';
+import { gatewayClient } from '@/lib/gatewayClient';
 import './dashboard.css';
 import Chart3D from '../../../components/Chart3D';
 import BarChart3D from '../../../components/BarChart3D';
@@ -416,24 +417,32 @@ export default function DashboardPage() {
         setUpdatingPeriodData(true);
         
         // Construir parâmetros para o gráfico de Presencial/Telemedicina
-        let chartParams = '';
+        const queryParams: Record<string, string | number> = {
+          year: selectedYear,
+          period: selectedPeriod,
+        };
+        
         if (chartPeriodType === 'day') {
-          chartParams = `&chartPeriod=day&chartDate=${encodeURIComponent(chartSelectedDate)}`;
+          queryParams.chartPeriod = 'day';
+          queryParams.chartDate = chartSelectedDate;
         } else if (chartPeriodType === 'week') {
-          chartParams = `&chartPeriod=week&chartDate=${encodeURIComponent(chartSelectedDate)}`;
+          queryParams.chartPeriod = 'week';
+          queryParams.chartDate = chartSelectedDate;
         } else if (chartPeriodType === 'month') {
-          chartParams = `&chartPeriod=month&chartMonth=${encodeURIComponent(chartSelectedMonth)}`;
+          queryParams.chartPeriod = 'month';
+          queryParams.chartMonth = chartSelectedMonth;
         } else {
-          chartParams = `&chartPeriod=year&chartYear=${encodeURIComponent(chartSelectedYear)}`;
+          queryParams.chartPeriod = 'year';
+          queryParams.chartYear = chartSelectedYear;
         }
         
-        const response = await fetch(`/api/dashboard?year=${encodeURIComponent(selectedYear)}&period=${encodeURIComponent(selectedPeriod)}${chartParams}`);
+        const response = await gatewayClient.get('/dashboard', { queryParams });
         
-        if (!response.ok) {
-          throw new Error('Erro ao carregar dados do período');
+        if (!response.success) {
+          throw new Error(response.error || 'Erro ao carregar dados do período');
         }
         
-        const data = await response.json();
+        const data = response.data;
         
         // Atualizar apenas os dados que mudam com o período, mantendo o resto
         setDashboardData(prev => {
@@ -486,26 +495,34 @@ export default function DashboardPage() {
         isUpdatingChartRef.current = true;
         
         // Construir parâmetros para o gráfico de Presencial/Telemedicina
-        let chartParams = '';
+        const queryParams: Record<string, string | number> = {
+          year: selectedYear,
+          period: selectedPeriod,
+        };
+        
         if (chartPeriodType === 'day') {
-          chartParams = `&chartPeriod=day&chartDate=${encodeURIComponent(chartSelectedDate)}`;
+          queryParams.chartPeriod = 'day';
+          queryParams.chartDate = chartSelectedDate;
         } else if (chartPeriodType === 'week') {
-          chartParams = `&chartPeriod=week&chartDate=${encodeURIComponent(chartSelectedDate)}`;
+          queryParams.chartPeriod = 'week';
+          queryParams.chartDate = chartSelectedDate;
         } else if (chartPeriodType === 'month') {
-          chartParams = `&chartPeriod=month&chartMonth=${encodeURIComponent(chartSelectedMonth)}`;
+          queryParams.chartPeriod = 'month';
+          queryParams.chartMonth = chartSelectedMonth;
         } else {
-          chartParams = `&chartPeriod=year&chartYear=${encodeURIComponent(chartSelectedYear)}`;
+          queryParams.chartPeriod = 'year';
+          queryParams.chartYear = chartSelectedYear;
         }
         
-        console.log('📊 [CHART UPDATE] Buscando dados:', chartParams);
+        console.log('📊 [CHART UPDATE] Buscando dados:', queryParams);
         
-        const response = await fetch(`/api/dashboard?year=${encodeURIComponent(selectedYear)}&period=${encodeURIComponent(selectedPeriod)}${chartParams}`);
+        const response = await gatewayClient.get('/dashboard', { queryParams });
         
-        if (!response.ok) {
-          throw new Error('Erro ao carregar dados do gráfico');
+        if (!response.success) {
+          throw new Error(response.error || 'Erro ao carregar dados do gráfico');
         }
         
-        const data = await response.json();
+        const data = response.data;
         
         console.log('✅ [CHART UPDATE] Dados recebidos:', data.graficos?.consultasPorDia?.length || 0, 'dias');
         
@@ -540,25 +557,32 @@ export default function DashboardPage() {
       setError(null);
       
       // Construir parâmetros para o gráfico de Presencial/Telemedicina
-      let chartParams = '';
+      const queryParams: Record<string, string | number | boolean> = {
+        year: selectedYear,
+        period: selectedPeriod,
+      };
+      
       if (chartPeriodType === 'day') {
-        chartParams = `&chartPeriod=day&chartDate=${encodeURIComponent(chartSelectedDate)}`;
+        queryParams.chartPeriod = 'day';
+        queryParams.chartDate = chartSelectedDate;
       } else if (chartPeriodType === 'week') {
-        chartParams = `&chartPeriod=week&chartDate=${encodeURIComponent(chartSelectedDate)}`;
+        queryParams.chartPeriod = 'week';
+        queryParams.chartDate = chartSelectedDate;
       } else if (chartPeriodType === 'month') {
-        chartParams = `&chartPeriod=month&chartMonth=${encodeURIComponent(chartSelectedMonth)}`;
+        queryParams.chartPeriod = 'month';
+        queryParams.chartMonth = chartSelectedMonth;
       } else {
-        chartParams = `&chartPeriod=year&chartYear=${encodeURIComponent(chartSelectedYear)}`;
+        queryParams.chartPeriod = 'year';
+        queryParams.chartYear = chartSelectedYear;
       }
       
-      const response = await fetch(`/api/dashboard?year=${encodeURIComponent(selectedYear)}&period=${encodeURIComponent(selectedPeriod)}${chartParams}`);
+      const response = await gatewayClient.get('/dashboard', { queryParams });
       
-      if (!response.ok) {
-        throw new Error('Erro ao carregar dados do dashboard');
+      if (!response.success) {
+        throw new Error(response.error || 'Erro ao carregar dados do dashboard');
       }
       
-      const data = await response.json();
-      setDashboardData(data);
+      setDashboardData(response.data);
     } catch (err) {
       console.error('Erro ao carregar dashboard:', err);
       setError(err instanceof Error ? err.message : 'Erro ao carregar dados do dashboard');

@@ -248,30 +248,58 @@ export default function CadastrarPaciente() {
     setSendingAnamnese(true);
 
     try {
-      const response = await fetch('/api/anamnese-inicial', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          patient_id: patientId
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Erro ao enviar anamnese');
-      }
-
-      const result = await response.json();
+      // Buscar usuário autenticado
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
       
-      // Armazenar o link retornado
-      if (result.link) {
-        setAnamneseLink(result.link);
+      if (userError || !user) {
+        throw new Error('Usuário não autenticado');
       }
+
+      // Criar ou atualizar anamnese inicial no Supabase
+      const { data: existingAnamnese } = await supabase
+        .from('anamnese_inicial')
+        .select('*')
+        .eq('paciente_id', patientId)
+        .single();
+
+      let anamneseResult;
+      
+      if (existingAnamnese) {
+        // Atualizar existente
+        const { data, error } = await supabase
+          .from('anamnese_inicial')
+          .update({ 
+            status: 'PENDENTE',
+            updated_at: new Date().toISOString()
+          })
+          .eq('paciente_id', patientId)
+          .select()
+          .single();
+        
+        if (error) throw error;
+        anamneseResult = data;
+      } else {
+        // Criar nova
+        const { data, error } = await supabase
+          .from('anamnese_inicial')
+          .insert({
+            paciente_id: patientId,
+            user_id: user.id,
+            status: 'PENDENTE'
+          })
+          .select()
+          .single();
+        
+        if (error) throw error;
+        anamneseResult = data;
+      }
+
+      // Gerar link para anamnese
+      const anamneseLink = `${window.location.origin}/anamnese-inicial?pacienteId=${patientId}`;
+      setAnamneseLink(anamneseLink);
       
       // Buscar status da anamnese
-      if (result.anamnese?.status) {
+      if (anamneseResult?.status) {
         setAnamneseStatus(result.anamnese.status);
       }
       
@@ -404,26 +432,32 @@ export default function CadastrarPaciente() {
 
       console.log('Dados do paciente para envio:', patientData);
 
-      // Fazer a chamada para a API
-      const response = await fetch('/api/patients', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(patientData),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Erro ao cadastrar paciente');
+      // Buscar usuário autenticado
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user) {
+        throw new Error('Usuário não autenticado');
       }
 
-      const result = await response.json();
-      console.log('Paciente cadastrado com sucesso:', result);
+      // Criar paciente no Supabase
+      const { data: patient, error: insertError } = await supabase
+        .from('pacientes')
+        .insert({
+          ...patientData,
+          user_id: user.id,
+        })
+        .select()
+        .single();
+
+      if (insertError || !patient) {
+        throw new Error(insertError?.message || 'Erro ao cadastrar paciente');
+      }
+
+      console.log('Paciente cadastrado com sucesso:', patient);
       
       // Salvar ID do paciente para upload de avatar e permitir enviar anamnese
-      if (result.patient && result.patient.id) {
-        setPatientId(result.patient.id);
+      if (patient && patient.id) {
+        setPatientId(patient.id);
         // Buscar status da anamnese após criar paciente
         setTimeout(() => {
           fetchAnamneseStatus();

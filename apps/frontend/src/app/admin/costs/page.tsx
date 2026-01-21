@@ -103,22 +103,120 @@ export default function CostsMonitorPage() {
       setRefreshing(true);
       setError(null);
 
-      const response = await fetch(`/api/admin/costs?period=${period}`, {
-        cache: 'no-store',
-      });
+      // Calcular data de início baseado no período
+      const now = new Date();
+      const periodDays = period === '7d' ? 7 : period === '30d' ? 30 : 1;
+      const startDate = new Date(now);
+      startDate.setDate(startDate.getDate() - periodDays);
 
-      if (!response.ok) {
-        if (response.status === 401) {
-          router.push('/login');
-          return;
-        }
-        throw new Error('Erro ao buscar dados');
+      // Buscar registros de custos de IA
+      const { data: aiCosts, error: costsError } = await supabase
+        .from('ai_pricing_usage')
+        .select('*')
+        .gte('created_at', startDate.toISOString())
+        .order('created_at', { ascending: false });
+
+      if (costsError) {
+        throw new Error(costsError.message || 'Erro ao buscar custos');
       }
 
-      const data = await response.json();
-      setStats(data.stats);
-      setActiveConsultations(data.activeConsultations || []);
-      setActiveSessions(data.activeSessions || []);
+      // Buscar consultas ativas (RECORDING)
+      const { data: activeConsults, error: consultsError } = await supabase
+        .from('consultas')
+        .select(`
+          id,
+          status,
+          room_id,
+          created_at,
+          consulta_inicio,
+          pacientes!inner(name),
+          medicos(name, email)
+        `)
+        .eq('status', 'RECORDING')
+        .order('created_at', { ascending: false });
+
+      if (consultsError) {
+        throw new Error(consultsError.message || 'Erro ao buscar consultas ativas');
+      }
+
+      // Buscar sessões ativas
+      const { data: sessions, error: sessionsError } = await supabase
+        .from('call_sessions')
+        .select('*')
+        .in('status', ['ACTIVE', 'CONNECTING'])
+        .order('created_at', { ascending: false });
+
+      if (sessionsError) {
+        throw new Error(sessionsError.message || 'Erro ao buscar sessões ativas');
+      }
+
+      // Calcular estatísticas client-side
+      const costs = aiCosts || [];
+      const total = costs.reduce((sum, record) => sum + (record.cost_usd || 0), 0);
+      const totalTester = costs.filter(r => r.is_test).reduce((sum, r) => sum + (r.cost_usd || 0), 0);
+      const totalProduction = total - totalTester;
+
+      // Agrupar por modelo
+      const byModel: Record<string, { count: number; cost: number; tokens: number }> = {};
+      costs.forEach(record => {
+        const model = record.model || 'unknown';
+        if (!byModel[model]) {
+          byModel[model] = { count: 0, cost: 0, tokens: 0 };
+        }
+        byModel[model].count++;
+        byModel[model].cost += record.cost_usd || 0;
+        byModel[model].tokens += (record.input_tokens || 0) + (record.output_tokens || 0);
+      });
+
+      // Agrupar por etapa
+      const byEtapa: Record<string, { count: number; cost: number }> = {};
+      costs.forEach(record => {
+        const etapa = record.etapa || 'unknown';
+        if (!byEtapa[etapa]) {
+          byEtapa[etapa] = { count: 0, cost: 0 };
+        }
+        byEtapa[etapa].count++;
+        byEtapa[etapa].cost += record.cost_usd || 0;
+      });
+
+      // Agrupar por dia
+      const byDay: Record<string, { count: number; cost: number }> = {};
+      costs.forEach(record => {
+        const day = new Date(record.created_at).toISOString().split('T')[0];
+        if (!byDay[day]) {
+          byDay[day] = { count: 0, cost: 0 };
+        }
+        byDay[day].count++;
+        byDay[day].cost += record.cost_usd || 0;
+      });
+
+      // Agrupar por hora
+      const byHour: Record<string, { count: number; cost: number }> = {};
+      costs.forEach(record => {
+        const hour = new Date(record.created_at).getHours();
+        const hourKey = `${hour}:00`;
+        if (!byHour[hourKey]) {
+          byHour[hourKey] = { count: 0, cost: 0 };
+        }
+        byHour[hourKey].count++;
+        byHour[hourKey].cost += record.cost_usd || 0;
+      });
+
+      const statsData: CostStats = {
+        total,
+        totalTester,
+        totalProduction,
+        byModel,
+        byEtapa,
+        byDay,
+        byHour,
+        recentRecords: costs.slice(0, 10),
+        totalRecords: costs.length,
+      };
+
+      setStats(statsData);
+      setActiveConsultations(activeConsults || []);
+      setActiveSessions(sessions || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao carregar dados');
     } finally {
@@ -154,19 +252,35 @@ export default function CostsMonitorPage() {
     setSuccess(null);
 
     try {
-      const response = await fetch('/api/admin/costs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'force_close_consultation',
-          consultationId,
-        }),
-      });
+      // Atualizar status da consulta para COMPLETED (forçar encerramento)
+      const { error: updateError } = await supabase
+        .from('consultas')
+        .update({
+          status: 'COMPLETED',
+          consulta_fim: new Date().toISOString(),
+        })
+        .eq('id', consultationId);
 
-      const data = await response.json();
+      if (updateError) {
+        throw new Error(updateError.message || 'Erro ao fechar consulta');
+      }
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Erro ao fechar consulta');
+      // Buscar room_id para atualizar call_session
+      const { data: consulta } = await supabase
+        .from('consultas')
+        .select('room_id')
+        .eq('id', consultationId)
+        .single();
+
+      // Se houver room_id, atualizar call_session também
+      if (consulta?.room_id) {
+        await supabase
+          .from('call_sessions')
+          .update({
+            status: 'ENDED',
+            webrtc_active: false,
+          })
+          .eq('room_id', consulta.room_id);
       }
 
       setSuccess('Consulta encerrada com sucesso');
@@ -190,19 +304,53 @@ export default function CostsMonitorPage() {
     setSuccess(null);
 
     try {
-      const response = await fetch('/api/admin/costs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'close_all_recording' }),
-      });
+      // Buscar todas as consultas RECORDING
+      const { data: recordingConsultations, error: fetchError } = await supabase
+        .from('consultas')
+        .select('id, room_id')
+        .eq('status', 'RECORDING');
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Erro ao fechar consultas');
+      if (fetchError) {
+        throw new Error(fetchError.message || 'Erro ao buscar consultas');
       }
 
-      setSuccess(data.message);
+      const count = recordingConsultations?.length || 0;
+
+      if (count === 0) {
+        setSuccess('Nenhuma consulta em andamento para encerrar');
+        setClosingId(null);
+        return;
+      }
+
+      // Atualizar todas as consultas RECORDING para COMPLETED
+      const { error: updateError } = await supabase
+        .from('consultas')
+        .update({
+          status: 'COMPLETED',
+          consulta_fim: new Date().toISOString(),
+        })
+        .eq('status', 'RECORDING');
+
+      if (updateError) {
+        throw new Error(updateError.message || 'Erro ao fechar consultas');
+      }
+
+      // Atualizar todas as call_sessions ativas
+      const roomIds = recordingConsultations
+        ?.filter(c => c.room_id)
+        .map(c => c.room_id) || [];
+
+      if (roomIds.length > 0) {
+        await supabase
+          .from('call_sessions')
+          .update({
+            status: 'ENDED',
+            webrtc_active: false,
+          })
+          .in('room_id', roomIds);
+      }
+
+      setSuccess(`${count} consulta(s) encerrada(s) com sucesso`);
       fetchData();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao fechar consultas');

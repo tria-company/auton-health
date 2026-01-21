@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useNotifications } from '@/components/shared/NotificationSystem';
 import { FileText, Save, ArrowLeft } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 import './anamnese-inicial.css';
 
 interface AnamneseFormData {
@@ -169,23 +170,20 @@ function AnamneseInicialContent() {
         invertedFormData.frutas = frutasOptions.filter(item => !(formData.frutas || []).includes(item));
       }
 
-      const response = await fetch('/api/anamnese-inicial', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          paciente_id: pacienteId,
-          ...invertedFormData
-        }),
-      });
+      // Atualizar anamnese no Supabase
+      const { data: updatedAnamnese, error: updateError } = await supabase
+        .from('anamnese_inicial')
+        .update({
+          ...invertedFormData,
+          status: 'COMPLETADA'
+        })
+        .eq('paciente_id', pacienteId)
+        .select()
+        .single();
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        const errorMessage = errorData.details 
-          ? `${errorData.error || 'Erro ao salvar anamnese'}: ${errorData.details}`
-          : errorData.error || 'Erro ao salvar anamnese';
-        console.error('Erro completo da API:', errorData);
+      if (updateError || !updatedAnamnese) {
+        const errorMessage = updateError?.message || 'Erro ao salvar anamnese';
+        console.error('Erro ao atualizar anamnese:', updateError);
         throw new Error(errorMessage);
       }
 

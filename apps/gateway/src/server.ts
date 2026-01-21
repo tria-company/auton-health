@@ -129,6 +129,14 @@ app.use('/api/recordings', recordingsRoutes);
 app.use('/api', twilioRoutes);
 import clinicRoutes from './routes/clinic';
 app.use('/api/clinic', clinicRoutes);
+import dashboardRoutes from './routes/dashboard';
+app.use('/dashboard', dashboardRoutes);
+import consultationsRoutes from './routes/consultations';
+app.use('/consultations', consultationsRoutes);
+import patientsRoutes from './routes/patients';
+app.use('/patients', patientsRoutes);
+import cadastroAnamneseRoutes from './routes/cadastro-anamnese';
+app.use('/cadastro-anamnese', cadastroAnamneseRoutes);
 
 // Endpoint para estatísticas de WebSocket PCM
 app.get('/api/pcm-transcription/stats', (req, res) => {

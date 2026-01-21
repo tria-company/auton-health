@@ -10,6 +10,7 @@ import {
   Pill,
   Dumbbell
 } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 interface SolutionsData {
   ltb: any;
@@ -59,14 +60,28 @@ export default function SolutionsList({ consultaId, onBack, onSolutionSelect, so
   const fetchSolutions = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/solutions/${consultaId}`);
       
-      if (!response.ok) {
-        throw new Error('Erro ao buscar soluções');
-      }
+      // Buscar todas as soluções relacionadas à consulta via Supabase
+      const [ltbResult, mentalidadeResult, suplementacaoResult, habitosResult, alimentacaoResult, atividadeResult] = await Promise.all([
+        supabase.from('solucoes_ltb').select('*').eq('consulta_id', consultaId).single(),
+        supabase.from('solucoes_mentalidade').select('*').eq('consulta_id', consultaId).single(),
+        supabase.from('solucoes_suplementacao').select('*').eq('consulta_id', consultaId).single(),
+        supabase.from('solucoes_habitos_vida').select('*').eq('consulta_id', consultaId).single(),
+        supabase.from('alimentacao').select('*').eq('consulta_id', consultaId),
+        supabase.from('atividade_fisica').select('*').eq('consulta_id', consultaId)
+      ]);
 
-      const data = await response.json();
-      setSolutions(data.solutions);
+      // Montar objeto de soluções
+      const solutionsData: SolutionsData = {
+        ltb: ltbResult.data || null,
+        mentalidade: mentalidadeResult.data || null,
+        alimentacao: alimentacaoResult.data || [],
+        suplementacao: suplementacaoResult.data || null,
+        exercicios: atividadeResult.data || [],
+        habitos: habitosResult.data || null
+      };
+
+      setSolutions(solutionsData);
     } catch (err) {
       console.error('Erro ao buscar soluções:', err);
       setError('Erro ao carregar soluções');

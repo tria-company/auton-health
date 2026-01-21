@@ -24,45 +24,6 @@ const nextConfig = {
   
   // Variáveis NEXT_PUBLIC_ são automaticamente expostas ao cliente
   
-  // Headers para WebRTC e áudio
-  async headers() {
-    return [
-      {
-        source: '/(.*)',
-        headers: [
-          {
-            key: 'Cross-Origin-Embedder-Policy',
-            value: 'credentialless', // Mais permissivo para AudioWorklet
-          },
-          {
-            key: 'Cross-Origin-Opener-Policy',
-            value: 'same-origin',
-          },
-          // Headers específicos para AudioWorklet
-          {
-            key: 'Cross-Origin-Resource-Policy',
-            value: 'cross-origin',
-          },
-          // Priorizar carregamento de fontes
-          {
-            key: 'X-Content-Type-Options',
-            value: 'nosniff',
-          },
-        ],
-      },
-      // Headers específicos para fontes
-      {
-        source: '/_next/static/media/:path*',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
-          },
-        ],
-      },
-    ];
-  },
-
   // Configurações para audio worklets e WebRTC
   webpack: (config, { isServer }) => {
     // Alias "@" → "src" para garantir resolução consistente em build
@@ -93,51 +54,17 @@ const nextConfig = {
     return config;
   },
 
-  // Configurações de imagens
+  // Configurações de imagens (unoptimized para export estático)
   images: {
-    domains: ['localhost', 'your-domain.com', 'yzjlhezmvdkwdhibyvwh.supabase.co'],
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'yzjlhezmvdkwdhibyvwh.supabase.co',
-        port: '',
-        pathname: '/storage/v1/object/public/**',
-      },
-      {
-        protocol: 'https',
-        hostname: '*.supabase.co',
-        port: '',
-        pathname: '/storage/v1/object/public/**',
-      },
-    ],
-  },
-
-  // Redirects para compatibilidade
-  async redirects() {
-    return [
-      {
-        source: '/room/:path*',
-        destination: '/call/:path*',
-        permanent: true,
-      },
-    ];
-  },
-
-  // Rewrites para API
-  async rewrites() {
-    return [
-      {
-        source: '/api/gateway/:path*',
-        destination: `${process.env.GATEWAY_URL || 'http://localhost:3001'}/api/:path*`,
-      },
-    ];
+    unoptimized: true,
   },
 
   // Configurações de transpilação
   transpilePackages: [],
 
-  // Configurações de output
-  output: 'standalone',
+  // Configurações de output para export estático
+  output: 'export',
+  trailingSlash: true,
   
   // Configurações de compilação
   compiler: {

@@ -200,23 +200,31 @@ export async function createConsultation(consultationData: {
   patient_name: string;
 }) {
   try {
-    console.log('📝 Criando consulta via API...', consultationData);
+    console.log('📝 Criando consulta via Supabase...', consultationData);
     
-    const response = await fetch('/api/consultations', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(consultationData),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error('❌ Erro na API de consultas:', errorData);
-      throw new Error(errorData.error || 'Erro ao criar consulta');
+    // Buscar usuário autenticado
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    
+    if (userError || !user) {
+      console.error('❌ Usuário não autenticado');
+      throw new Error('Usuário não autenticado');
     }
 
-    const consultation = await response.json();
+    // Criar consulta no Supabase
+    const { data: consultation, error: insertError } = await supabase
+      .from('consultas')
+      .insert({
+        ...consultationData,
+        user_id: user.id,
+      })
+      .select()
+      .single();
+
+    if (insertError || !consultation) {
+      console.error('❌ Erro ao criar consulta:', insertError);
+      throw new Error(insertError?.message || 'Erro ao criar consulta');
+    }
+
     console.log('✅ Consulta criada com sucesso:', consultation.id);
     return consultation;
     

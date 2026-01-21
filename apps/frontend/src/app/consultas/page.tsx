@@ -14,6 +14,8 @@ import { StatusBadge, mapBackendStatus } from '../../components/StatusBadge';
 import ExamesUploadSection from '../../components/ExamesUploadSection';
 import SolutionsViewer from '../../components/solutions/SolutionsViewer';
 import { getWebhookEndpoints, getWebhookHeaders } from '@/lib/webhook-config';
+import { gatewayClient } from '@/lib/gatewayClient';
+import { supabase } from '@/lib/supabase';
 import './consultas.css';
 import '../../components/solutions/solutions.css';
 
@@ -151,20 +153,51 @@ async function fetchConsultations(
     params.append('date', dateFilter.date);
   }
 
-  const response = await fetch(`/api/consultations?${params}`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    cache: 'no-store',
+  const queryParams: Record<string, string | number | boolean> = {};
+  params.forEach((value, key) => {
+    queryParams[key] = value;
   });
+  
+  const response = await gatewayClient.get('/consultations', { queryParams });
 
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.error || 'Erro ao buscar consultas');
+  if (!response.success) {
+    throw new Error(response.error || 'Erro ao buscar consultas');
   }
 
-  return response.json();
+  return response;
+}
+
+// Função para buscar uma consulta específica
+async function fetchConsultationById(id: string): Promise<any> {
+  const response = await gatewayClient.get(`/consultations/${id}`);
+  
+  if (!response.success) {
+    throw new Error(response.error || 'Erro ao buscar consulta');
+  }
+  
+  return response;
+}
+
+// Função para atualizar uma consulta
+async function updateConsultationData(id: string, data: any): Promise<any> {
+  const response = await gatewayClient.patch(`/consultations/${id}`, data);
+  
+  if (!response.success) {
+    throw new Error(response.error || 'Erro ao atualizar consulta');
+  }
+  
+  return response;
+}
+
+// Função para deletar uma consulta
+async function deleteConsultationData(id: string): Promise<any> {
+  const response = await gatewayClient.delete(`/consultations/${id}`);
+  
+  if (!response.success) {
+    throw new Error(response.error || 'Erro ao deletar consulta');
+  }
+  
+  return response;
 }
 
 // Componente de Seção Colapsável
@@ -682,19 +715,23 @@ function AnamneseSection({
   const fetchSinteseAnalitica = async () => {
     try {
       setLoadingSintese(true);
-      const response = await fetch(`/api/sintese-analitica/${consultaId}`);
       
-      if (!response.ok) {
+      const { data: sintese, error } = await supabase
+        .from('sintese_analitica')
+        .select('*')
+        .eq('consulta_id', consultaId)
+        .single();
+      
+      if (error) {
         // Se não encontrar, retornar null (não é erro)
-        if (response.status === 404) {
+        if (error.code === 'PGRST116') {
           setSinteseAnalitica(null);
           return;
         }
-        throw new Error('Erro ao buscar síntese analítica');
+        throw error;
       }
       
-      const data = await response.json();
-      setSinteseAnalitica(data);
+      setSinteseAnalitica(sintese);
     } catch (err) {
       console.error('❌ Erro ao carregar síntese analítica:', err);
       setSinteseAnalitica(null);
@@ -1660,16 +1697,12 @@ function DiagnosticoSection({
       try {
         const webhookEndpoints = getWebhookEndpoints();
         
-        await fetch('/api/ai-edit', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            webhookUrl: webhookEndpoints.edicaoDiagnostico,
-            origem: 'MANUAL',
-            fieldPath, 
-            texto: newValue,
-            consultaId 
-          }),
+        await gatewayClient.post('/ai/edit', { 
+          webhookUrl: webhookEndpoints.edicaoDiagnostico,
+          origem: 'MANUAL',
+          fieldPath, 
+          texto: newValue,
+          consultaId 
         });
       } catch (webhookError) {
         console.warn('Aviso: Webhook não pôde ser notificado, mas dados foram salvos:', webhookError);
@@ -5071,33 +5104,27 @@ function ConsultasPageContent() {
       console.log('🔗 URL:', webhookUrl);
       
       // Faz requisição para nossa API interna (que chama o webhook)
-      console.log('📤 Fazendo requisição para /api/ai-edit...');
-      const response = await fetch('/api/ai-edit', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...requestBody,
-          webhookUrl: webhookUrl
-        }),
+      console.log('📤 Fazendo requisição para /ai/edit...');
+      const response = await gatewayClient.post('/ai/edit', {
+        ...requestBody,
+        webhookUrl: webhookUrl
       });
       
-      console.log('📥 Resposta recebida da API interna:', response.status);
+      console.log('📥 Resposta recebida do Gateway:', response);
 
-      console.log('Status da resposta:', response.status);
-      console.log('Response OK?', response.ok);
+      console.log('Success?', response.success);
       
-      const data = await response.json();
-      
-      if (!response.ok) {
-        console.error('Response not OK:', response.status, response.statusText);
+      if (!response.success) {
+        console.error('Response not OK:', response.error);
         // Se for erro 500, pode ser problema no webhook, mas ainda mostramos a resposta
-        if (data.warning) {
-          throw new Error(data.message || 'Webhook de IA não disponível');
+        if (response.warning) {
+          throw new Error(response.message || 'Webhook de IA não disponível');
         }
         throw new Error('Erro ao comunicar com a IA');
       }
+      
+      // O gatewayClient já parseia a resposta JSON automaticamente
+      const data = response;
       
       // A API retorna { success: true, result: "string_json" }
       // Precisamos extrair o result e fazer parse
@@ -5704,19 +5731,15 @@ function ConsultasPageContent() {
       
       // Notificar webhook via proxy (evita CORS)
       try {
-        await fetch('/api/webhook-proxy', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            endpoint: 'edicaoSolucao',
-            payload: {
-            origem: 'MANUAL',
-              fieldPath: 's_exercicios_fisicos',
-              texto: 'Múltiplas alterações salvas',
-            consultaId,
-            solucao_etapa: 'ATIVIDADE_FISICA'
-            }
-          }),
+        await gatewayClient.post('/webhook/proxy', { 
+          endpoint: 'edicaoSolucao',
+          payload: {
+          origem: 'MANUAL',
+            fieldPath: 's_exercicios_fisicos',
+            texto: 'Múltiplas alterações salvas',
+          consultaId,
+          solucao_etapa: 'ATIVIDADE_FISICA'
+          }
         });
       } catch (webhookError) {
         console.warn('Webhook não notificado:', webhookError);

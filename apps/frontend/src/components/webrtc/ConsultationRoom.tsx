@@ -17,6 +17,7 @@ import { NetworkWarning } from './NetworkWarning';
 import './webrtc-styles.css';
 
 import { getPatientNameById } from '@/lib/supabase';
+import { gatewayClient } from '@/lib/gatewayClient';
 import { Video, Mic, CheckCircle, Copy, Check, Brain, Sparkles, ChevronDown, ChevronUp, MoreVertical, Minimize2, Maximize2, Circle, Clock, Scale, Ruler, Droplet, User as UserIcon, FileText } from 'lucide-react';
 import Image from 'next/image';
 import { useRecording } from '@/hooks/useRecording';
@@ -427,23 +428,21 @@ export function ConsultationRoom({
         setLoadingPatientData(true);
         try {
           // Buscar dados básicos do paciente
-          const patientResponse = await fetch(`/api/patients/${patientId}`);
-          if (patientResponse.ok) {
-            const patientResult = await patientResponse.json();
-            setPatientData(patientResult.patient);
+          const patientResponse = await gatewayClient.get(`/patients/${patientId}`);
+          if (patientResponse.success) {
+            setPatientData(patientResponse.patient);
           }
 
           // Buscar dados do cadastro de anamnese (peso, altura, tipo sanguíneo)
           try {
-            const anamneseResponse = await fetch(`/api/cadastro-anamnese/${patientId}`);
-            if (anamneseResponse.ok) {
-              const anamneseResult = await anamneseResponse.json();
-              console.log('✅ ConsultationRoom: Dados da anamnese recebidos:', anamneseResult);
-              console.log('  - peso_atual:', anamneseResult?.peso_atual);
-              console.log('  - altura:', anamneseResult?.altura);
-              console.log('  - idade:', anamneseResult?.idade);
-              console.log('  - tipo_saguineo:', anamneseResult?.tipo_saguineo);
-              setPatientAnamnese(anamneseResult);
+            const anamneseResponse = await gatewayClient.get(`/cadastro-anamnese/${patientId}`);
+            if (anamneseResponse.success) {
+              console.log('✅ ConsultationRoom: Dados da anamnese recebidos:', anamneseResponse.cadastro);
+              console.log('  - peso_atual:', anamneseResponse.cadastro?.peso_atual);
+              console.log('  - altura:', anamneseResponse.cadastro?.altura);
+              console.log('  - idade:', anamneseResponse.cadastro?.idade);
+              console.log('  - tipo_saguineo:', anamneseResponse.cadastro?.tipo_saguineo);
+              setPatientAnamnese(anamneseResponse.cadastro);
             }
           } catch (err) {
             console.warn('⚠️ Não foi possível buscar cadastro de anamnese:', err);
@@ -3532,14 +3531,13 @@ export function ConsultationRoom({
   // Função para verificar o status da anamnese
   const checkAnamneseStatus = async (consultationId: string): Promise<boolean> => {
     try {
-      const response = await fetch(`/api/consultations/${consultationId}`);
-      if (!response.ok) {
+      const response = await gatewayClient.get(`/consultations/${consultationId}`);
+      if (!response.success) {
         console.error('Erro ao verificar status da consulta');
         return false;
       }
 
-      const data = await response.json();
-      const consultation = data.consultation;
+      const consultation = response;
 
       console.log('📊 Status da consulta:', consultation.status, '| Etapa:', consultation.etapa);
 
@@ -3654,10 +3652,9 @@ export function ConsultationRoom({
           // Se não está pronta, verificar se está em processamento e iniciar polling
           if (!isReady) {
             try {
-              const response = await fetch(`/api/consultations/${consultationId}`);
-              if (response.ok) {
-                const data = await response.json();
-                const consultation = data.consultation;
+              const response = await gatewayClient.get(`/consultations/${consultationId}`);
+              if (response.success) {
+                const consultation = response;
                 
                 // Se está em PROCESSING com etapa ANAMNESE, iniciar polling
                 if (consultation.status === 'PROCESSING' && consultation.etapa === 'ANAMNESE') {
@@ -4390,15 +4387,9 @@ export function ConsultationRoom({
                       throw new Error('Erro ao enviar transcrição para gerar anamnese');
                     }
 
-                    await fetch(`/api/consultations/${consultationId}`, {
-                      method: 'PATCH',
-                      headers: {
-                        'Content-Type': 'application/json',
-                      },
-                      body: JSON.stringify({
-                        status: 'PROCESSING',
-                        etapa: 'ANAMNESE'
-                      }),
+                    await gatewayClient.patch(`/consultations/${consultationId}`, {
+                      status: 'PROCESSING',
+                      etapa: 'ANAMNESE'
                     });
 
                     startAnamnesePolling(consultationId);
@@ -4617,15 +4608,9 @@ export function ConsultationRoom({
                     throw new Error('Erro ao enviar transcrição para gerar anamnese');
                   }
 
-                  await fetch(`/api/consultations/${consultationId}`, {
-                    method: 'PATCH',
-                    headers: {
-                      'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                      status: 'PROCESSING',
-                      etapa: 'ANAMNESE'
-                    }),
+                  await gatewayClient.patch(`/consultations/${consultationId}`, {
+                    status: 'PROCESSING',
+                    etapa: 'ANAMNESE'
                   });
 
                   // Iniciar polling para verificar quando anamnese estiver pronta

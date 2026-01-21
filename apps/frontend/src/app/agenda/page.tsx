@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ChevronLeft, ChevronRight, Calendar, Clock, User, Video, Plus, LogIn, RefreshCw, Check, X, Loader2, Pencil, Trash2 } from 'lucide-react';
+import { gatewayClient } from '@/lib/gatewayClient';
 import './agenda.css';
 
 interface ConsultationEvent {
@@ -103,10 +104,9 @@ export default function AgendaPage() {
   useEffect(() => {
     const loadGoogleCalendarStatus = async () => {
       try {
-        const res = await fetch('/api/auth/google-calendar/status');
-        if (res.ok) {
-          const data = await res.json();
-          setGoogleCalendarStatus(data);
+        const response = await gatewayClient.get('/auth/google-calendar/status');
+        if (response.success && response.data) {
+          setGoogleCalendarStatus(response.data);
         }
       } catch (error) {
         console.error('Erro ao carregar status do Google Calendar:', error);
@@ -135,8 +135,8 @@ export default function AgendaPage() {
     if (!confirm('Tem certeza que deseja desconectar o Google Calendar?')) return;
     
     try {
-      const res = await fetch('/api/auth/google-calendar/disconnect', { method: 'POST' });
-      if (res.ok) {
+      const response = await gatewayClient.post('/auth/google-calendar/disconnect');
+      if (response.success) {
         setGoogleCalendarStatus({ connected: false });
         setNotification({ type: 'success', message: 'Google Calendar desconectado.' });
       } else {

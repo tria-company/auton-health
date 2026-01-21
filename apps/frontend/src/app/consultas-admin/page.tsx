@@ -96,21 +96,48 @@ export default function ConsultasAdminPage() {
       setRefreshing(true);
       setError(null);
 
-      const response = await fetch('/api/consultas-admin', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        cache: 'no-store',
-      });
+      // Buscar consultas com status RECORDING (salas abertas/em andamento)
+      const { data: consultasData, error: consultasError } = await supabase
+        .from('consultas')
+        .select(`
+          *,
+          medicos!inner(
+            name,
+            email
+          ),
+          pacientes!inner(
+            name
+          ),
+          call_sessions!left(
+            status,
+            webrtc_active
+          )
+        `)
+        .eq('status', 'RECORDING')
+        .order('created_at', { ascending: false });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Erro ao buscar consultas');
+      if (consultasError) {
+        throw new Error(consultasError.message || 'Erro ao buscar consultas');
       }
 
-      const data: ConsultasResponse = await response.json();
-      setConsultas(data.consultations);
+      // Mapear dados para o formato esperado pelo componente
+      const consultations: ConsultaAdmin[] = (consultasData || []).map((c: any) => ({
+        id: c.id,
+        doctor_id: c.user_id,
+        patient_id: c.patient_id,
+        status: c.status,
+        consulta_inicio: c.consulta_inicio,
+        patient_name: c.pacientes?.name || 'Paciente desconhecido',
+        consultation_type: c.patient_type,
+        created_at: c.created_at,
+        medico_email: c.medicos?.email || null,
+        medico_name: c.medicos?.name || null,
+        room_id: c.room_id,
+        session_status: c.call_sessions?.[0]?.status || null,
+        webrtc_active: c.call_sessions?.[0]?.webrtc_active || false,
+      }));
+
+      setConsultas(consultations);
     } catch (err) {
       console.error('Erro ao buscar consultas:', err);
       setError(err instanceof Error ? err.message : 'Erro ao carregar consultas');
@@ -147,23 +174,28 @@ export default function ConsultasAdminPage() {
     setTerminateSuccess(null);
 
     try {
-      const response = await fetch('/api/consultas-admin', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'terminate',
-          roomId: consulta.room_id,
-          consultationId: consulta.id,
-          reason: 'Encerrado pelo administrador',
-        }),
-      });
+      // Atualizar status da consulta para COMPLETED (encerrada)
+      const { error: updateError } = await supabase
+        .from('consultas')
+        .update({
+          status: 'COMPLETED',
+          consulta_fim: new Date().toISOString(),
+        })
+        .eq('id', consulta.id);
 
-      const data = await response.json();
+      if (updateError) {
+        throw new Error(updateError.message || 'Erro ao encerrar chamada');
+      }
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Erro ao encerrar chamada');
+      // Se houver call_session associada, atualizar também
+      if (consulta.room_id) {
+        await supabase
+          .from('call_sessions')
+          .update({
+            status: 'ENDED',
+            webrtc_active: false,
+          })
+          .eq('room_id', consulta.room_id);
       }
 
       setTerminateSuccess(`Chamada encerrada com sucesso: ${consulta.room_id}`);

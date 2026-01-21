@@ -19,6 +19,7 @@ const envSchema = z.object({
   // Supabase
   SUPABASE_URL: z.string().min(1, 'SUPABASE_URL é obrigatório'),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1, 'SUPABASE_SERVICE_ROLE_KEY é obrigatório'),
+  SUPABASE_ANON_KEY: z.string().min(1, 'SUPABASE_ANON_KEY é obrigatório'),
 
   // Azure OpenAI (Primary)
   AZURE_OPENAI_ENDPOINT: z.string().min(1, 'AZURE_OPENAI_ENDPOINT é obrigatório'),

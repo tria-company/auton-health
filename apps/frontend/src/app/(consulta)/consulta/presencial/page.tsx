@@ -9,6 +9,7 @@ import { PresencialTranscription } from '@/components/presencial/PresencialTrans
 import { usePresencialAudioCapture } from '@/hooks/usePresencialAudioCapture';
 import { formatDuration } from '@/lib/audioUtils';
 import { ConfirmModal } from '@/components/modals/ConfirmModal';
+import { supabase } from '@/lib/supabase';
 
 interface Transcription {
   speaker: 'doctor' | 'patient';
@@ -244,10 +245,23 @@ function PresencialConsultationContent() {
     // Buscar nome do médico
     const loadDoctor = async () => {
       try {
-        const response = await fetch('/api/medico');
-        if (response.ok) {
-          const data = await response.json();
-          setDoctorName(data.medico?.name || 'Dr. Médico');
+        // Buscar usuário autenticado
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        
+        if (userError || !user) {
+          console.warn('Usuário não autenticado');
+          return;
+        }
+        
+        // Buscar dados do médico
+        const { data: medico, error: medicoError } = await supabase
+          .from('medicos')
+          .select('*')
+          .eq('user_auth', user.id)
+          .single();
+        
+        if (!medicoError && medico) {
+          setDoctorName(medico.name || 'Dr. Médico');
         }
       } catch (error) {
         console.error('Erro ao carregar médico:', error);

@@ -5,7 +5,7 @@ import { useNotifications } from '@/components/shared/NotificationSystem';
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
-import { getPatients } from '@/lib/supabase';
+import { getPatients, supabase } from '@/lib/supabase';
 import io, { Socket } from 'socket.io-client';
 
 interface Patient {
@@ -199,16 +199,30 @@ export function CreateConsultationRoom({
     const loadDoctorData = async () => {
       try {
         setLoadingDoctor(true);
-        const response = await fetch('/api/medico');
         
-        if (response.ok) {
-          const data = await response.json();
-          const doctorName = data.medico?.name || 'Dr. Médico';
-          setHostName(doctorName);
-          console.log('✅ Dados do médico carregados:', doctorName);
-        } else {
+        // Buscar usuário autenticado
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        
+        if (userError || !user) {
+          console.warn('⚠️ Usuário não autenticado');
+          setHostName('Dr. Médico');
+          return;
+        }
+        
+        // Buscar dados do médico
+        const { data: medico, error: medicoError } = await supabase
+          .from('medicos')
+          .select('*')
+          .eq('user_auth', user.id)
+          .single();
+        
+        if (medicoError || !medico) {
           console.warn('⚠️ Não foi possível carregar dados do médico');
           setHostName('Dr. Médico');
+        } else {
+          const doctorName = medico.name || 'Dr. Médico';
+          setHostName(doctorName);
+          console.log('✅ Dados do médico carregados:', doctorName);
         }
       } catch (error) {
         console.error('Erro ao carregar dados do médico:', error);
@@ -441,36 +455,43 @@ export function CreateConsultationRoom({
       // Gerar roomName automaticamente
       const roomName = `Consulta - ${selectedPatientData.name}`;
 
-      // ✅ AGENDAMENTO: Criar consulta via API sem Socket.IO
+      // ✅ AGENDAMENTO: Criar consulta via Supabase sem Socket.IO
       if (creationType === 'agendamento') {
         // Combinar data e hora para criar o timestamp
         const consultaInicio = new Date(`${scheduledDate}T${scheduledTime}`).toISOString();
         
-        const response = await fetch('/api/consultations', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
+        // Buscar usuário autenticado
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        
+        if (userError || !user) {
+          setIsCreatingRoom(false);
+          showError('Usuário não autenticado', 'Erro ao Criar');
+          return;
+        }
+
+        // Criar consulta no Supabase
+        const { data: consultation, error: insertError } = await supabase
+          .from('consultas')
+          .insert({
             patient_id: selectedPatient,
             patient_name: selectedPatientData.name,
             consultation_type: consultationType === 'online' ? 'TELEMEDICINA' : 'PRESENCIAL',
             status: 'AGENDAMENTO',
             consulta_inicio: consultaInicio,
-          }),
-        });
+            user_id: user.id,
+          })
+          .select()
+          .single();
 
         setIsCreatingRoom(false);
 
-        if (response.ok) {
-          const consultation = await response.json();
+        if (insertError || !consultation) {
+          showError('Erro ao criar agendamento: ' + (insertError?.message || 'Erro desconhecido'), 'Erro ao Criar');
+        } else {
           console.log('✅ Agendamento criado:', consultation);
           
           // Redirecionar para página de consultas
           router.push('/consultas');
-        } else {
-          const errorData = await response.json();
-          showError('Erro ao criar agendamento: ' + (errorData.error || 'Erro desconhecido'), 'Erro ao Criar');
         }
         return;
       }
@@ -487,28 +508,25 @@ export function CreateConsultationRoom({
           throw new Error('Usuário não autenticado');
         }
 
-        // Criar consulta presencial via API
-        const response = await fetch('/api/consultations', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
+        // Criar consulta presencial via Supabase
+        const { data: consultation, error: insertError } = await supabase
+          .from('consultas')
+          .insert({
             patient_id: selectedPatient,
             patient_name: selectedPatientData.name,
             consultation_type: 'PRESENCIAL',
             status: 'RECORDING',
-          }),
-        });
+            user_id: userAuth,
+          })
+          .select()
+          .single();
 
         setIsCreatingRoom(false);
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Erro ao criar consulta presencial');
+        if (insertError || !consultation) {
+          throw new Error(insertError?.message || 'Erro ao criar consulta presencial');
         }
 
-        const consultation = await response.json();
         console.log('✅ Consulta presencial criada:', consultation.id);
 
         // Redirecionar para página de consulta presencial

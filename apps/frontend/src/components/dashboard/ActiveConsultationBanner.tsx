@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { AlertCircle, Video, X, CheckCircle } from 'lucide-react';
 import { ConfirmModal } from '@/components/modals/ConfirmModal';
+import { supabase } from '@/lib/supabase';
 import './ActiveConsultationBanner.css';
 
 interface ActiveConsultation {
@@ -85,11 +86,11 @@ export function ActiveConsultationBanner() {
         setLoading(true);
       }
       
-      // Buscar apenas consultas com status RECORDING (sala aberta/gravando)
-      const response = await fetch('/api/consultations?status=RECORDING&limit=10');
+      // Verificar autenticação
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
       
-      // ✅ CORREÇÃO: Se erro 401, parar polling imediatamente
-      if (response.status === 401) {
+      // ✅ CORREÇÃO: Se erro de autenticação, parar polling imediatamente
+      if (userError || !user) {
         console.warn('⚠️ [ActiveConsultationBanner] Sessão expirada - parando polling');
         pollingActiveRef.current = false;
         if (intervalRef.current) clearInterval(intervalRef.current);
@@ -99,7 +100,32 @@ export function ActiveConsultationBanner() {
         return;
       }
       
-      if (!response.ok) {
+      // Buscar médico primeiro
+      const { data: medico, error: medicoError } = await supabase
+        .from('medicos')
+        .select('id')
+        .eq('user_auth', user.id)
+        .single();
+      
+      if (medicoError || !medico) {
+        pollingActiveRef.current = false;
+        if (intervalRef.current) clearInterval(intervalRef.current);
+        if (fastIntervalRef.current) clearInterval(fastIntervalRef.current);
+        setActiveConsultation(null);
+        setLoading(false);
+        return;
+      }
+      
+      // Buscar apenas consultas com status RECORDING (sala aberta/gravando)
+      const { data: consultations, error: queryError } = await supabase
+        .from('consultations')
+        .select('*')
+        .eq('status', 'RECORDING')
+        .eq('doctor_id', medico.id)
+        .order('created_at', { ascending: false })
+        .limit(10);
+      
+      if (queryError) {
         // ✅ Se já existe consulta ativa, não remover em caso de erro temporário
         if (!activeConsultationRef.current) {
           activeConsultationRef.current = null;
@@ -108,11 +134,9 @@ export function ActiveConsultationBanner() {
         setLoading(false);
         return;
       }
-
-      const data = await response.json();
       
       // Encontrar a primeira consulta com status RECORDING (sala em aberto)
-      const active = data.consultations?.find((c: ActiveConsultation) => 
+      const active = consultations?.find((c: ActiveConsultation) => 
         c.status === 'RECORDING'
       );
 

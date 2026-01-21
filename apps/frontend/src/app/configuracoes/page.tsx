@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { User, Mail, Phone, Stethoscope, CreditCard, Calendar, Hash, FileText } from 'lucide-react';
 import { AvatarUpload } from '@/components/shared/AvatarUpload';
 import { formatCPF, formatPhone, validateCPF, removeMask } from '@/lib/validations';
+import { supabase } from '@/lib/supabase';
 import './configuracoes.css';
 
 interface MedicoData {
@@ -57,25 +58,37 @@ export default function ConfiguracoesPage() {
   const fetchMedicoData = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/medico');
       
-      if (!response.ok) {
+      // Buscar usuário autenticado
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user) {
+        throw new Error('Usuário não autenticado');
+      }
+      
+      // Buscar dados do médico
+      const { data: medico, error: medicoError } = await supabase
+        .from('medicos')
+        .select('*')
+        .eq('user_auth', user.id)
+        .single();
+      
+      if (medicoError || !medico) {
         throw new Error('Erro ao carregar dados do médico');
       }
       
-      const data = await response.json();
-      setMedico(data.medico);
+      setMedico(medico);
       
       // Preencher formulário com dados existentes e aplicar máscaras
       setFormData({
-        name: data.medico.name || '',
-        email: data.medico.email || '',
-        phone: data.medico.phone ? formatPhone(data.medico.phone) : '',
-        specialty: data.medico.specialty || '',
-        crm: data.medico.crm || '',
-        cpf: data.medico.cpf ? formatCPF(data.medico.cpf) : '',
-        birth_date: data.medico.birth_date || '',
-        subscription_type: data.medico.subscription_type || 'FREE'
+        name: medico.name || '',
+        email: medico.email || '',
+        phone: medico.phone ? formatPhone(medico.phone) : '',
+        specialty: medico.specialty || '',
+        crm: medico.crm || '',
+        cpf: medico.cpf ? formatCPF(medico.cpf) : '',
+        birth_date: medico.birth_date || '',
+        subscription_type: medico.subscription_type || 'FREE'
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao carregar dados');
@@ -127,28 +140,33 @@ export default function ConfiguracoesPage() {
       setError(null);
       setSuccess(null);
 
-      // Remove máscaras antes de enviar para o servidor
+      // Buscar usuário autenticado
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user) {
+        throw new Error('Usuário não autenticado');
+      }
+
+      // Remove máscaras antes de enviar para o banco
       const dataToSend = {
         ...formData,
         phone: removeMask(formData.phone),
         cpf: removeMask(formData.cpf),
       };
 
-      const response = await fetch('/api/medico', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(dataToSend),
-      });
+      // Atualizar dados do médico no Supabase
+      const { data: updatedMedico, error: updateError } = await supabase
+        .from('medicos')
+        .update(dataToSend)
+        .eq('user_auth', user.id)
+        .select()
+        .single();
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Erro ao atualizar dados');
+      if (updateError || !updatedMedico) {
+        throw new Error(updateError?.message || 'Erro ao atualizar dados');
       }
 
-      const data = await response.json();
-      setMedico(data.medico);
+      setMedico(updatedMedico);
       setSuccess('Dados atualizados com sucesso!');
       
     } catch (err) {
