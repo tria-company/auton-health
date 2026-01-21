@@ -1,7 +1,7 @@
 {
   "version": 2,
   "name": "auton-health-frontend",
-  "buildCommand": "cd apps/frontend && npm install && npm run build",
+  "buildCommand": "bash build-frontend.sh",
   "outputDirectory": "apps/frontend/out",
   "installCommand": "npm install --legacy-peer-deps",
   "framework": null,
