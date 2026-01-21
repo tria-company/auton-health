@@ -1,0 +1,13 @@
+node_modules
+.next
+.git
+*.log
+.DS_Store
+apps/gateway
+apps/backend
+database
+docs
+scripts
+tools
+*.md
+!README.md
