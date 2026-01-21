@@ -17,21 +17,36 @@ Antes de fazer o deploy, você precisa configurar as seguintes variáveis de amb
 
 ### 2. Configure as Variáveis de Ambiente
 
-Na seção "Environment Variables", adicione:
+Na seção "Environment Variables", adicione **UMA POR UMA**:
 
-```env
-# Supabase
-NEXT_PUBLIC_SUPABASE_URL=https://yzjlhezmvdkwdhibyvwh.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=seu-anon-key-aqui
+#### Nome da Variável → Valor
 
-# Gateway Backend
-NEXT_PUBLIC_GATEWAY_URL=wss://seu-gateway.com
-NEXT_PUBLIC_GATEWAY_HTTP_URL=https://seu-gateway.com
+**1. NEXT_PUBLIC_SUPABASE_URL**
+```
+https://yzjlhezmvdkwdhibyvwh.supabase.co
 ```
 
-⚠️ **IMPORTANTE**: 
-- Substitua `seu-anon-key-aqui` pela sua chave do Supabase
-- Substitua `seu-gateway.com` pela URL do seu backend Gateway
+**2. NEXT_PUBLIC_SUPABASE_ANON_KEY**
+```
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl6amxoZXptdmRrd2RoaWJ5dndoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc1MjY2NTcsImV4cCI6MjA3MzEwMjY1N30.6k4ey41rv--Eawi55H_pacZgMrmM-SR--l2t88gV7z0
+```
+
+**3. NEXT_PUBLIC_GATEWAY_URL**
+```
+ws://localhost:3001
+```
+(⚠️ Altere para `wss://seu-gateway-producao.com` quando o gateway estiver em produção)
+
+**4. NEXT_PUBLIC_GATEWAY_HTTP_URL**
+```
+http://localhost:3001
+```
+(⚠️ Altere para `https://seu-gateway-producao.com` quando o gateway estiver em produção)
+
+#### Importante:
+- ✅ Clique em "Add" após cada variável
+- ✅ Selecione todos os ambientes: **Production**, **Preview**, **Development**
+- ⚠️ NÃO use sintaxe de secrets (@secret-name)
 
 ### 3. Configurações do Build
 
