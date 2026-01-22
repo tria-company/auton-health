@@ -77,6 +77,6 @@ steps:
       - "--min-instances=0"
       - "--concurrency=80"
       - "--timeout=300"
-      - "--startup-cpu-boost"
+      - "--cpu-boost"
       - "--cpu-throttling"
       - "--clear-secrets"
