@@ -50,8 +50,9 @@ COPY --from=builder /app/apps/gateway/package.json ./apps/gateway/package.json
 # EXPOSE 3001    # Removed - Cloud Run handles port exposure
 
 # Healthcheck hits the non-authenticated health endpoint
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD curl -fsS http://localhost:8080/api/health || exit 1
+# Uses PORT env var (defaults to 8080 if not set)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
+  CMD curl -fsS http://localhost:${PORT:-8080}/health || exit 1
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["node", "apps/gateway/dist/index.js"]

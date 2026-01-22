@@ -603,12 +603,10 @@ function AnamneseSection({
         }),
       });
 
-      if (!response.ok) {
-        throw new Error('Erro ao atualizar campo no Supabase');
-      }
+      if (!response.success) { throw new Error(response.error || "Erro na requisição"); }
 
       // Obter dados da resposta da API
-      const result = await response.json();
+      const result = response;
       console.log('📦 Dados retornados pela API:', result);
 
       // 2. Fazer requisição para o webhook
@@ -684,17 +682,17 @@ function AnamneseSection({
       
       // Buscar dados de todas as tabelas de anamnese
       console.log('🔍 Buscando anamnese para consulta_id:', consultaId);
-      const response = await fetch(`/api/anamnese/${consultaId}`);
+      const response = await gatewayClient.get(`/anamnese/${consultaId}`);
       
       console.log('📡 Status da resposta:', response.status);
       
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Erro desconhecido' }));
+      if (!response.success) {
+        const errorData = response(() => ({ error: 'Erro desconhecido' }));
         console.error('❌ Erro da API:', errorData);
         throw new Error(errorData.error || 'Erro ao carregar dados da anamnese');
       }
       
-      const data = await response.json();
+      const data = response;
       console.log('✅ Dados da anamnese recebidos:', data);
       console.log('🔍 Estrutura dos dados:', {
         type: typeof data,
@@ -773,9 +771,9 @@ function AnamneseSection({
       setLoadingCadastro(true);
       console.log('🔍 Buscando cadastro anamnese para paciente_id:', patientId);
       
-      const response = await fetch(`/api/cadastro-anamnese/${patientId}`);
+      const response = await gatewayClient.get(`/cadastro-anamnese/${patientId}`);
       
-      if (!response.ok) {
+      if (!response.success) {
         if (response.status === 404) {
           setCadastroAnamnese(null);
           return;
@@ -783,7 +781,7 @@ function AnamneseSection({
         throw new Error('Erro ao buscar cadastro de anamnese');
       }
       
-      const data = await response.json();
+      const data = response;
       console.log('✅ Dados do cadastro anamnese recebidos:', data);
       setCadastroAnamnese(data);
     } catch (err) {
@@ -810,11 +808,9 @@ function AnamneseSection({
         }),
       });
 
-      if (!response.ok) {
-        throw new Error('Erro ao atualizar campo do cadastro de anamnese');
-      }
+      if (!response.success) { throw new Error(response.error || "Erro na requisição"); }
 
-      const result = await response.json();
+      const result = response;
       console.log('✅ Campo do cadastro atualizado:', result);
 
       // Atualizar estado local
@@ -1655,10 +1651,10 @@ function DiagnosticoSection({
     try {
       setLoadingDetails(true);
       console.log('🔍 Carregando dados de diagnóstico para consulta:', consultaId);
-      const response = await fetch(`/api/diagnostico/${consultaId}`);
+      const response = await gatewayClient.get(`/diagnostico/${consultaId}`);
       console.log('📡 Response status:', response.status);
-      if (response.ok) {
-        const data = await response.json();
+      if (response.success) {
+        const data = response;
         console.log('✅ Dados de diagnóstico carregados:', data);
         console.log('🔍 Estrutura dos dados de diagnóstico:', {
           type: typeof data,
@@ -1691,7 +1687,7 @@ function DiagnosticoSection({
         }),
       });
 
-      if (!response.ok) throw new Error('Erro ao atualizar campo no Supabase');
+      if (!response.success) throw new Error('Erro ao atualizar campo no Supabase');
       
       // Depois, notificar o webhook (opcional, para processamento adicional)
       try {
@@ -2376,16 +2372,16 @@ function MentalidadeSection({
       
       console.log('🔍 [FRONTEND-LTV] Carregando dados de mentalidade para consulta:', consultaId);
       
-      const response = await fetch(`/api/solucao-mentalidade/${consultaId}`);
+      const response = await gatewayClient.get(`/solucao-mentalidade/${consultaId}`);
       
       console.log('📡 [FRONTEND-LTV] Response status:', response.status);
       
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Erro desconhecido' }));
+      if (!response.success) {
+        const errorData = response(() => ({ error: 'Erro desconhecido' }));
         throw new Error(errorData.error || 'Erro ao carregar dados de mentalidade');
       }
       
-      const data = await response.json();
+      const data = response;
       console.log('✅ [FRONTEND-LTV] Dados recebidos:', data);
       
       if (data.mentalidade_data) {
@@ -2597,9 +2593,7 @@ function MentalidadeSection({
         }),
       });
 
-      if (!response.ok) {
-        throw new Error('Erro ao atualizar campo no Supabase');
-      }
+      if (!response.success) { throw new Error(response.error || "Erro na requisição"); }
 
       // Recarregar dados após salvar
       await loadMentalidadeData();
@@ -2783,8 +2777,8 @@ function MentalidadeSection({
         }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Erro ao salvar' }));
+      if (!response.success) {
+        const errorData = response(() => ({ error: 'Erro ao salvar' }));
         throw new Error(errorData.error || 'Erro ao salvar alteração');
       }
 
@@ -3381,17 +3375,17 @@ function SuplemementacaoSection({
       
       console.log('🔍 Carregando dados de suplementação para consulta:', consultaId);
       
-      const response = await fetch(`/api/solucao-suplementacao/${consultaId}`);
+      const response = await gatewayClient.get(`/solucao-suplementacao/${consultaId}`);
       
       console.log('📡 Response status:', response.status, response.statusText);
       
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Erro desconhecido' }));
+      if (!response.success) {
+        const errorData = response(() => ({ error: 'Erro desconhecido' }));
         console.error('❌ Erro na resposta:', errorData);
         throw new Error(errorData.error || 'Erro ao carregar dados de suplementação');
       }
       
-      const data = await response.json();
+      const data = response;
       console.log('✅ Dados de suplementação recebidos:', data);
       console.log('📊 Estrutura suplementacao_data:', {
         hasData: !!data.suplementacao_data,
@@ -3511,7 +3505,7 @@ function SuplemementacaoSection({
                         value: newValue
                       }),
                     });
-                    if (response.ok) {
+                    if (response.success) {
                       await loadSuplementacaoData();
                     }
                   }} 
@@ -3533,7 +3527,7 @@ function SuplemementacaoSection({
                         value: newValue
                       }),
                     });
-                    if (response.ok) {
+                    if (response.success) {
                       await loadSuplementacaoData();
                     }
                   }} 
@@ -3555,7 +3549,7 @@ function SuplemementacaoSection({
                         value: newValue
                       }),
                     });
-                    if (response.ok) {
+                    if (response.success) {
                       await loadSuplementacaoData();
                     }
                   }} 
@@ -3577,7 +3571,7 @@ function SuplemementacaoSection({
                         value: newValue
                       }),
                     });
-                    if (response.ok) {
+                    if (response.success) {
                       await loadSuplementacaoData();
                     }
                   }} 
@@ -3599,7 +3593,7 @@ function SuplemementacaoSection({
                         value: newValue
                       }),
                     });
-                    if (response.ok) {
+                    if (response.success) {
                       await loadSuplementacaoData();
                     }
                   }} 
@@ -3621,7 +3615,7 @@ function SuplemementacaoSection({
                         value: newValue
                       }),
                     });
-                    if (response.ok) {
+                    if (response.success) {
                       await loadSuplementacaoData();
                     }
                   }} 
@@ -3679,12 +3673,12 @@ function AlimentacaoSection({
       setLoadingDetails(true);
       console.log('🔍 [FRONTEND] Carregando dados de alimentação para consulta:', consultaId);
       
-      const response = await fetch(`/api/alimentacao/${consultaId}`);
+      const response = await gatewayClient.get(`/alimentacao/${consultaId}`);
       
       console.log('📡 [FRONTEND] Response status:', response.status);
       
-      if (response.ok) {
-        const data = await response.json();
+      if (response.success) {
+        const data = response;
         console.log('✅ [FRONTEND] Dados recebidos:', data);
         console.log('📊 [FRONTEND] Estrutura alimentacao_data:', {
           cafe_da_manha: data.alimentacao_data?.cafe_da_manha?.length || 0,
@@ -3717,7 +3711,7 @@ function AlimentacaoSection({
         }),
       });
 
-      if (!response.ok) throw new Error('Erro ao atualizar campo no Supabase');
+      if (!response.success) throw new Error('Erro ao atualizar campo no Supabase');
       
       // Depois, notificar o webhook
       try {
@@ -3848,7 +3842,7 @@ function AlimentacaoSection({
                               kcal: item.kcal
                             }),
                           });
-                          if (response.ok) {
+                          if (response.success) {
                             await loadAlimentacaoData();
                           }
                         }} 
@@ -3872,7 +3866,7 @@ function AlimentacaoSection({
                               kcal: item.kcal
                             }),
                           });
-                          if (response.ok) {
+                          if (response.success) {
                             await loadAlimentacaoData();
                           }
                         }} 
@@ -3896,7 +3890,7 @@ function AlimentacaoSection({
                               kcal: item.kcal
                             }),
                           });
-                          if (response.ok) {
+                          if (response.success) {
                             await loadAlimentacaoData();
                           }
                         }} 
@@ -3920,7 +3914,7 @@ function AlimentacaoSection({
                               kcal: newValue
                             }),
                           });
-                          if (response.ok) {
+                          if (response.success) {
                             await loadAlimentacaoData();
                           }
                         }} 
@@ -4233,10 +4227,10 @@ function ConsultationDetailsOverview({
       try {
         setLoadingPatientData(true);
         console.log('🔍 ConsultationDetailsOverview: Buscando dados do paciente:', patientId);
-        const response = await fetch(`/api/cadastro-anamnese/${patientId}`);
+        const response = await gatewayClient.get(`/cadastro-anamnese/${patientId}`);
         
-        if (response.ok) {
-          const data = await response.json();
+        if (response.success) {
+          const data = response;
           console.log('✅ ConsultationDetailsOverview: Dados do paciente recebidos:', data);
           console.log('✅ ConsultationDetailsOverview: data_nascimento:', data?.data_nascimento);
           console.log('✅ ConsultationDetailsOverview: idade:', data?.idade);
@@ -4716,9 +4710,7 @@ function ConsultasPageContent() {
         }),
       });
 
-      if (!response.ok) {
-        throw new Error('Erro ao atualizar consulta');
-      }
+      if (!response.success) { throw new Error(response.error || "Erro na requisição"); }
 
       // Forçar mostrar a tela de seleção de soluções
       setForceShowSolutionSelection(true);
@@ -4766,9 +4758,7 @@ function ConsultasPageContent() {
         }),
       });
 
-      if (!response.ok) {
-        throw new Error('Erro ao navegar para solução anterior');
-      }
+      if (!response.success) { throw new Error(response.error || "Erro na requisição"); }
 
       await fetchConsultaDetails(consultaId);
     } catch (error) {
@@ -4808,9 +4798,7 @@ function ConsultasPageContent() {
         }),
       });
 
-      if (!response.ok) {
-        throw new Error('Erro ao navegar para próxima solução');
-      }
+      if (!response.success) { throw new Error(response.error || "Erro na requisição"); }
 
       await fetchConsultaDetails(consultaId);
     } catch (error) {
@@ -5018,12 +5006,12 @@ function ConsultasPageContent() {
   const checkAnamnesePreenchida = useCallback(async (patientId: string): Promise<boolean> => {
     try {
       console.log('🔍 Verificando anamnese para paciente:', patientId);
-      const response = await fetch(`/api/patients/${patientId}`);
-      if (!response.ok) {
+      const response = await gatewayClient.get(`/patients/${patientId}`);
+      if (!response.success) {
         console.error('❌ Erro ao buscar dados do paciente:', response.status);
         return false;
       }
-      const data = await response.json();
+      const data = response;
       const patient = data.patient || data;
       const isPreenchida = patient?.anamnese?.status === 'preenchida';
       console.log('📋 Status da anamnese:', {
@@ -5425,7 +5413,9 @@ function ConsultasPageContent() {
 
   // Carregar detalhes quando houver consulta_id na URL
   useEffect(() => {
+    console.log('🔄 useEffect consultaId mudou:', consultaId);
     if (consultaId) {
+      console.log('📥 Carregando detalhes da consulta:', consultaId);
       fetchConsultaDetails(consultaId);
       // Resetar o estado do visualizador de soluções quando mudar de consulta
       setShowSolutionsViewer(false);
@@ -5437,6 +5427,7 @@ function ConsultasPageContent() {
         setSelectedSection(null);
       }
     } else {
+      console.log('❌ Nenhuma consulta selecionada, limpando detalhes');
       setConsultaDetails(null);
       setSelectedSection(null);
     }
@@ -5550,9 +5541,7 @@ function ConsultasPageContent() {
 
       try {
         // Buscar dados diretamente da API (com cache busting para garantir dados frescos)
-        const response = await fetch(`/api/consultations/${consultaId}?t=${Date.now()}`, {
-          cache: 'no-store'
-        });
+        const response = await gatewayClient.get(`/consultations/${consultaId}?t=${Date.now()}`);
         
         // ✅ CORREÇÃO: Se erro 401 (não autenticado), parar polling imediatamente
         if (response.status === 401) {
@@ -5571,8 +5560,8 @@ function ConsultasPageContent() {
           return;
         }
         
-        if (response.ok) {
-          const data = await response.json();
+        if (response.success) {
+          const data = response;
           const newConsultation = data.consultation;
           
           if (!newConsultation) {
@@ -5647,18 +5636,18 @@ function ConsultasPageContent() {
       setLoadingAtividadeFisica(true);
       console.log('🔍 DEBUG [REFERENCIA] Iniciando carregamento de dados de atividade física para consulta:', consultaId);
       
-      const response = await fetch(`/api/atividade-fisica/${consultaId}`);
+      const response = await gatewayClient.get(`/atividade-fisica/${consultaId}`);
       console.log('🔍 DEBUG [REFERENCIA] Resposta da API:', response.status, response.statusText);
       
-      if (response.ok) {
-        const data = await response.json();
+      if (response.success) {
+        const data = response;
         console.log('🔍 DEBUG [REFERENCIA] Dados recebidos da API:', data);
         const exercicios = data.exercicios || [];
         console.log('🔍 DEBUG [REFERENCIA] Exercícios para setar:', exercicios.length, 'exercícios');
         setAtividadeFisicaData(exercicios);
         console.log('🔍 DEBUG [REFERENCIA] Estado atividadeFisicaData atualizado');
       } else {
-        const errorData = await response.json().catch(() => ({ error: 'Erro desconhecido' }));
+        const errorData = response(() => ({ error: 'Erro desconhecido' }));
         console.error('❌ Erro na resposta da API:', errorData);
       }
     } catch (error) {
@@ -5676,9 +5665,9 @@ function ConsultasPageContent() {
     }
 
     try {
-      const response = await fetch(`/api/lista-exercicios-fisicos?search=${encodeURIComponent(searchTerm)}`);
-      if (response.ok) {
-        const data = await response.json();
+      const response = await gatewayClient.get(`/lista-exercicios-fisicos?search=${encodeURIComponent(searchTerm)}`);
+      if (response.success) {
+        const data = response;
         setExercicioSuggestions(data.exercicios || []);
       } else {
         setExercicioSuggestions([]);
@@ -5725,7 +5714,7 @@ function ConsultasPageContent() {
         }),
       });
 
-          if (!response.ok) throw new Error(`Erro ao atualizar ${field}`);
+          if (!response.success) throw new Error(`Erro ao atualizar ${field}`);
         }
       }
       
@@ -5788,11 +5777,7 @@ function ConsultasPageContent() {
         }),
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ [handleSelectSolucao] Erro na resposta:', response.status, errorText);
-        throw new Error('Erro ao atualizar consulta');
-      }
+      if (!response.success) { throw new Error(response.error || "Erro na requisição"); }
 
       console.log('✅ [handleSelectSolucao] Consulta atualizada com sucesso');
 
@@ -5835,9 +5820,7 @@ function ConsultasPageContent() {
         }),
       });
 
-      if (!response.ok) {
-        throw new Error('Erro ao atualizar consulta');
-      }
+      if (!response.success) { throw new Error(response.error || "Erro na requisição"); }
 
       // Recarregar detalhes da consulta
       await fetchConsultaDetails(consultaId);
@@ -5856,14 +5839,12 @@ function ConsultasPageContent() {
       }
       setError(null);
       //console.log('🔍 Carregando detalhes da consulta:', id);
-      const response = await fetch(`/api/consultations/${id}`);
+      const response = await gatewayClient.get(`/consultations/${id}`);
       //console.log('📡 Response status:', response.status);
       
-      if (!response.ok) {
-        throw new Error('Erro ao carregar detalhes da consulta');
-      }
+      if (!response.success) { throw new Error(response.error || "Erro na requisição"); }
       
-      const data = await response.json();
+      const data = response;
       const newConsultation = data.consultation;
       
       // Logs para debug de consulta_inicio, consulta_fim e duration
@@ -5926,6 +5907,7 @@ function ConsultasPageContent() {
   };
 
   const handleConsultationClick = (consultation: Consultation) => {
+    console.log('🖱️ Clicando na consulta:', consultation.id);
     router.push(`/consultas?consulta_id=${consultation.id}`);
   };
 
@@ -5987,10 +5969,7 @@ function ConsultasPageContent() {
         })
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Erro ao atualizar agendamento');
-      }
+      if (!response.success) { throw new Error(response.error || "Erro na requisição"); }
 
       // Atualizar lista local
       setConsultations(prev => prev.map(c => {
@@ -6034,9 +6013,7 @@ function ConsultasPageContent() {
         },
       });
 
-      if (!response.ok) {
-        throw new Error('Erro ao excluir consulta');
-      }
+      if (!response.success) { throw new Error(response.error || "Erro na requisição"); }
 
       // Atualiza a lista removendo a consulta excluída
       setConsultations(prev => prev.filter(c => c.id !== consultationToDelete.id));
@@ -6097,9 +6074,7 @@ function ConsultasPageContent() {
         body: JSON.stringify(updateData),
       });
 
-      if (!response.ok) {
-        throw new Error('Erro ao atualizar consulta');
-      }
+      if (!response.success) { throw new Error(response.error || "Erro na requisição"); }
 
       // Disparar webhook apenas se precisar gerar (não se já existe)
       if (shouldGenerate) {
@@ -6211,9 +6186,7 @@ function ConsultasPageContent() {
         body: JSON.stringify(updateData),
       });
 
-      if (!response.ok) {
-        throw new Error('Erro ao atualizar consulta');
-      }
+      if (!response.success) { throw new Error(response.error || "Erro na requisição"); }
 
       // Disparar webhook apenas se precisar gerar (não se já existe)
       if (shouldGenerate) {
@@ -6276,9 +6249,7 @@ function ConsultasPageContent() {
         }),
       });
 
-      if (!response.ok) {
-        throw new Error('Erro ao atualizar consulta');
-      }
+      if (!response.success) { throw new Error(response.error || "Erro na requisição"); }
         
       // Recarrega os dados da consulta
       await fetchConsultaDetails(consultaId);
@@ -6308,9 +6279,7 @@ function ConsultasPageContent() {
         }),
       });
 
-      if (!response.ok) {
-        throw new Error('Erro ao atualizar consulta');
-      }
+      if (!response.success) { throw new Error(response.error || "Erro na requisição"); }
         
       // Recarrega os dados da consulta
       await fetchConsultaDetails(consultaId);
@@ -6340,9 +6309,7 @@ function ConsultasPageContent() {
         }),
       });
 
-      if (!response.ok) {
-        throw new Error('Erro ao atualizar consulta');
-      }
+      if (!response.success) { throw new Error(response.error || "Erro na requisição"); }
 
       // Recarrega os dados da consulta
       await fetchConsultaDetails(consultaId);

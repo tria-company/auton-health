@@ -153,10 +153,9 @@ export default function AgendaPage() {
     const load = async () => {
       const year = currentYear;
       const month = currentMonth + 1; // 1-12
-      const res = await fetch(`/api/agenda?year=${year}&month=${month}`);
-      if (!res.ok) return;
-      const json = await res.json();
-      const items = (json.items || []) as Array<{
+      const res = await gatewayClient.get(`/agenda?year=${year}&month=${month}`);
+      if (!res.success) return;
+      const items = (res.items || []) as Array<{
         id: string;
         patient: string;
         patient_id: string;
@@ -440,10 +439,7 @@ export default function AgendaPage() {
         })
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Erro ao atualizar consulta');
-      }
+      if (!response.success) { throw new Error(response.error || "Erro na requisição"); }
 
       // Atualizar lista local
       setConsultations(prev => prev.map(c => {
@@ -488,16 +484,12 @@ export default function AgendaPage() {
     try {
       console.log('Excluindo consulta:', consultationToDelete.id);
       
-      const response = await fetch(`/api/consultations/${consultationToDelete.id}`, {
-        method: 'DELETE'
-      });
+      const response = await gatewayClient.delete(`/consultations/${consultationToDelete.id}`);
 
-      const data = await response.json();
+      const data = response;
       console.log('Resposta da exclusão:', data);
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Erro ao excluir consulta');
-      }
+      if (!response.success) { throw new Error(response.error || "Erro na requisição"); }
 
       // Remover da lista local
       setConsultations(prev => prev.filter(c => c.id !== consultationToDelete.id));

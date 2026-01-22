@@ -53,7 +53,7 @@ export async function logAudit(params: AuditLogParams): Promise<void> {
       body: JSON.stringify(params),
     });
 
-    if (!response.ok) {
+    if (!response.success) {
       const errorText = await response.text().catch(() => 'Erro desconhecido');
       console.warn(`⚠️ [AUDIT] Erro ao registrar log (status ${response.status}):`, errorText);
     } else {

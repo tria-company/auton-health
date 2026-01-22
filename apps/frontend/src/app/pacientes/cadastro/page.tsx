@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { gatewayClient } from '@/lib/gatewayClient';
 import { useNotifications } from '@/components/shared/NotificationSystem';
 import { useRouter } from 'next/navigation';
 import { User, FileText, Shield, Calendar, Camera, Loader2, X, Copy, Check, Mail, CheckCircle, Clock } from 'lucide-react';
@@ -128,7 +129,7 @@ export default function CadastrarPaciente() {
     
     try {
       const response = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
-      const data = await response.json();
+      const data = response;
       
       if (!data.erro) {
         // Preenche automaticamente os campos de endereço
@@ -342,9 +343,9 @@ export default function CadastrarPaciente() {
     if (!patientId) return;
 
     try {
-      const response = await fetch(`/api/anamnese-inicial?patient_id=${patientId}`);
-      if (response.ok) {
-        const data = await response.json();
+      const response = await gatewayClient.get(`/anamnese-inicial?patient_id=${patientId}`);
+      if (response.success) {
+        const data = response;
         if (data.anamnese) {
           setAnamneseStatus(data.anamnese.status);
           

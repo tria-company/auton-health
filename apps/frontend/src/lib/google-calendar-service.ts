@@ -109,7 +109,7 @@ export async function refreshAccessTokenIfNeeded(
       }),
     });
 
-    if (!response.ok) {
+    if (!response.success) {
       const errorData = await response.text();
       console.error('[GoogleCalendar] Erro ao renovar token:', errorData);
       return null;
@@ -228,7 +228,7 @@ Tipo: ${consultation.consultation_type}`;
       }
     );
 
-    if (!response.ok) {
+    if (!response.success) {
       const errorData = await response.text();
       console.error('[GoogleCalendar] Erro ao criar evento:', errorData);
       return null;
@@ -305,7 +305,7 @@ Tipo: ${consultation.consultation_type}`;
       }
     );
 
-    if (!response.ok) {
+    if (!response.success) {
       const errorData = await response.text();
       console.error('[GoogleCalendar] Erro ao atualizar evento:', errorData);
       return false;

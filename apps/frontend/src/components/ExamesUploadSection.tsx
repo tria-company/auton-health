@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { gatewayClient } from '@/lib/gatewayClient';
 import { Upload, FileText, CheckCircle, AlertCircle, Loader2, Search, MoreHorizontal, Plus, FileCheck } from 'lucide-react';
 import FileUpload, { useFileUpload, UploadedFile } from './FileUpload';
 
@@ -45,13 +46,13 @@ export default function ExamesUploadSection({
     try {
       setLoading(true);
       console.log('🔍 Buscando exames para consulta:', consultaId);
-      const response = await fetch(`/api/exames/${consultaId}`);
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
+      const response = await gatewayClient.get(`/exames/${consultaId}`);
+      if (!response.success) {
+        const errorData = response(() => ({}));
         console.error('❌ Erro ao buscar exames:', response.status, errorData);
         throw new Error(errorData.error || 'Erro ao buscar exames');
       }
-      const data = await response.json();
+      const data = response;
       console.log('✅ Exames recebidos:', data);
       setExames(data.exames || []);
     } catch (error) {

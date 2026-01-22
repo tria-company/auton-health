@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { gatewayClient } from '@/lib/gatewayClient';
 import { Calendar as CalendarIcon, User, FileText, Clock, TrendingUp, TrendingDown, Loader2, X } from 'lucide-react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
@@ -129,9 +130,9 @@ export default function AdministracaoPage() {
       if (filtrarPorClinica) {
         params.append('filtrarPorClinica', 'true');
       }
-      const response = await fetch(`/api/admin/dashboard?${params.toString()}`);
-      if (!response.ok) throw new Error('Erro ao buscar dados');
-      const data = await response.json();
+      const response = await gatewayClient.get(`/admin/dashboard?${params.toString()}`);
+      if (!response.success) throw new Error('Erro ao buscar dados');
+      const data = response;
       setDashboardData(data);
     } catch (error) {
       console.error('Erro ao buscar dados do dashboard:', error);

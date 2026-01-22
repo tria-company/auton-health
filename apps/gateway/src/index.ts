@@ -8,7 +8,11 @@ dotenv.config();
 import { config } from './config';
 import { testDatabaseConnection } from './config/database';
 
-// Função para verificar conexão com banco
+// Importar o servidor configurado IMEDIATAMENTE
+// Isso garante que o servidor comece a escutar na porta o mais rápido possível
+import './server';
+
+// Função para verificar conexão com banco (executa APÓS o servidor iniciar)
 async function verifyDatabaseConnection() {
   console.log('🔍 [STARTUP] Verificando conexão com banco de dados...');
   console.log('🔍 [STARTUP] SUPABASE_URL:', config.SUPABASE_URL ? '✅ Configurado' : '❌ Não configurado');
@@ -25,13 +29,12 @@ async function verifyDatabaseConnection() {
   return isConnected;
 }
 
-// Verificar conexão (não bloquear startup)
-verifyDatabaseConnection().catch((error) => {
-  console.error('❌ [STARTUP] Erro ao verificar conexão:', error);
-});
-
-// Importar o servidor configurado
-import './server';
+// Verificar conexão APÓS importar o servidor (não bloqueia startup)
+setTimeout(() => {
+  verifyDatabaseConnection().catch((error) => {
+    console.error('❌ [STARTUP] Erro ao verificar conexão:', error);
+  });
+}, 1000); // Aguarda 1 segundo para servidor iniciar
 
 // Tratamento de erros não capturados
 process.on('unhandledRejection', (reason, promise) => {

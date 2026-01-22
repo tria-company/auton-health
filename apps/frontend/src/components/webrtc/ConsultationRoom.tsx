@@ -4383,7 +4383,7 @@ export function ConsultationRoom({
                       body: JSON.stringify(webhookData),
                     });
 
-                    if (!response.ok) {
+                    if (!response.success) {
                       throw new Error('Erro ao enviar transcrição para gerar anamnese');
                     }
 
@@ -4604,7 +4604,7 @@ export function ConsultationRoom({
                     body: JSON.stringify(webhookData),
                   });
 
-                  if (!response.ok) {
+                  if (!response.success) {
                     throw new Error('Erro ao enviar transcrição para gerar anamnese');
                   }
 

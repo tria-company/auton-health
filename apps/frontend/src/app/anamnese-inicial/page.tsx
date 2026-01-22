@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
+import { gatewayClient } from '@/lib/gatewayClient';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useNotifications } from '@/components/shared/NotificationSystem';
 import { FileText, Save, ArrowLeft } from 'lucide-react';
@@ -67,11 +68,9 @@ function AnamneseInicialContent() {
 
   const fetchAnamnese = async () => {
     try {
-      const response = await fetch(`/api/anamnese-inicial?patient_id=${pacienteId}`);
-      if (!response.ok) {
-        throw new Error('Erro ao carregar anamnese');
-      }
-      const data = await response.json();
+      const response = await gatewayClient.get(`/anamnese-inicial?patient_id=${pacienteId}`);
+      if (!response.success) { throw new Error(response.error || "Erro na requisição"); }
+      const data = response;
       if (data.anamnese) {
         // Inverter a lógica ao carregar: se no banco está o que DESEJA,
         // na interface mostramos o que NÃO DESEJA (inverso)

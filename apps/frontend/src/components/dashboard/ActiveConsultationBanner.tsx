@@ -2,6 +2,7 @@
 
 import { useNotifications } from '@/components/shared/NotificationSystem';
 import { useState, useEffect, useRef } from 'react';
+import { gatewayClient } from '@/lib/gatewayClient';
 import { useRouter } from 'next/navigation';
 import { AlertCircle, Video, X, CheckCircle } from 'lucide-react';
 import { ConfirmModal } from '@/components/modals/ConfirmModal';
@@ -172,15 +173,15 @@ export function ActiveConsultationBanner() {
 
     try {
       // Buscar detalhes da consulta para obter roomId
-      const response = await fetch(`/api/consultations/${activeConsultation.id}`);
+      const response = await gatewayClient.get(`/consultations/${activeConsultation.id}`);
       
-      if (!response.ok) {
+      if (!response.success) {
         // Se não conseguir buscar, navegar para página de consultas
         router.push(`/consultas?consulta_id=${activeConsultation.id}`);
         return;
       }
 
-      const data = await response.json();
+      const data = response;
       const consultation = data.consultation;
       
       // Se tiver roomId, navegar diretamente para a sala
@@ -235,9 +236,7 @@ export function ActiveConsultationBanner() {
         }),
       });
 
-      if (!response.ok) {
-        throw new Error('Erro ao finalizar consulta');
-      }
+      if (!response.success) { throw new Error(response.error || "Erro na requisição"); }
 
       // Remover o banner
       activeConsultationRef.current = null;

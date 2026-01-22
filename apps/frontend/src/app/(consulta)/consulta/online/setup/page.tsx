@@ -103,7 +103,7 @@ function SetupInner() {
         }),
       });
 
-      if (!response.ok) {
+      if (!response.success) {
         throw new Error('Falha ao criar sessão online');
       }
 

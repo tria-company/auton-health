@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, Suspense } from 'react';
+import { gatewayClient } from '@/lib/gatewayClient';
 import { useRouter, useSearchParams } from 'next/navigation';
 import io, { Socket } from 'socket.io-client';
 import { AlertCircle, CheckCircle, XCircle, Radio, AlertTriangle, ArrowLeft } from 'lucide-react';
@@ -230,9 +231,9 @@ function PresencialConsultationContent() {
       if (!consultationId) return;
 
       try {
-        const response = await fetch(`/api/consultations/${consultationId}`);
-        if (response.ok) {
-          const data = await response.json();
+        const response = await gatewayClient.get(`/consultations/${consultationId}`);
+        if (response.success) {
+          const data = response;
           setPatientName(data.consultation.patient_name);
         }
       } catch (error) {

@@ -5,6 +5,7 @@ import { useNotifications } from '@/components/shared/NotificationSystem';
 import { Plus, Search, MoreVertical, Edit, Trash2, Phone, Mail, MapPin, Calendar, Grid3X3, List, Link2, Copy, User, Trash, FileText, CheckCircle, Clock, Loader2 } from 'lucide-react';
 import { PatientForm } from '@/components/patients/PatientForm';
 import { supabase } from '@/lib/supabase';
+import { gatewayClient } from '@/lib/gatewayClient';
 import './pacientes.css';
 
 // Tipos locais para pacientes - apenas campos da tabela patients
@@ -100,19 +101,10 @@ export default function PatientsPage() {
       if (search) params.append('search', search);
       if (status !== 'all') params.append('status', status);
 
-      console.log('🔍 Buscando pacientes...', `/api/patients?${params}`);
+      console.log('🔍 Buscando pacientes...', `/patients?${params}`);
 
-      const response = await fetch(`/api/patients?${params}`, {
-        credentials: 'include',
-      });
+      const data = await gatewayClient.get<PatientsResponse>(`/patients?${params}`);
       
-      console.log('📡 Resposta da API:', response.status, response.statusText);
-      
-      if (!response.ok) {
-        throw new Error('Erro ao buscar pacientes');
-      }
-
-      const data: PatientsResponse = await response.json();
       console.log('📋 Dados recebidos:', data);
       console.log('👤 Primeiro paciente (exemplo):', data.patients[0]);
       setPatients(data.patients);
@@ -233,17 +225,10 @@ export default function PatientsPage() {
     if (!editingPatient) return;
 
     try {
-      const response = await fetch(`/api/patients/${editingPatient.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify(patientData),
-      });
+      const response = await gatewayClient.put(`/patients/${editingPatient.id}`, patientData);
 
-      if (!response.ok) {
-        throw new Error('Erro ao atualizar paciente');
+      if (!response.success) {
+        throw new Error(response.error || 'Erro ao atualizar paciente');
       }
 
       setEditingPatient(null);
@@ -260,13 +245,10 @@ export default function PatientsPage() {
     }
 
     try {
-      const response = await fetch(`/api/patients/${patientId}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
+      const response = await gatewayClient.delete(`/patients/${patientId}`);
 
-      if (!response.ok) {
-        throw new Error('Erro ao deletar paciente');
+      if (!response.success) {
+        throw new Error(response.error || 'Erro ao deletar paciente');
       }
 
       fetchPatients(pagination.page, searchTerm, statusFilter, false);
@@ -377,13 +359,10 @@ export default function PatientsPage() {
   // Confirmar exclusão de paciente
   const handleConfirmDelete = async (patientId: string) => {
     try {
-      const response = await fetch(`/api/patients/${patientId}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
+      const response = await gatewayClient.delete(`/patients/${patientId}`);
 
-      if (!response.ok) {
-        throw new Error('Erro ao deletar paciente');
+      if (!response.success) {
+        throw new Error(response.error || 'Erro ao deletar paciente');
       }
 
       setShowDeleteConfirm(null);

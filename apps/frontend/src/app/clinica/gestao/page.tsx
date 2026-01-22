@@ -106,7 +106,7 @@ export default function ClinicManagementPage() {
 
             const data = await response.json();
 
-            if (!response.ok) {
+            if (!response.success) {
                 // Handle different error formats (string, array of Zod errors, or object)
                 let errorMessage = 'Erro ao cadastrar médico';
                 if (typeof data.error === 'string') {

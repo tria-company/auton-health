@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { gatewayClient } from '@/lib/gatewayClient';
 import { X, Calendar, Clock, User, Phone, Video, Mic, FileText, Stethoscope, Pill, Download, Play } from 'lucide-react';
 
 interface Consultation {
@@ -93,13 +94,11 @@ export function ConsultaModal({ consulta, isOpen, onClose }: ConsultaModalProps)
   const fetchConsultaDetails = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/consultations/${consulta.id}`);
+      const response = await gatewayClient.get(`/consultations/${consulta.id}`);
       
-      if (!response.ok) {
-        throw new Error('Erro ao carregar detalhes da consulta');
-      }
+      if (!response.success) { throw new Error(response.error || "Erro na requisição"); }
       
-      const data = await response.json();
+      const data = response;
       setConsultaDetails(data.consultation);
     } catch (err) {
       console.error('Erro ao carregar detalhes:', err);
