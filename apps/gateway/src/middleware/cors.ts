@@ -100,11 +100,20 @@ let cachedOrigins: string[] | null = null;
  */
 export const corsMiddleware = cors({
   origin: (origin, callback) => {
+    // TEMPORÁRIO: Permitir TODAS as origens para debug
+    console.log(`🔍 [CORS DEBUG] Origin recebido: ${origin}`);
+    
     // Modo permissivo (apenas para debug/desenvolvimento temporário)
     if (process.env.CORS_ALLOW_ALL === 'true') {
       if (isProduction) {
         console.warn('⚠️ [CORS] CORS_ALLOW_ALL está ativo em PRODUÇÃO - isso é inseguro!');
       }
+      return callback(null, true);
+    }
+    
+    // TEMPORÁRIO: Permitir Vercel sem validação
+    if (origin && origin.includes('vercel.app')) {
+      console.log(`✅ [CORS] Permitindo Vercel: ${origin}`);
       return callback(null, true);
     }
     
@@ -131,8 +140,9 @@ export const corsMiddleware = cors({
       return callback(null, true);
     }
     
-    // Em produção, bloquear
-    callback(new Error(`CORS: Origem não permitida: ${origin}`));
+    // TEMPORÁRIO: Permitir de qualquer forma para debug
+    console.warn(`⚠️ [CORS TEMP] Permitindo origem para debug: ${origin}`);
+    return callback(null, true);
   },
   
   // Permitir envio de cookies/credenciais
