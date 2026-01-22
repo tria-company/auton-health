@@ -19,8 +19,10 @@ function getAllowedOrigins(): string[] {
   
   // Origens de produção padrão
   const defaultProdOrigins = [
+    'https://auton-health-frontend.vercel.app',
     'https://medcall-ai-frontend-v2.vercel.app',
-    'https://medcall-ai-homolog.vercel.app'
+    'https://medcall-ai-homolog.vercel.app',
+    '*.vercel.app' // Permitir qualquer subdomínio Vercel
   ];
   
   const origins: string[] = [];
