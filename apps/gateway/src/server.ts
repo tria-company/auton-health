@@ -255,7 +255,7 @@ app.use('*', (req, res) => {
   });
 });
 
-const PORT = process.env.PORT || 3001;
+const PORT = parseInt(process.env.PORT || '3001', 10);
 
 // Configurar upgrade para WebSocket PCM com debug detalhado
 
