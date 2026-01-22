@@ -282,8 +282,10 @@ httpServer.on('upgrade', (request, socket, head) => {
   }
 });
 
-httpServer.listen(PORT, () => {
-  console.log('🚀 MedCall Gateway Server Started\n\n');
+httpServer.listen(PORT, '0.0.0.0', () => {
+  console.log('🚀 MedCall Gateway Server Started');
+  console.log(`📡 Listening on port ${PORT}`);
+  console.log(`🌐 Ready to accept connections from Cloud Run\n`);
 });
 
 // Tratamento de sinais de encerramento
