@@ -1,10 +1,10 @@
 {
   "version": 2,
   "name": "auton-health-frontend",
-  "buildCommand": "npm run build:vercel",
-  "outputDirectory": "apps/frontend/out",
-  "installCommand": "npm install --legacy-peer-deps",
-  "framework": null,
+  "buildCommand": "npm install && npm run build",
+  "outputDirectory": "out",
+  "installCommand": "npm install",
+  "framework": "nextjs",
   "public": false,
   "regions": ["gru1"],
   "headers": [

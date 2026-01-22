@@ -1,5 +1,29 @@
 # 🚀 Deploy do Auton Health na Vercel
 
+## ⚠️ IMPORTANTE: Configuração de Monorepo
+
+Como este projeto usa monorepo (estrutura `apps/frontend`), você **DEVE** configurar o **Root Directory** na Vercel:
+
+### 📍 Como Configurar o Root Directory:
+
+**Durante a importação do projeto:**
+1. Na tela de importação, procure a opção **"Root Directory"**
+2. Clique em **"Edit"**
+3. Digite: `apps/frontend`
+4. Clique em **"Continue"**
+
+**Ou após criar o projeto:**
+1. Vá em **Settings** → **General**
+2. Encontre a seção **Root Directory**
+3. Clique em **Edit**
+4. Digite: `apps/frontend`
+5. Clique em **Save**
+6. Faça um **Redeploy**
+
+**⚠️ Sem essa configuração, o build falhará!**
+
+---
+
 ## 📋 Pré-requisitos
 
 - Conta na Vercel (https://vercel.com)
