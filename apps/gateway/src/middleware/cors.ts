@@ -75,8 +75,10 @@ function isOriginAllowed(origin: string | undefined, allowedOrigins: string[]): 
   // Verificar padrões com wildcard (ex: *.vercel.app)
   for (const allowed of allowedOrigins) {
     if (allowed.startsWith('*.')) {
-      const domain = allowed.slice(2);
-      if (origin.endsWith(domain) || origin.endsWith('.' + domain)) {
+      const domain = allowed.slice(2); // Remove '*.' → 'vercel.app'
+      // Remover protocolo da origin para comparação
+      const originWithoutProtocol = origin.replace(/^https?:\/\//, '');
+      if (originWithoutProtocol.endsWith(domain) || originWithoutProtocol.endsWith('.' + domain)) {
         return true;
       }
     }
@@ -115,11 +117,13 @@ export const corsMiddleware = cors({
     const allowed = isOriginAllowed(origin, cachedOrigins);
     
     if (allowed) {
+      console.log(`✅ [CORS] Origem permitida: ${origin}`);
       return callback(null, true);
     }
     
     // Log de origem bloqueada
     console.warn(`🚫 [CORS] Origem bloqueada: ${origin}`);
+    console.warn(`🚫 [CORS] Origens permitidas:`, cachedOrigins);
     
     // Em desenvolvimento, ser mais permissivo e apenas logar
     if (isDevelopment) {
