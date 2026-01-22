@@ -11,6 +11,7 @@
     "dev": "npm run dev --workspaces --if-present",
     "dev:all": "concurrently -n GATEWAY,FRONTEND -c magenta,cyan \"npm run dev --workspace=apps/gateway\" \"npm run dev --workspace=apps/frontend\"",
     "build": "npm run build --workspaces --if-present",
+    "build:vercel": "cd apps/frontend && npm install && npm run build",
     "test": "npm run test --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "clean": "npm run clean --workspaces --if-present && rm -rf node_modules",

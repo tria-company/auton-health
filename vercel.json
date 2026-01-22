@@ -1,7 +1,7 @@
 {
   "version": 2,
   "name": "auton-health-frontend",
-  "buildCommand": "bash build-frontend.sh",
+  "buildCommand": "npm run build:vercel",
   "outputDirectory": "apps/frontend/out",
   "installCommand": "npm install --legacy-peer-deps",
   "framework": null,
