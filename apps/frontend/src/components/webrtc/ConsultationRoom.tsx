@@ -480,7 +480,7 @@ export function ConsultationRoom({
 
         const script = document.createElement('script');
 
-        script.src = `${process.env.NEXT_PUBLIC_GATEWAY_HTTP_URL || 'http://localhost:3001'}/socket.io/socket.io.js`;
+        script.src = `${(process.env.NEXT_PUBLIC_REALTIME_WS_URL || 'ws://localhost:3002').replace(/^ws/, 'http')}/socket.io/socket.io.js`;
 
         script.onload = () => {
 
@@ -859,7 +859,7 @@ export function ConsultationRoom({
       const tempUserName = userName || localStorage.getItem('userName') || 'Anônimo';
 
       socketRef.current = (window as any).io.connect(
-        process.env.NEXT_PUBLIC_GATEWAY_HTTP_URL || 'http://localhost:3001',
+        process.env.NEXT_PUBLIC_REALTIME_WS_URL || 'ws://localhost:3002',
         {
           auth: {
             userName: tempUserName,
@@ -915,7 +915,7 @@ export function ConsultationRoom({
 
       socketRef.current = window.io.connect(
 
-        process.env.NEXT_PUBLIC_GATEWAY_HTTP_URL || 'http://localhost:3001',
+        process.env.NEXT_PUBLIC_REALTIME_WS_URL || 'ws://localhost:3002',
 
         {
 
@@ -3549,7 +3549,7 @@ export function ConsultationRoom({
         setAnamneseReady(true);
         return true;
       }
-      
+
       // Se está em PROCESSING e etapa=ANAMNESE, significa que está sendo gerada
       if (consultation.status === 'PROCESSING' && consultation.etapa === 'ANAMNESE') {
         console.log('⏳ Anamnese ainda está sendo gerada... Status: PROCESSING');
@@ -3590,7 +3590,7 @@ export function ConsultationRoom({
 
     anamnesePollingRef.current = setInterval(async () => {
       const isReady = await checkAnamneseStatus(consultationId);
-      
+
       if (isReady) {
         // Anamnese está pronta, parar polling
         if (anamnesePollingRef.current) {
@@ -3637,7 +3637,7 @@ export function ConsultationRoom({
 
       try {
         const { supabase } = await import('@/lib/supabase');
-        
+
         // Tentar obter consultationId da call_sessions
         const { data: callSession } = await supabase
           .from('call_sessions')
@@ -3648,14 +3648,14 @@ export function ConsultationRoom({
         if (callSession?.consultation_id) {
           const consultationId = callSession.consultation_id;
           const isReady = await checkAnamneseStatus(consultationId);
-          
+
           // Se não está pronta, verificar se está em processamento e iniciar polling
           if (!isReady) {
             try {
               const response = await gatewayClient.get(`/consultations/${consultationId}`);
               if (response.success) {
                 const consultation = response;
-                
+
                 // Se está em PROCESSING com etapa ANAMNESE, iniciar polling
                 if (consultation.status === 'PROCESSING' && consultation.etapa === 'ANAMNESE') {
                   setIsGeneratingAnamnese(true);
@@ -3674,7 +3674,7 @@ export function ConsultationRoom({
 
     // Aguardar um pouco para garantir que os dados da sala foram carregados
     const timeoutId = setTimeout(checkInitialAnamneseStatus, 2000);
-    
+
     return () => clearTimeout(timeoutId);
   }, [roomId, userType]);
 
@@ -4214,8 +4214,8 @@ export function ConsultationRoom({
                       {patientAnamnese?.idade
                         ? `${patientAnamnese.idade} anos`
                         : patientData?.birth_date
-                        ? `${calculateAge(patientData.birth_date)} anos`
-                        : 'N/A'}
+                          ? `${calculateAge(patientData.birth_date)} anos`
+                          : 'N/A'}
                     </div>
                   </div>
                 </div>
@@ -4224,7 +4224,7 @@ export function ConsultationRoom({
                   <div className="data-icon">
                     <Scale size={14} />
                   </div>
-                    <div className="data-content">
+                  <div className="data-content">
                     <div className="data-label">Peso</div>
                     <div className="data-value">
                       {patientAnamnese?.peso_atual ? `${patientAnamnese.peso_atual} kg` : 'N/A'}
@@ -4383,8 +4383,8 @@ export function ConsultationRoom({
                       body: JSON.stringify(webhookData),
                     });
 
-                    if (!response.success) {
-                      throw new Error('Erro ao enviar transcrição para gerar anamnese');
+                    if (!response.ok) {
+                      throw new Error(`Erro ao enviar transcrição para gerar anamnese: ${response.status} ${response.statusText}`);
                     }
 
                     await gatewayClient.patch(`/consultations/${consultationId}`, {
@@ -4604,7 +4604,7 @@ export function ConsultationRoom({
                     body: JSON.stringify(webhookData),
                   });
 
-                  if (!response.success) {
+                  if (!response.ok) {
                     throw new Error('Erro ao enviar transcrição para gerar anamnese');
                   }
 

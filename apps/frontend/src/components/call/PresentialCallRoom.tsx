@@ -28,16 +28,16 @@ interface Utterance {
 interface Suggestion {
   id: string;
   type:
-    | 'question'
-    | 'protocol'
-    | 'alert'
-    | 'followup'
-    | 'assessment'
-    | 'insight'
-    | 'warning'
-    | 'diagnosis'
-    | 'treatment'
-    | 'note';
+  | 'question'
+  | 'protocol'
+  | 'alert'
+  | 'followup'
+  | 'assessment'
+  | 'insight'
+  | 'warning'
+  | 'diagnosis'
+  | 'treatment'
+  | 'note';
   content: string;
   confidence: number;
   timestamp: string;
@@ -61,6 +61,7 @@ export function PresentialCallRoom({
   patientName
 }: PresentialCallRoomProps) {
   const router = useRouter();
+  const { showWarning } = useNotifications();
   const [utterances, setUtterances] = useState<Utterance[]>([]);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [suggestionsEnabled, setSuggestionsEnabled] = useState<boolean>(true);
@@ -77,7 +78,7 @@ export function PresentialCallRoom({
   const [completionSummary, setCompletionSummary] = useState<{ durationSeconds: number; suggestions: { total: number; used: number } } | null>(null);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const transcriptionScrollRef = useRef<HTMLDivElement>(null);
-  
+
   // Estados para dados da anamnese
   const [patientData, setPatientData] = useState({
     name: patientName,
@@ -88,7 +89,7 @@ export function PresentialCallRoom({
     currentMedications: '',
     allergies: ''
   });
-  
+
   // 🛡️ PROTEÇÃO CONTRA DUPLICAÇÃO: Set para rastrear IDs já processados
   const processedUtteranceIds = useRef<Set<string>>(new Set());
 
@@ -124,18 +125,18 @@ export function PresentialCallRoom({
     const initializeWebSocket = () => {
       setConnectionState(prev => ({ ...prev, isConnecting: true }));
 
-        // Conectar ao gateway WebSocket
-        const gatewayUrl = process.env.NEXT_PUBLIC_GATEWAY_URL || 'ws://localhost:3001';
-        let wsUrl = gatewayUrl;
-        
-        // Converter HTTP/HTTPS para WS/WSS apenas se necessário
-        if (gatewayUrl.startsWith('https://')) {
-          wsUrl = gatewayUrl.replace('https://', 'wss://');
-        } else if (gatewayUrl.startsWith('http://')) {
-          wsUrl = gatewayUrl.replace('http://', 'ws://');
-        }
+      // Socket.IO connects directly to realtime-service (not gateway)
+      const realtimeUrl = process.env.NEXT_PUBLIC_REALTIME_WS_URL || 'ws://localhost:3002';
+      let wsUrl = realtimeUrl;
 
-        socketInstance = io(wsUrl, {
+      // Ensure WebSocket URL format
+      if (realtimeUrl.startsWith('https://')) {
+        wsUrl = realtimeUrl.replace('https://', 'wss://');
+      } else if (realtimeUrl.startsWith('http://')) {
+        wsUrl = realtimeUrl.replace('http://', 'ws://');
+      }
+
+      socketInstance = io(wsUrl, {
         transports: ['websocket'],
         timeout: 10000
       });
@@ -215,13 +216,13 @@ export function PresentialCallRoom({
             console.log('🛡️ Utterance duplicado bloqueado:', data.utterance.id);
             return;
           }
-          
+
           // Marcar como processado ANTES de adicionar
           processedUtteranceIds.current.add(data.utterance.id);
-          
+
           console.log('✅ Adicionando utterance à lista:', data.utterance);
           setUtterances(prev => [...prev, data.utterance]);
-          
+
           // Limpeza periódica do Set (manter últimos 1000 IDs)
           if (processedUtteranceIds.current.size > 1000) {
             const idsArray = Array.from(processedUtteranceIds.current);
@@ -268,9 +269,9 @@ export function PresentialCallRoom({
 
       socketInstance.on('ai:suggestion:used', (data) => {
         console.log('✅ Sugestão marcada como usada:', data);
-        setSuggestions(prev => 
-          prev.map(s => 
-            s.id === data.suggestionId 
+        setSuggestions(prev =>
+          prev.map(s =>
+            s.id === data.suggestionId
               ? { ...s, used: true, used_at: data.timestamp }
               : s
           )
@@ -308,7 +309,7 @@ export function PresentialCallRoom({
         socketInstance.disconnect();
         socketInstance = null;
       }
-      
+
       // 🧹 Limpar IDs processados ao trocar de sessão
       processedUtteranceIds.current.clear();
     };
@@ -326,7 +327,7 @@ export function PresentialCallRoom({
     if (utterances.length > 0) {
       // Simular processamento de IA para extrair dados do paciente
       const latestUtterance = utterances[utterances.length - 1];
-      
+
       // Exemplo de extração automática (em produção, isso viria do backend)
       if (latestUtterance.text.toLowerCase().includes('nasci') || latestUtterance.text.toLowerCase().includes('nascimento')) {
         // Extrair data de nascimento (exemplo)
@@ -338,7 +339,7 @@ export function PresentialCallRoom({
           }));
         }
       }
-      
+
       if (latestUtterance.text.toLowerCase().includes('anos') || latestUtterance.text.toLowerCase().includes('idade')) {
         // Extrair idade (exemplo)
         const ageMatch = latestUtterance.text.match(/(\d+)\s*anos?/);
@@ -431,16 +432,16 @@ export function PresentialCallRoom({
         sessionId,
         userId: 'doctor-current' // TODO: Pegar do contexto de auth
       });
-      
+
       // Atualizar estado local imediatamente
-      setSuggestions(prev => 
-        prev.map(s => 
-          s.id === suggestionId 
+      setSuggestions(prev =>
+        prev.map(s =>
+          s.id === suggestionId
             ? { ...s, used: true, used_at: new Date().toISOString() }
             : s
         )
       );
-      
+
       console.log(`✅ Sugestão ${suggestionId} marcada como usada`);
     }
   }, [socket, connectionState.isConnected, sessionId]);
@@ -468,7 +469,7 @@ export function PresentialCallRoom({
   }, [router, consultationId]);
 
   // Calcular duração da sessão
-  const sessionDuration = sessionStartTime 
+  const sessionDuration = sessionStartTime
     ? Math.floor((Date.now() - sessionStartTime.getTime()) / 1000)
     : 0;
 
@@ -501,7 +502,7 @@ export function PresentialCallRoom({
               <Volume2 className="w-5 h-5" />
               Controle de Áudio
             </h3>
-            
+
             <div className="mic-controls-compact">
               <div className="mic-control-compact">
                 <Mic className="w-4 h-4" />
@@ -534,9 +535,9 @@ export function PresentialCallRoom({
                 {isFinalizing ? 'Finalizando…' : 'Parar Gravação'}
               </button>
             )}
-            
+
             {/* Botão para ativar/desativar sugestões de IA */}
-            <button 
+            <button
               onClick={() => {
                 setSuggestionsEnabled(!suggestionsEnabled);
                 if (!suggestionsEnabled) {
@@ -620,7 +621,7 @@ export function PresentialCallRoom({
                 <User className="w-4 h-4" />
                 Informações do Paciente
               </h3>
-              
+
               <div className="patient-field">
                 <label className="patient-field-label">Nome do Paciente</label>
                 <div className="patient-field-value ai-generated">
@@ -677,15 +678,15 @@ export function PresentialCallRoom({
           <div className="transcription-content" ref={transcriptionScrollRef}>
             {utterances.length === 0 ? (
               <p className="no-transcription">
-                {audioForker.isRecording 
-                  ? 'Aguardando fala...' 
+                {audioForker.isRecording
+                  ? 'Aguardando fala...'
                   : 'Inicie a gravação para ver a transcrição'}
               </p>
             ) : (
               <div className="utterances-list">
                 {utterances.map((utterance, index) => (
-                  <div 
-                    key={`${utterance.id}-${index}`} 
+                  <div
+                    key={`${utterance.id}-${index}`}
                     className={`utterance ${utterance.speaker}`}
                   >
                     <div className="utterance-header">
@@ -755,8 +756,8 @@ export function PresentialCallRoom({
             <div className="suggestions-content">
               <div className="suggestions-list">
                 {suggestions.map((suggestion) => (
-                  <div 
-                    key={suggestion.id} 
+                  <div
+                    key={suggestion.id}
                     className={`suggestion ${suggestion.type} ${suggestion.used ? 'used' : ''}`}
                   >
                     <div className="suggestion-header">
@@ -781,17 +782,17 @@ export function PresentialCallRoom({
                         {Math.round(suggestion.confidence * 100)}%
                       </div>
                     </div>
-                    
+
                     <div className="suggestion-text">
                       {suggestion.content}
                     </div>
-                    
+
                     {suggestion.source && (
                       <div className="suggestion-source">
                         📚 {suggestion.source}
                       </div>
                     )}
-                    
+
                     <div className="suggestion-actions">
                       {!suggestion.used ? (
                         <button

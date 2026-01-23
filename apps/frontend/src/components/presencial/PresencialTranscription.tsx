@@ -4,77 +4,72 @@ import { useEffect, useRef } from 'react';
 import { Stethoscope, User } from 'lucide-react';
 import { formatDuration } from '@/lib/audioUtils';
 
-interface Transcription {
-    speaker: 'doctor' | 'patient';
-    text: string;
-    timestamp: string;
-    sequence: number;
-}
+import { TranscriptionSegment } from '@medcall/shared-types';
 
 interface PresencialTranscriptionProps {
-    transcriptions: Transcription[];
-    doctorName?: string;
-    patientName?: string;
+  transcriptions: TranscriptionSegment[];
+  doctorName?: string;
+  patientName?: string;
 }
 
 export function PresencialTranscription({
-    transcriptions,
-    doctorName = 'Médico',
-    patientName = 'Paciente'
+  transcriptions,
+  doctorName = 'Médico',
+  patientName = 'Paciente'
 }: PresencialTranscriptionProps) {
-    const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-    // Auto-scroll para última transcrição
-    useEffect(() => {
-        if (containerRef.current) {
-            containerRef.current.scrollTop = containerRef.current.scrollHeight;
-        }
-    }, [transcriptions]);
+  // Auto-scroll para última transcrição
+  useEffect(() => {
+    if (containerRef.current) {
+      containerRef.current.scrollTop = containerRef.current.scrollHeight;
+    }
+  }, [transcriptions]);
 
-    return (
-        <div className="presencial-transcription">
-            <div className="transcription-header">
-                <h3>Transcrição em Tempo Real</h3>
-                <span className="transcription-count">{transcriptions.length} mensagens</span>
+  return (
+    <div className="presencial-transcription">
+      <div className="transcription-header">
+        <h3>Transcrição em Tempo Real</h3>
+        <span className="transcription-count">{transcriptions.length} mensagens</span>
+      </div>
+
+      <div ref={containerRef} className="transcription-container">
+        {transcriptions.length === 0 ? (
+          <div className="empty-state">
+            <p>Aguardando transcrições...</p>
+            <p className="hint">As falas serão transcritas em tempo real</p>
+          </div>
+        ) : (
+          transcriptions.map((t, index) => (
+            <div
+              key={t.id || index}
+              className={`transcription-item ${t.speaker === 'MEDICO' ? 'doctor' : 'patient'}`}
+            >
+              <div className="transcription-header-item">
+                <span className="speaker-name">
+                  {(t.speaker === 'MEDICO') ? (
+                    <>
+                      <Stethoscope className="speaker-icon" size={16} />
+                      {doctorName}
+                    </>
+                  ) : (
+                    <>
+                      <User className="speaker-icon" size={16} />
+                      {patientName}
+                    </>
+                  )}
+                </span>
+                <span className="timestamp">
+                  {new Date(t.timestamp).toLocaleTimeString('pt-BR')}
+                </span>
+              </div>
+              <p className="transcription-text">{t.text}</p>
             </div>
+          ))
+        )}
+      </div>
 
-            <div ref={containerRef} className="transcription-container">
-                {transcriptions.length === 0 ? (
-                    <div className="empty-state">
-                        <p>Aguardando transcrições...</p>
-                        <p className="hint">As falas serão transcritas em tempo real</p>
-                    </div>
-                ) : (
-                    transcriptions.map((t, index) => (
-                        <div
-                            key={`${t.speaker}-${t.sequence}-${index}`}
-                            className={`transcription-item ${t.speaker}`}
-                        >
-                            <div className="transcription-header-item">
-                                <span className="speaker-name">
-                                    {t.speaker === 'doctor' ? (
-                                        <>
-                                            <Stethoscope className="speaker-icon" size={16} />
-                                            {doctorName}
-                                        </>
-                                    ) : (
-                                        <>
-                                            <User className="speaker-icon" size={16} />
-                                            {patientName}
-                                        </>
-                                    )}
-                                </span>
-                                <span className="timestamp">
-                                    {new Date(t.timestamp).toLocaleTimeString('pt-BR')}
-                                </span>
-                            </div>
-                            <p className="transcription-text">{t.text}</p>
-                        </div>
-                    ))
-                )}
-            </div>
-
-            <style jsx>{`
+      <style jsx>{`
         .presencial-transcription {
           display: flex;
           flex-direction: column;
@@ -213,6 +208,6 @@ export function PresencialTranscription({
           background: #153350;
         }
       `}</style>
-        </div>
-    );
+    </div>
+  );
 }

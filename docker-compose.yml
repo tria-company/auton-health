@@ -23,11 +23,11 @@ services:
     networks:
       - medcall-network
 
-  # Gateway (Node.js/Express)
+  # Gateway (Node.js/Express) - API Gateway & Proxy
   gateway:
     build:
-      context: ./apps/gateway
-      dockerfile: ../../configs/docker/gateway.Dockerfile
+      context: .
+      dockerfile: configs/docker/gateway.Dockerfile
     ports:
       - "3001:3001"
     environment:
@@ -42,13 +42,63 @@ services:
       - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN}
       - REDIS_URL=redis://redis:6379
       - JWT_SECRET=${JWT_SECRET}
+      - REALTIME_SERVICE_URL=http://realtime-service:3002
+      - AI_SERVICE_URL=http://ai-service:3003
     volumes:
-      - ./apps/gateway:/app
+      - ./apps/backend/gateway:/app/apps/backend/gateway
       - /app/node_modules
-      - /app/dist
+      - /app/apps/backend/gateway/dist
     depends_on:
       - redis
       - postgres
+    networks:
+      - medcall-network
+
+  # Realtime Service (Socket.IO + Transcription)
+  realtime-service:
+    build:
+      context: .
+      dockerfile: configs/docker/realtime-service.Dockerfile
+    ports:
+      - "3002:3002"
+    environment:
+      - NODE_ENV=development
+      - PORT=3002
+      - SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - REDIS_URL=redis://redis:6379
+      - GATEWAY_URL=http://gateway:3001
+    volumes:
+      - ./apps/backend/realtime-service:/app/apps/backend/realtime-service
+      - /app/node_modules
+      - /app/apps/backend/realtime-service/dist
+    depends_on:
+      - redis
+      - gateway
+    networks:
+      - medcall-network
+
+  # AI Service (LLM, RAG, Suggestions)
+  ai-service:
+    build:
+      context: .
+      dockerfile: configs/docker/ai-service.Dockerfile
+    ports:
+      - "3003:3003"
+    environment:
+      - NODE_ENV=development
+      - PORT=3003
+      - SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GATEWAY_URL=http://gateway:3001
+    volumes:
+      - ./apps/backend/ai-service:/app/apps/backend/ai-service
+      - /app/node_modules
+      - /app/apps/backend/ai-service/dist
+    depends_on:
+      - gateway
     networks:
       - medcall-network
 
@@ -107,6 +157,8 @@ services:
     depends_on:
       - frontend
       - gateway
+      - realtime-service
+      - ai-service
     networks:
       - medcall-network
     profiles:

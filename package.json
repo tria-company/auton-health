@@ -5,6 +5,7 @@
   "private": true,
   "workspaces": [
     "apps/*",
+    "apps/backend/*",
     "packages/*"
   ],
   "scripts": {
@@ -16,9 +17,12 @@
     "clean": "npm run clean --workspaces --if-present && rm -rf node_modules",
     "type-check": "npm run type-check --workspaces --if-present",
     "dev:frontend": "npm run dev --workspace=apps/frontend",
-    "dev:gateway": "npm run dev --workspace=apps/gateway",
+    "dev:gateway": "npm run dev --workspace=apps/backend/gateway",
+    "dev:realtime": "npm run dev --workspace=apps/backend/realtime-service",
+    "dev:all-backend": "concurrently -n GATEWAY,REALTIME -c magenta,cyan \"npm run dev:gateway\" \"npm run dev:realtime\"",
     "build:frontend": "npm run build --workspace=apps/frontend",
-    "build:gateway": "npm run build --workspace=apps/gateway",
+    "build:gateway": "npm run build --workspace=apps/backend/gateway",
+    "build:realtime": "npm run build --workspace=apps/backend/realtime-service",
     "setup": "npm install && npm run setup --workspaces --if-present",
     "docker:build": "docker-compose build",
     "docker:up": "docker-compose up -d",

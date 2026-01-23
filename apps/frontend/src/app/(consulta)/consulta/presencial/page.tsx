@@ -12,12 +12,16 @@ import { formatDuration } from '@/lib/audioUtils';
 import { ConfirmModal } from '@/components/modals/ConfirmModal';
 import { supabase } from '@/lib/supabase';
 
+import { TranscriptionSegment } from '@medcall/shared-types';
+
+/*
 interface Transcription {
   speaker: 'doctor' | 'patient';
   text: string;
   timestamp: string;
   sequence: number;
 }
+*/
 
 function PresencialConsultationContent() {
   const router = useRouter();
@@ -34,7 +38,7 @@ function PresencialConsultationContent() {
   const [doctorMicrophoneId, setDoctorMicrophoneId] = useState('');
   const [patientMicrophoneId, setPatientMicrophoneId] = useState('');
 
-  const [transcriptions, setTranscriptions] = useState<Transcription[]>([]);
+  const [transcriptions, setTranscriptions] = useState<TranscriptionSegment[]>([]);
   const [duration, setDuration] = useState(0);
 
   const [patientName, setPatientName] = useState('');
@@ -133,12 +137,12 @@ function PresencialConsultationContent() {
           const bufferLength = analyser.frequencyBinCount;
           const dataArray = new Uint8Array(bufferLength);
           analyser.getByteFrequencyData(dataArray);
-          
+
           let sum = 0;
           for (let i = 0; i < bufferLength; i++) {
             sum += dataArray[i];
           }
-          
+
           const average = sum / bufferLength;
           return Math.min(average / 128, 1); // Normalizar para 0-1
         };
@@ -192,14 +196,15 @@ function PresencialConsultationContent() {
 
   // Conectar Socket.IO
   useEffect(() => {
-    const gatewayUrl = process.env.NEXT_PUBLIC_GATEWAY_HTTP_URL || 'http://localhost:3001';
+    // Usar diretamente a URL do Realtime Service (WebSocket)
+    const realtimeUrl = process.env.NEXT_PUBLIC_REALTIME_WS_URL || 'ws://localhost:3002';
 
-    const newSocket = io(gatewayUrl, {
+    const newSocket = io(realtimeUrl, {
       auth: {
         userName: 'Doctor',
         password: 'x'
       },
-      transports: ['polling', 'websocket']
+      transports: ['websocket', 'polling']
     });
 
     newSocket.on('connect', () => {
@@ -213,9 +218,17 @@ function PresencialConsultationContent() {
     });
 
     // Receber transcrições
-    newSocket.on('presencialTranscription', (data: Transcription) => {
+    newSocket.on('presencialTranscription', (data: any) => {
       console.log('📝 Nova transcrição:', data);
-      setTranscriptions(prev => [...prev, data]);
+      // mapear para TranscriptionSegment
+      const mappedData: TranscriptionSegment = {
+        id: `seq-${data.sequence || Date.now()}`,
+        text: data.text,
+        speaker: data.speaker === 'doctor' ? 'MEDICO' : 'PACIENTE',
+        timestamp: data.timestamp, // string iso
+        confidence: 1.0, // placeholder
+      };
+      setTranscriptions(prev => [...prev, mappedData]);
     });
 
     setSocket(newSocket);
@@ -248,19 +261,19 @@ function PresencialConsultationContent() {
       try {
         // Buscar usuário autenticado
         const { data: { user }, error: userError } = await supabase.auth.getUser();
-        
+
         if (userError || !user) {
           console.warn('Usuário não autenticado');
           return;
         }
-        
+
         // Buscar dados do médico
         const { data: medico, error: medicoError } = await supabase
           .from('medicos')
           .select('*')
           .eq('user_auth', user.id)
           .single();
-        
+
         if (!medicoError && medico) {
           setDoctorName(medico.name || 'Dr. Médico');
         }

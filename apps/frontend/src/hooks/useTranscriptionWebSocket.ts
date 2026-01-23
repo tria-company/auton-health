@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 
+import { TranscriptionSegment } from '@medcall/shared-types';
+
+/* 
 interface TranscriptionSegment {
   id: string;
   text: string;
@@ -10,6 +13,7 @@ interface TranscriptionSegment {
   final: boolean;
   confidence?: number;
 }
+*/
 
 interface UseTranscriptionWebSocketProps {
   roomName: string;
@@ -24,7 +28,7 @@ export function useTranscriptionWebSocket({
   participantId,
   consultationId,
   enabled = true,
-  gatewayUrl = process.env.NEXT_PUBLIC_GATEWAY_HTTP_URL || 'http://localhost:3001'
+  gatewayUrl = process.env.NEXT_PUBLIC_REALTIME_WS_URL || 'ws://localhost:3002'
 }: UseTranscriptionWebSocketProps) {
   const [transcriptions, setTranscriptions] = useState<TranscriptionSegment[]>([]);
   const [isConnected, setIsConnected] = useState(false);
@@ -50,8 +54,9 @@ export function useTranscriptionWebSocket({
     if (!enabled || !roomName || !participantId) return;
 
     console.log('🔗 Conectando ao serviço de transcrição...');
-    
-    const socketUrl = gatewayUrl.replace('http', 'ws');
+
+    // Agora usamos diretamente a URL do Realtime Service (já deve ser ws:// ou wss://)
+    const socketUrl = gatewayUrl;
     socketRef.current = io(`${socketUrl}/transcription`, {
       transports: ['websocket'],
       autoConnect: true
@@ -116,12 +121,12 @@ export function useTranscriptionWebSocket({
       if (audioElements.length > 0) {
         audioElements.forEach((audio, index) => {
           console.log(`🎵 Áudio ${index}:`, audio.srcObject);
-          
+
           if (audio.srcObject) {
             try {
               const stream = audio.srcObject as MediaStream;
               const audioTracks = stream.getAudioTracks();
-              
+
               if (audioTracks.length > 0) {
                 console.log('✅ Track de áudio encontrado, iniciando captura...');
                 startAudioProcessing(stream);
@@ -144,19 +149,19 @@ export function useTranscriptionWebSocket({
     const startAudioProcessing = (stream: MediaStream) => {
       try {
         mediaStreamRef.current = stream;
-        
+
         // Criar contexto de áudio
         audioContextRef.current = new AudioContext({ sampleRate: 16000 });
         const source = audioContextRef.current.createMediaStreamSource(stream);
 
         // Criar processador
         processorRef.current = audioContextRef.current.createScriptProcessor(4096, 1, 1);
-        
+
         processorRef.current.onaudioprocess = (event) => {
           if (!socketRef.current?.connected) return;
 
           const inputData = event.inputBuffer.getChannelData(0);
-          
+
           // Verificar se há áudio (não silêncio)
           const hasAudio = inputData.some(sample => Math.abs(sample) > 0.01);
           if (!hasAudio) return;
@@ -168,9 +173,9 @@ export function useTranscriptionWebSocket({
           }
 
           const audioData = Buffer.from(int16Data.buffer).toString('base64');
-          
+
           console.log('📤 Enviando áudio para transcrição...');
-          
+
           socketRef.current.emit('audio-data', {
             roomName,
             participantId,
@@ -185,7 +190,7 @@ export function useTranscriptionWebSocket({
         processorRef.current.connect(audioContextRef.current.destination);
 
         console.log('🎵 Processamento de áudio iniciado!');
-        
+
       } catch (error) {
         console.error('❌ Erro no processamento:', error);
         setError('Erro ao processar áudio');
@@ -205,7 +210,7 @@ export function useTranscriptionWebSocket({
 
         console.log('✅ Acesso direto ao microfone obtido');
         startAudioProcessing(stream);
-        
+
       } catch (error) {
         console.error('❌ Erro no acesso direto:', error);
         setError('Não foi possível acessar o microfone');
@@ -219,18 +224,18 @@ export function useTranscriptionWebSocket({
 
     return () => {
       clearTimeout(timeout);
-      
+
       // Limpar recursos
       if (processorRef.current) {
         processorRef.current.disconnect();
         processorRef.current = null;
       }
-      
+
       if (audioContextRef.current) {
         audioContextRef.current.close();
         audioContextRef.current = null;
       }
-      
+
       // Limpar stream
       if (mediaStreamRef.current) {
         const tracks = mediaStreamRef.current.getTracks();

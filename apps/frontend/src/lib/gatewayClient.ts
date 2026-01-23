@@ -78,7 +78,7 @@ function buildUrl(endpoint: string, queryParams?: Record<string, string | number
   }
 
   const url = new URL(endpoint.startsWith('/') ? endpoint : `/${endpoint}`, GATEWAY_BASE_URL);
-  
+
   if (queryParams) {
     Object.entries(queryParams).forEach(([key, value]) => {
       url.searchParams.append(key, String(value));
@@ -92,13 +92,13 @@ function buildUrl(endpoint: string, queryParams?: Record<string, string | number
  * Executa uma requisição HTTP ao Gateway
  */
 async function request<T = any>(
-  method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH',
   endpoint: string,
   options: RequestOptions = {}
 ): Promise<GatewayResponse<T>> {
   try {
     const token = await getAuthToken();
-    
+
     // buildUrl pode lançar erro se GATEWAY_BASE_URL não estiver configurada
     const url = buildUrl(endpoint, options.queryParams);
 
@@ -187,6 +187,13 @@ export const gatewayClient = {
    */
   put: <T = any>(endpoint: string, body?: any, options?: Omit<RequestOptions, 'body'>) =>
     request<T>('PUT', endpoint, { ...options, body }),
+
+  /**
+   * PATCH request
+   * @example gatewayClient.patch('/consultations/123', { status: 'in_progress' })
+   */
+  patch: <T = any>(endpoint: string, body?: any, options?: Omit<RequestOptions, 'body'>) =>
+    request<T>('PATCH', endpoint, { ...options, body }),
 
   /**
    * DELETE request

@@ -2,17 +2,10 @@
 
 import { useRef, useEffect } from 'react';
 import { FileText, User, Clock } from 'lucide-react';
-
-interface Utterance {
-  id: string;
-  speaker: 'doctor' | 'patient';
-  text: string;
-  timestamp: string;
-  confidence: number;
-}
+import { TranscriptionSegment } from '@medcall/shared-types';
 
 interface TranscriptionPanelProps {
-  utterances: Utterance[];
+  utterances: TranscriptionSegment[];
   scrollRef?: React.RefObject<HTMLDivElement>;
 }
 
@@ -26,7 +19,7 @@ export function TranscriptionPanel({ utterances, scrollRef }: TranscriptionPanel
         </h4>
         <span className="utterance-count">{utterances.length} falas</span>
       </div>
-      
+
       <div className="transcription-content" ref={scrollRef}>
         {utterances.length === 0 ? (
           <div className="transcription-empty">
@@ -35,15 +28,17 @@ export function TranscriptionPanel({ utterances, scrollRef }: TranscriptionPanel
           </div>
         ) : (
           utterances.map((utterance) => (
-            <div 
-              key={utterance.id} 
-              className={`utterance utterance-${utterance.speaker}`}
+            <div
+              key={utterance.id}
+              className={`utterance utterance-${utterance.speaker.toLowerCase()}`}
             >
               <div className="utterance-header">
                 <div className="speaker-info">
                   <User className="w-3 h-3" />
                   <span className="speaker-name">
-                    {utterance.speaker === 'doctor' ? 'Médico' : 'Paciente'}
+                    {utterance.speaker === 'MEDICO' ? 'Médico' :
+                      utterance.speaker === 'PACIENTE' ? 'Paciente' :
+                        utterance.participantName || 'Desconhecido'}
                   </span>
                 </div>
                 <div className="utterance-meta">
@@ -51,9 +46,11 @@ export function TranscriptionPanel({ utterances, scrollRef }: TranscriptionPanel
                   <span className="timestamp">
                     {new Date(utterance.timestamp).toLocaleTimeString()}
                   </span>
-                  <span className="confidence">
-                    {Math.round(utterance.confidence * 100)}%
-                  </span>
+                  {utterance.confidence && (
+                    <span className="confidence">
+                      {Math.round(utterance.confidence * 100)}%
+                    </span>
+                  )}
                 </div>
               </div>
               <div className="utterance-text">
