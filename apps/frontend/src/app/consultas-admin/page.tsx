@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
+import { gatewayClient } from '@/lib/gatewayClient';
 import './consultas-admin.css';
 
 interface ConsultaAdmin {
@@ -96,48 +97,14 @@ export default function ConsultasAdminPage() {
       setRefreshing(true);
       setError(null);
 
-      // Buscar consultas com status RECORDING (salas abertas/em andamento)
-      const { data: consultasData, error: consultasError } = await supabase
-        .from('consultas')
-        .select(`
-          *,
-          medicos!inner(
-            name,
-            email
-          ),
-          pacientes!inner(
-            name
-          ),
-          call_sessions!left(
-            status,
-            webrtc_active
-          )
-        `)
-        .eq('status', 'RECORDING')
-        .order('created_at', { ascending: false });
+      // Buscar consultas com status RECORDING via gateway
+      const response = await gatewayClient.get('/admin/consultations');
 
-      if (consultasError) {
-        throw new Error(consultasError.message || 'Erro ao buscar consultas');
+      if (!response.success) {
+        throw new Error(response.error || 'Erro ao buscar consultas');
       }
 
-      // Mapear dados para o formato esperado pelo componente
-      const consultations: ConsultaAdmin[] = (consultasData || []).map((c: any) => ({
-        id: c.id,
-        doctor_id: c.user_id,
-        patient_id: c.patient_id,
-        status: c.status,
-        consulta_inicio: c.consulta_inicio,
-        patient_name: c.pacientes?.name || 'Paciente desconhecido',
-        consultation_type: c.patient_type,
-        created_at: c.created_at,
-        medico_email: c.medicos?.email || null,
-        medico_name: c.medicos?.name || null,
-        room_id: c.room_id,
-        session_status: c.call_sessions?.[0]?.status || null,
-        webrtc_active: c.call_sessions?.[0]?.webrtc_active || false,
-      }));
-
-      setConsultas(consultations);
+      setConsultas(response.consultations || []);
     } catch (err) {
       console.error('Erro ao buscar consultas:', err);
       setError(err instanceof Error ? err.message : 'Erro ao carregar consultas');
@@ -174,28 +141,11 @@ export default function ConsultasAdminPage() {
     setTerminateSuccess(null);
 
     try {
-      // Atualizar status da consulta para COMPLETED (encerrada)
-      const { error: updateError } = await supabase
-        .from('consultas')
-        .update({
-          status: 'COMPLETED',
-          consulta_fim: new Date().toISOString(),
-        })
-        .eq('id', consulta.id);
+      // Encerrar consulta via gateway
+      const response = await gatewayClient.post(`/admin/consultations/${consulta.id}/terminate`);
 
-      if (updateError) {
-        throw new Error(updateError.message || 'Erro ao encerrar chamada');
-      }
-
-      // Se houver call_session associada, atualizar também
-      if (consulta.room_id) {
-        await supabase
-          .from('call_sessions')
-          .update({
-            status: 'ENDED',
-            webrtc_active: false,
-          })
-          .eq('room_id', consulta.room_id);
+      if (!response.success) {
+        throw new Error(response.error || 'Erro ao encerrar chamada');
       }
 
       setTerminateSuccess(`Chamada encerrada com sucesso: ${consulta.room_id}`);

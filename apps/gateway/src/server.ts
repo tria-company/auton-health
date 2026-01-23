@@ -137,6 +137,8 @@ import patientsRoutes from './routes/patients';
 app.use('/patients', patientsRoutes);
 import cadastroAnamneseRoutes from './routes/cadastro-anamnese';
 app.use('/cadastro-anamnese', cadastroAnamneseRoutes);
+import sinteseAnaliticaRoutes from './routes/sintese-analitica';
+app.use('/sintese-analitica', sinteseAnaliticaRoutes);
 
 // Novas rotas migradas do frontend
 import anamneseRoutes from './routes/anamnese';
@@ -154,6 +156,8 @@ app.use('/exames', examesRoutes);
 app.use('/processar-exames', examesRoutes);
 import googleCalendarRoutes from './routes/google-calendar';
 app.use('/auth/google-calendar', googleCalendarRoutes);
+import consultasAdminRoutes from './routes/consultas-admin';
+app.use('/admin/consultations', consultasAdminRoutes);
 
 // Endpoint para estatísticas de WebSocket PCM
 app.get('/api/pcm-transcription/stats', (req, res) => {

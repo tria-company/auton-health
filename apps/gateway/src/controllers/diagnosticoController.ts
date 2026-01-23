@@ -17,14 +17,31 @@ export async function getDiagnostico(req: AuthenticatedRequest, res: Response) {
 
     const { consultaId } = req.params;
 
-    const { data: diagnostico, error } = await supabase
-      .from('a_diagnostico')
-      .select('*')
-      .eq('consultation_id', consultaId)
-      .maybeSingle();
+    // Buscar dados de todas as tabelas de diagnóstico
+    const [
+      diagnostico_principal,
+      estado_geral,
+      estado_fisiologico,
+      estado_mental,
+      agente_integracao_diagnostica,
+      agente_habitos_vida_sistemica
+    ] = await Promise.all([
+      supabase.from('d_diagnostico_principal').select('*').eq('consulta_id', consultaId).maybeSingle(),
+      supabase.from('d_estado_geral').select('*').eq('consulta_id', consultaId).maybeSingle(),
+      supabase.from('d_estado_fisiologico').select('*').eq('consulta_id', consultaId).maybeSingle(),
+      supabase.from('d_estado_mental').select('*').eq('consulta_id', consultaId).maybeSingle(),
+      supabase.from('d_agente_integracao_diagnostica').select('*').eq('consulta_id', consultaId).maybeSingle(),
+      supabase.from('d_agente_habitos_vida_sistemica').select('*').eq('consulta_id', consultaId).maybeSingle()
+    ]);
 
-    if (error) {
-      console.error('Erro ao buscar diagnóstico:', error);
+    // Verificar se alguma query falhou
+    const errors = [
+      diagnostico_principal, estado_geral, estado_fisiologico, estado_mental,
+      agente_integracao_diagnostica, agente_habitos_vida_sistemica
+    ].filter(result => result.error);
+
+    if (errors.length > 0) {
+      console.error('Erro ao buscar diagnóstico:', errors[0].error);
       return res.status(500).json({
         success: false,
         error: 'Erro ao buscar diagnóstico'
@@ -33,7 +50,12 @@ export async function getDiagnostico(req: AuthenticatedRequest, res: Response) {
 
     return res.json({
       success: true,
-      diagnostico: diagnostico || null
+      diagnostico_principal: diagnostico_principal.data,
+      estado_geral: estado_geral.data,
+      estado_fisiologico: estado_fisiologico.data,
+      estado_mental: estado_mental.data,
+      agente_integracao_diagnostica: agente_integracao_diagnostica.data,
+      agente_habitos_vida_sistemica: agente_habitos_vida_sistemica.data
     });
 
   } catch (error) {

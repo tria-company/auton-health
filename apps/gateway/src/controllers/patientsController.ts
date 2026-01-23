@@ -293,41 +293,44 @@ export async function deletePatient(req: AuthenticatedRequest, res: Response) {
  */
 export async function getCadastroAnamnese(req: AuthenticatedRequest, res: Response) {
   try {
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        error: 'Não autorizado'
-      });
-    }
-
+    console.log('[getCadastroAnamnese] ========== INICIANDO ==========');
+    console.log('[getCadastroAnamnese] patientId:', req.params.patientId);
+    console.log('[getCadastroAnamnese] user:', req.user ? 'autenticado' : 'NÃO AUTENTICADO');
+    
     const { patientId } = req.params;
 
     // Buscar cadastro de anamnese
+    console.log('[getCadastroAnamnese] Fazendo query no Supabase...');
     const { data: cadastro, error } = await supabase
       .from('a_cadastro_anamnese')
       .select('*')
-      .eq('patient_id', patientId)
+      .eq('paciente_id', patientId)  // ← CORRIGIDO: era 'patient_id'
       .maybeSingle();
 
     if (error) {
-      console.error('Erro ao buscar cadastro de anamnese:', error);
+      console.error('[getCadastroAnamnese] ❌ ERRO Supabase:', JSON.stringify(error, null, 2));
       return res.status(500).json({
         success: false,
-        error: 'Erro ao buscar dados do cadastro'
+        error: 'Erro ao buscar dados do cadastro',
+        details: error.message
       });
     }
 
+    console.log('[getCadastroAnamnese] ✅ Query OK - cadastro:', cadastro ? 'encontrado' : 'não encontrado (null)');
+    
     // Se não encontrou, retorna dados vazios (não é erro)
     return res.json({
       success: true,
       cadastro: cadastro || null
     });
 
-  } catch (error) {
-    console.error('Erro ao buscar cadastro de anamnese:', error);
+  } catch (error: any) {
+    console.error('[getCadastroAnamnese] ❌❌ ERRO CATCH:', error);
+    console.error('[getCadastroAnamnese] Stack:', error.stack);
     return res.status(500).json({
       success: false,
-      error: 'Erro interno do servidor'
+      error: 'Erro interno do servidor',
+      message: error.message
     });
   }
 }
@@ -352,7 +355,7 @@ export async function updateCadastroAnamnese(req: AuthenticatedRequest, res: Res
     const { data: existing } = await supabase
       .from('a_cadastro_anamnese')
       .select('id')
-      .eq('patient_id', patientId)
+      .eq('paciente_id', patientId)  // ← CORRIGIDO
       .maybeSingle();
 
     let result;
@@ -364,7 +367,7 @@ export async function updateCadastroAnamnese(req: AuthenticatedRequest, res: Res
           ...cadastroData,
           updated_at: new Date().toISOString()
         })
-        .eq('patient_id', patientId)
+        .eq('paciente_id', patientId)  // ← CORRIGIDO
         .select()
         .single();
 
@@ -375,7 +378,7 @@ export async function updateCadastroAnamnese(req: AuthenticatedRequest, res: Res
       const { data, error } = await supabase
         .from('a_cadastro_anamnese')
         .insert({
-          patient_id: patientId,
+          paciente_id: patientId,  // ← CORRIGIDO
           ...cadastroData
         })
         .select()

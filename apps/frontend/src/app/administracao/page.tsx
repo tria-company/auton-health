@@ -132,10 +132,31 @@ export default function AdministracaoPage() {
       }
       const response = await gatewayClient.get(`/admin/dashboard?${params.toString()}`);
       if (!response.success) throw new Error('Erro ao buscar dados');
-      const data = response;
-      setDashboardData(data);
+      
+      // ✅ Backend agora retorna no formato correto
+      setDashboardData(response as DashboardData);
     } catch (error) {
       console.error('Erro ao buscar dados do dashboard:', error);
+      // ✅ Definir dados vazios em caso de erro
+      setDashboardData({
+        estatisticas: {
+          totalConsultas: 0,
+          totalPacientes: 0,
+          tempoMedioMinutos: 0,
+          taxaNoShow: '0%',
+          variacaoConsultas: 0,
+          variacaoPacientes: 0
+        },
+        graficos: {
+          consultasPorDia: [],
+          consultasPorProfissional: [],
+          statusCount: {},
+          etapaCount: {}
+        },
+        consultasAtivas: [],
+        proximasConsultas: [],
+        consultasCalendario: {}
+      });
     } finally {
       setLoading(false);
     }

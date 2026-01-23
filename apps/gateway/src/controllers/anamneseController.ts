@@ -17,14 +17,40 @@ export async function getAnamnese(req: AuthenticatedRequest, res: Response) {
 
     const { consultaId } = req.params;
 
-    const { data: anamnese, error } = await supabase
-      .from('a_anamnese')
-      .select('*')
-      .eq('consultation_id', consultaId)
-      .maybeSingle();
+    // Buscar dados de todas as tabelas de anamnese
+    const [
+      cadastro_prontuario,
+      objetivos_queixas,
+      historico_risco,
+      observacao_clinica_lab,
+      historia_vida,
+      setenios_eventos,
+      ambiente_contexto,
+      sensacao_emocoes,
+      preocupacoes_crencas,
+      reino_miasma
+    ] = await Promise.all([
+      supabase.from('a_cadastro_prontuario').select('*').eq('consulta_id', consultaId).maybeSingle(),
+      supabase.from('a_objetivos_queixas').select('*').eq('consulta_id', consultaId).maybeSingle(),
+      supabase.from('a_historico_risco').select('*').eq('consulta_id', consultaId).maybeSingle(),
+      supabase.from('a_observacao_clinica_lab').select('*').eq('consulta_id', consultaId).maybeSingle(),
+      supabase.from('a_historia_vida').select('*').eq('consulta_id', consultaId).maybeSingle(),
+      supabase.from('a_setenios_eventos').select('*').eq('consulta_id', consultaId).maybeSingle(),
+      supabase.from('a_ambiente_contexto').select('*').eq('consulta_id', consultaId).maybeSingle(),
+      supabase.from('a_sensacao_emocoes').select('*').eq('consulta_id', consultaId).maybeSingle(),
+      supabase.from('a_preocupacoes_crencas').select('*').eq('consulta_id', consultaId).maybeSingle(),
+      supabase.from('a_reino_miasma').select('*').eq('consulta_id', consultaId).maybeSingle()
+    ]);
 
-    if (error) {
-      console.error('Erro ao buscar anamnese:', error);
+    // Verificar se alguma query falhou
+    const errors = [
+      cadastro_prontuario, objetivos_queixas, historico_risco, observacao_clinica_lab,
+      historia_vida, setenios_eventos, ambiente_contexto, sensacao_emocoes,
+      preocupacoes_crencas, reino_miasma
+    ].filter(result => result.error);
+
+    if (errors.length > 0) {
+      console.error('Erro ao buscar anamnese:', errors[0].error);
       return res.status(500).json({
         success: false,
         error: 'Erro ao buscar anamnese'
@@ -33,7 +59,16 @@ export async function getAnamnese(req: AuthenticatedRequest, res: Response) {
 
     return res.json({
       success: true,
-      anamnese: anamnese || null
+      cadastro_prontuario: cadastro_prontuario.data,
+      objetivos_queixas: objetivos_queixas.data,
+      historico_risco: historico_risco.data,
+      observacao_clinica_lab: observacao_clinica_lab.data,
+      historia_vida: historia_vida.data,
+      setenios_eventos: setenios_eventos.data,
+      ambiente_contexto: ambiente_contexto.data,
+      sensacao_emocoes: sensacao_emocoes.data,
+      preocupacoes_crencas: preocupacoes_crencas.data,
+      reino_miasma: reino_miasma.data
     });
 
   } catch (error) {

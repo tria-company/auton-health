@@ -573,6 +573,8 @@ function AnamneseSection({
   renderViewSolutionsButton?: () => JSX.Element;
   activeTab?: string;
 }) {
+  console.log('🔍 [AnamneseSection] Componente renderizado com consultaId:', consultaId, 'patientId:', patientId);
+  
   const [anamneseData, setAnamneseData] = useState<AnamneseData | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
   //console.log('🔍 AnamneseSection readOnly:', readOnly);
@@ -677,6 +679,11 @@ function AnamneseSection({
 
   const fetchAnamneseData = async () => {
     try {
+      if (!consultaId) {
+        console.warn('⚠️ consultaId é null, não carregando anamnese');
+        return;
+      }
+      
       setLoadingDetails(true);
       setError(null);
       
@@ -712,23 +719,29 @@ function AnamneseSection({
 
   const fetchSinteseAnalitica = async () => {
     try {
+      if (!consultaId) {
+        console.warn('⚠️ consultaId é null, não carregando síntese analítica');
+        setSinteseAnalitica(null);
+        return;
+      }
+      
       setLoadingSintese(true);
+      console.log('🔍 Carregando síntese analítica para consultaId:', consultaId);
       
-      const { data: sintese, error } = await supabase
-        .from('sintese_analitica')
-        .select('*')
-        .eq('consulta_id', consultaId)
-        .single();
+      const response = await gatewayClient.get(`/sintese-analitica/${consultaId}`);
       
-      if (error) {
+      if (!response.success) {
         // Se não encontrar, retornar null (não é erro)
-        if (error.code === 'PGRST116') {
+        if (response.status === 404) {
+          console.log('ℹ️ Síntese analítica não encontrada (404)');
           setSinteseAnalitica(null);
           return;
         }
-        throw error;
+        throw new Error(response.error || 'Erro ao carregar síntese analítica');
       }
       
+      const sintese = response.data || response;
+      console.log('✅ Síntese analítica carregada:', sintese);
       setSinteseAnalitica(sintese);
     } catch (err) {
       console.error('❌ Erro ao carregar síntese analítica:', err);
@@ -739,8 +752,14 @@ function AnamneseSection({
   };
 
   useEffect(() => {
-    fetchAnamneseData();
-    fetchSinteseAnalitica();
+    console.log('🔍 [AnamneseSection] useEffect disparado - consultaId:', consultaId);
+    if (consultaId) {
+      console.log('✅ [AnamneseSection] consultaId válido, chamando fetch...');
+      fetchAnamneseData();
+      fetchSinteseAnalitica();
+    } else {
+      console.warn('⚠️ [AnamneseSection] consultaId é null/undefined, não carregando dados');
+    }
   }, [consultaId]);
 
   // Buscar dados do cadastro de anamnese quando tiver patientId
@@ -781,7 +800,7 @@ function AnamneseSection({
         throw new Error('Erro ao buscar cadastro de anamnese');
       }
       
-      const data = response;
+      const data = response.cadastro || response.data?.cadastro || response;  // Extrair cadastro
       console.log('✅ Dados do cadastro anamnese recebidos:', data);
       setCadastroAnamnese(data);
     } catch (err) {
@@ -4230,7 +4249,7 @@ function ConsultationDetailsOverview({
         const response = await gatewayClient.get(`/cadastro-anamnese/${patientId}`);
         
         if (response.success) {
-          const data = response;
+          const data = response.cadastro || response.data?.cadastro || response;  // Extrair cadastro
           console.log('✅ ConsultationDetailsOverview: Dados do paciente recebidos:', data);
           console.log('✅ ConsultationDetailsOverview: data_nascimento:', data?.data_nascimento);
           console.log('✅ ConsultationDetailsOverview: idade:', data?.idade);
@@ -4689,6 +4708,8 @@ function ConsultasPageContent() {
   const [consultaDetails, setConsultaDetails] = useState<Consultation | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [showSolutionsViewer, setShowSolutionsViewer] = useState(false);
+  const [forceRender, setForceRender] = useState(0); // Para forçar re-render
+
   const [selectedSection, setSelectedSection] = useState<'ANAMNESE' | 'DIAGNOSTICO' | 'SOLUCOES' | 'EXAMES' | null>(null);
   const [forceShowSolutionSelection, setForceShowSolutionSelection] = useState(false);
 
@@ -5834,18 +5855,18 @@ function ConsultasPageContent() {
 
   const fetchConsultaDetails = async (id: string, silent = false) => {
     try {
+      console.log('🔍 [fetchConsultaDetails] INICIANDO para ID:', id);
       if (!silent) {
         setLoadingDetails(true);
       }
       setError(null);
-      //console.log('🔍 Carregando detalhes da consulta:', id);
       const response = await gatewayClient.get(`/consultations/${id}`);
-      //console.log('📡 Response status:', response.status);
+      console.log('📡 [fetchConsultaDetails] Response recebido:', response.success ? 'SUCESSO' : 'ERRO');
       
       if (!response.success) { throw new Error(response.error || "Erro na requisição"); }
       
-      const data = response;
-      const newConsultation = data.consultation;
+      const data = response.data || response;
+      const newConsultation = data.consultation || data;
       
       // Logs para debug de consulta_inicio, consulta_fim e duration
       console.log('📅 Dados da consulta recebidos (duração):', {
@@ -5872,32 +5893,12 @@ function ConsultasPageContent() {
         solucao_etapa: newConsultation?.solucao_etapa
       });
       
-      // Sempre atualizar para garantir que mudanças no banco sejam refletidas
-      // A comparação anterior estava impedindo atualizações quando o status mudava no banco
-      setConsultaDetails(prev => {
-        if (!prev) {
-          return newConsultation;
-        }
-        
-        // Comparar campos importantes para log
-        const statusChanged = prev.status !== newConsultation.status;
-        const etapaChanged = prev.etapa !== newConsultation.etapa;
-        const solucaoEtapaChanged = prev.solucao_etapa !== newConsultation.solucao_etapa;
-        const updatedAtChanged = prev.updated_at !== newConsultation.updated_at;
-        
-        if (statusChanged || etapaChanged || solucaoEtapaChanged || updatedAtChanged) {
-          console.log(`📝 Dados da consulta atualizados:`, {
-            status: `${prev.status} → ${newConsultation.status}`,
-            etapa: `${prev.etapa} → ${newConsultation.etapa}`,
-            solucao_etapa: `${prev.solucao_etapa} → ${newConsultation.solucao_etapa}`,
-            updated_at: `${prev.updated_at} → ${newConsultation.updated_at}`
-          });
-        }
-        
-        // Sempre retornar novo objeto para garantir atualização
-        return newConsultation;
-      });
+      // Atualizar consulta e forçar re-render
+      setConsultaDetails(newConsultation);
+      setForceRender(prev => prev + 1);
+      console.log('✅ [fetchConsultaDetails] setConsultaDetails EXECUTADO!');
     } catch (err) {
+      console.error('❌ [fetchConsultaDetails] ERRO:', err);
       setError(err instanceof Error ? err.message : 'Erro ao carregar detalhes da consulta');
     } finally {
       if (!silent) {
@@ -5907,12 +5908,14 @@ function ConsultasPageContent() {
   };
 
   const handleConsultationClick = (consultation: Consultation) => {
-    console.log('🖱️ Clicando na consulta:', consultation.id);
-    router.push(`/consultas?consulta_id=${consultation.id}`);
+    console.log('🖱️ Clicando na consulta:', consultation.id, consultation.patient_name);
+    fetchConsultaDetails(consultation.id);
   };
 
   const handleBackToList = () => {
-    router.push('/consultas');
+    // Limpar state
+    setConsultaDetails(null);
+    setSelectedSection(null);
   };
 
   // Função para editar consulta
@@ -6777,10 +6780,10 @@ function ConsultasPageContent() {
     return 'ANAMNESE';
   };
 
-  // Renderizar detalhes da consulta
-  console.log('🎯 [RENDER CHECK] consultaId:', consultaId, 'consultaDetails:', consultaDetails ? 'existe' : 'null');
-  if (consultaId && consultaDetails) {
-    console.log('✅ [RENDER CHECK] Entrando no bloco de renderização, status:', consultaDetails.status, 'solucao_etapa:', consultaDetails.solucao_etapa);
+  // Renderizar detalhes da consulta (forceRender usado para garantir re-render)
+  console.log(`🎯 [RENDER #${forceRender}]`, consultaDetails ? `Detalhes: ${consultaDetails.id}` : 'Lista de consultas');
+  if (consultaDetails) {
+    console.log('✅ [RENDER] RENDERIZANDO DETALHES! Status:', consultaDetails.status);
     // Se showSolutionsViewer for true, renderiza o visualizador de soluções
     if (showSolutionsViewer) {
       return (
@@ -7486,7 +7489,7 @@ function ConsultasPageContent() {
           {/* Conteúdo da Anamnese */}
           <div className="anamnese-content-wrapper">
             <AnamneseSection 
-              consultaId={consultaId}
+              consultaId={consultaDetails?.id || consultaId}
               patientId={consultaDetails?.patient_id}
               selectedField={selectedField}
               chatMessages={chatMessages}
@@ -7960,7 +7963,7 @@ function ConsultasPageContent() {
           {/* Conteúdo do Diagnóstico */}
           <div className="anamnese-content-wrapper">
             <DiagnosticoSection 
-              consultaId={consultaId}
+              consultaId={consultaDetails?.id || consultaId}
               selectedField={selectedField}
               chatMessages={chatMessages}
               isTyping={isTyping}
@@ -8631,7 +8634,7 @@ function ConsultasPageContent() {
             </div>
             <div className="anamnese-content" style={{ padding: '24px' }}>
               <AnamneseSection 
-                consultaId={consultaId}
+                consultaId={consultaDetails?.id || consultaId}
                 selectedField={null}
                 chatMessages={[]}
                 isTyping={false}
@@ -8807,7 +8810,7 @@ function ConsultasPageContent() {
 
                 <div className="anamnese-content">
                   <DiagnosticoSection 
-                    consultaId={consultaId}
+                    consultaId={consultaDetails?.id || consultaId}
                     selectedField={selectedField}
                     chatMessages={chatMessages}
                     isTyping={isTyping}
@@ -9954,7 +9957,7 @@ function ConsultasPageContent() {
 
               <div className="anamnese-content">
                 <AnamneseSection 
-                  consultaId={consultaId}
+                  consultaId={consultaDetails?.id || consultaId}
                   patientId={consultaDetails?.patient_id}
                   selectedField={selectedField}
                   chatMessages={chatMessages}
