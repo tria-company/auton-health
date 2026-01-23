@@ -12,7 +12,6 @@ substitutions:
 images:
   - "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/medcall-gateway:$SHORT_SHA"
   - "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/medcall-realtime-service:$SHORT_SHA"
-  - "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/medcall-ai-service:$SHORT_SHA"
 
 options:
   logging: CLOUD_LOGGING_ONLY
@@ -58,14 +57,7 @@ steps:
       - "--tag=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/medcall-realtime-service:$SHORT_SHA"
       - "."
 
-  # Build AI Service
-  - id: "build ai-service"
-    name: "gcr.io/cloud-builders/docker"
-    args:
-      - "build"
-      - "--file=configs/docker/ai-service.Dockerfile"
-      - "--tag=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/medcall-ai-service:$SHORT_SHA"
-      - "."
+
 
   # ========== PUSH ALL SERVICES ==========
   - id: "push gateway"
@@ -80,11 +72,7 @@ steps:
       - "push"
       - "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/medcall-realtime-service:$SHORT_SHA"
 
-  - id: "push ai-service"
-    name: "gcr.io/cloud-builders/docker"
-    args:
-      - "push"
-      - "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/medcall-ai-service:$SHORT_SHA"
+
 
   # ========== DEPLOY ALL SERVICES TO CLOUD RUN ==========
   # Deploy Gateway
@@ -132,25 +120,5 @@ steps:
       - "--cpu-boost"
       - "--cpu-throttling"
 
-  # Deploy AI Service
-  - id: "deploy ai-service"
-    name: "gcr.io/google.com/cloudsdktool/cloud-sdk:slim"
-    entrypoint: "gcloud"
-    args:
-      - "run"
-      - "deploy"
-      - "medcall-ai-service"
-      - "--image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/medcall-ai-service:$SHORT_SHA"
-      - "--region=${_REGION}"
-      - "--platform=managed"
-      - "--port=8080"
-      - "--allow-unauthenticated"
-      - "--cpu=1"
-      - "--memory=1Gi"
-      - "--max-instances=5"
-      - "--min-instances=0"
-      - "--concurrency=40"
-      - "--timeout=300"
-      - "--cpu-boost"
-      - "--cpu-throttling"
+
 
