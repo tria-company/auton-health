@@ -1,7 +1,7 @@
 # Cloud Build pipeline to build and deploy ONLY the Realtime microservice
-# Uses the monorepo Dockerfiles at configs/docker/
+# Uses the monorepo Dockerfiles at configs/docker/.
 
-# Substitutions you can override in the trigger or with: gcloud builds submit --substitutions=...
+# Substitutions you can override in the trigger or with: gcloud builds submit --substitutions=... 
 # _REGION:  Cloud Run/Artifact Registry region (e.g. us-central1, southamerica-east1)
 # _REPO:    Artifact Registry Docker repository name (must exist)
 substitutions:
@@ -9,7 +9,7 @@ substitutions:
   _REPO: "medcall"
 
 # Produce and push images for Realtime only
-images:
+images:.
   - "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/medcall-realtime-service:$SHORT_SHA"
 
 options:
