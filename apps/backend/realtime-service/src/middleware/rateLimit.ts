@@ -16,9 +16,9 @@ export const generalRateLimiter = rateLimit({
   },
   standardHeaders: rateLimitConfig.standardHeaders, // Retorna rate limit info nos headers `RateLimit-*`
   legacyHeaders: rateLimitConfig.legacyHeaders, // Desabilita headers `X-RateLimit-*`
-  
+
   // Função para identificar o cliente (por IP)
-  keyGenerator: (req: Request): string => {
+  keyGenerator: (req: any): string => {
     // Prioriza X-Forwarded-For para proxies/load balancers
     const forwarded = req.headers['x-forwarded-for'];
     if (forwarded) {
@@ -29,7 +29,7 @@ export const generalRateLimiter = rateLimit({
   },
 
   // Handler customizado quando rate limit é excedido
-  handler: (req: Request, res: Response) => {
+  handler: (req: any, res: any) => {
     console.warn(`⚠️ [RATE-LIMIT] Limite excedido para IP: ${req.ip} - ${req.method} ${req.path}`);
     res.status(429).json({
       error: 'Too Many Requests',
@@ -39,7 +39,7 @@ export const generalRateLimiter = rateLimit({
   },
 
   // Skip rate limiting em desenvolvimento (opcional)
-  skip: (req: Request): boolean => {
+  skip: (req: any): boolean => {
     // Pular health checks
     if (req.path === '/api/health' || req.path === '/health') {
       return true;
@@ -62,8 +62,8 @@ export const authRateLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  
-  keyGenerator: (req: Request): string => {
+
+  keyGenerator: (req: any): string => {
     const forwarded = req.headers['x-forwarded-for'];
     if (forwarded) {
       const ip = Array.isArray(forwarded) ? forwarded[0] : forwarded.split(',')[0];
@@ -72,7 +72,7 @@ export const authRateLimiter = rateLimit({
     return req.ip || req.socket.remoteAddress || 'unknown';
   },
 
-  handler: (req: Request, res: Response) => {
+  handler: (req: any, res: any) => {
     console.warn(`🚨 [RATE-LIMIT-AUTH] Muitas tentativas de auth para IP: ${req.ip}`);
     res.status(429).json({
       error: 'Too Many Login Attempts',
@@ -96,16 +96,16 @@ export const aiRateLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  
-  keyGenerator: (req: Request): string => {
+
+  keyGenerator: (req: any): string => {
     // Para AI, pode usar user ID se disponível (mais granular)
     const userId = req.headers['x-user-id'] as string;
     const forwarded = req.headers['x-forwarded-for'];
-    
+
     if (userId) {
       return `user:${userId}`;
     }
-    
+
     if (forwarded) {
       const ip = Array.isArray(forwarded) ? forwarded[0] : forwarded.split(',')[0];
       return ip.trim();
@@ -113,7 +113,7 @@ export const aiRateLimiter = rateLimit({
     return req.ip || req.socket.remoteAddress || 'unknown';
   },
 
-  handler: (req: Request, res: Response) => {
+  handler: (req: any, res: any) => {
     console.warn(`⚠️ [RATE-LIMIT-AI] Limite de AI excedido: ${req.ip} - ${req.path}`);
     res.status(429).json({
       error: 'AI Rate Limit Exceeded',
@@ -137,8 +137,8 @@ export const wsRateLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  
-  keyGenerator: (req: Request): string => {
+
+  keyGenerator: (req: any): string => {
     const forwarded = req.headers['x-forwarded-for'];
     if (forwarded) {
       const ip = Array.isArray(forwarded) ? forwarded[0] : forwarded.split(',')[0];

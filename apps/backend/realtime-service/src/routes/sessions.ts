@@ -30,10 +30,10 @@ const createSessionSchema = z.object({
 // Criar nova sessão
 router.post('/', asyncHandler(async (req: Request, res: Response) => {
   console.log('📨 Recebida requisição para criar sessão:', req.body);
-  
+
   // Validar dados de entrada
   const validationResult = createSessionSchema.safeParse(req.body);
-  
+
   if (!validationResult.success) {
     console.error('❌ Validação falhou:', validationResult.error);
     throw new ValidationError(`Dados inválidos para criar sessão: ${validationResult.error.message}`);
@@ -76,10 +76,10 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
     // Registrar log de auditoria - Início de consulta
     const doctorId = participants.doctor.id;
     const patientId = participants.patient.id;
-    
+
     // Buscar dados do médico para auditoria
     const medico = await db.getDoctorByAuth(doctorId);
-    
+
     await auditService.log({
       user_id: doctorId,
       user_email: participants.doctor.email || medico?.email,
@@ -121,7 +121,7 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
     // Ambas usam WebRTC direto via WebSocket
     const websocketUrl = process.env.WEBSOCKET_URL || 'ws://localhost:3001';
     const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-    
+
     res.status(201).json({
       session: {
         id: session.id,
@@ -149,7 +149,7 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
 
 // Buscar sessão por ID
 router.get('/:sessionId', asyncHandler(async (req: Request, res: Response) => {
-  const { sessionId } = req.params;
+  const { sessionId } = req.params as { sessionId: string };
 
   if (!sessionId) {
     throw new ValidationError('ID da sessão é obrigatório');
@@ -183,7 +183,7 @@ router.get('/:sessionId', asyncHandler(async (req: Request, res: Response) => {
 
 // Buscar conversas de uma sessão (formato array)
 router.get('/:sessionId/conversations', asyncHandler(async (req: Request, res: Response) => {
-  const { sessionId } = req.params;
+  const { sessionId } = req.params as { sessionId: string };
 
   if (!sessionId) {
     throw new ValidationError('ID da sessão é obrigatório');
@@ -200,7 +200,7 @@ router.get('/:sessionId/conversations', asyncHandler(async (req: Request, res: R
 
 // Finalizar sessão
 router.patch('/:sessionId/end', asyncHandler(async (req: Request, res: Response) => {
-  const { sessionId } = req.params;
+  const { sessionId } = req.params as { sessionId: string };
 
   if (!sessionId) {
     throw new ValidationError('ID da sessão é obrigatório');
@@ -245,7 +245,7 @@ router.patch('/:sessionId/end', asyncHandler(async (req: Request, res: Response)
 
 // Finalizar sessão e consolidar dados
 router.post('/:sessionId/complete', asyncHandler(async (req: Request, res: Response) => {
-  const { sessionId } = req.params;
+  const { sessionId } = req.params as { sessionId: string };
 
   if (!sessionId) {
     throw new ValidationError('ID da sessão é obrigatório');
@@ -292,8 +292,8 @@ router.post('/:sessionId/complete', asyncHandler(async (req: Request, res: Respo
   const protocol = generateSimpleProtocol({
     transcriptText,
     utterances,
-    suggestions,
-    usedSuggestions,
+    suggestions: suggestions.map(s => ({ ...s, text: s.content })),
+    usedSuggestions: usedSuggestions.map(s => ({ ...s, text: s.content })),
     participants: session.participants,
   });
 

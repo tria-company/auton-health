@@ -14,8 +14,8 @@ export function setSocketIO(io: any) {
 
 // Health check para rotas de salas
 router.get('/health', (req: Request, res: Response) => {
-  res.json({ 
-    status: 'ok', 
+  res.json({
+    status: 'ok',
     service: 'rooms-api',
     timestamp: new Date().toISOString()
   });
@@ -36,7 +36,7 @@ router.post('/create', async (req: Request, res: Response) => {
     // TODO: Integrar com sistema de salas via Socket.IO
     // Por enquanto, retornar sucesso para integração
     const roomId = `room-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
+
     res.json({
       success: true,
       roomId: roomId,
@@ -63,7 +63,7 @@ router.get('/:roomId', async (req: Request, res: Response) => {
 
     // Buscar sala no mapa de salas
     const room = rooms.get(roomId);
-    
+
     if (!room) {
       return res.status(404).json({
         success: false,
@@ -103,7 +103,7 @@ router.get('/:roomId/transcriptions', async (req: Request, res: Response) => {
 
     // Buscar sala no mapa de salas
     const room = rooms.get(roomId);
-    
+
     if (!room) {
       return res.status(404).json({
         success: false,
@@ -202,7 +202,7 @@ router.get('/admin/active', async (req: Request, res: Response) => {
  */
 router.post('/admin/terminate/:roomId', async (req: Request, res: Response) => {
   try {
-    const { roomId } = req.params;
+    const { roomId } = req.params as { roomId: string };
     const { reason } = req.body;
 
     console.log(`🛑 [ADMIN] Solicitação de encerramento remoto da sala: ${roomId}`);
@@ -210,7 +210,7 @@ router.post('/admin/terminate/:roomId', async (req: Request, res: Response) => {
 
     // Buscar sala no mapa de salas
     const room = rooms.get(roomId);
-    
+
     if (!room) {
       return res.status(404).json({
         success: false,
@@ -248,7 +248,7 @@ router.post('/admin/terminate/:roomId', async (req: Request, res: Response) => {
           console.log(`📤 [ADMIN] Notificação enviada ao participante: ${room.participantUserName} (socket: ${room.participantSocketId})`);
           notificationsSent++;
         }
-        
+
         // Também emitir para a sala inteira como fallback
         socketIO.to(roomId).emit('roomTerminatedByAdmin', terminationMessage);
         console.log(`📤 [ADMIN] Notificação enviada para a sala: ${roomId}`);

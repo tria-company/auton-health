@@ -17,7 +17,7 @@ const upload = multer({
       mimetype: file.mimetype,
       encoding: file.encoding,
     });
-    
+
     // Aceitar vídeo WebM, MP4 e outros formatos de vídeo/áudio
     // O navegador pode enviar diferentes mimetypes dependendo do codec
     const allowedTypes = [
@@ -27,12 +27,12 @@ const upload = multer({
       'audio/webm',
       'application/octet-stream', // Alguns navegadores enviam assim
     ];
-    
-    const isAllowed = allowedTypes.includes(file.mimetype) || 
-                      file.mimetype.startsWith('video/') || 
-                      file.mimetype.startsWith('audio/') ||
-                      file.originalname.endsWith('.webm');
-    
+
+    const isAllowed = allowedTypes.includes(file.mimetype) ||
+      file.mimetype.startsWith('video/') ||
+      file.mimetype.startsWith('audio/') ||
+      file.originalname.endsWith('.webm');
+
     if (isAllowed) {
       cb(null, true);
     } else {
@@ -46,7 +46,7 @@ const upload = multer({
  * POST /api/recordings/upload
  * Upload de gravação ou chunk de gravação
  */
-router.post('/upload', upload.single('recording'), async (req, res) => {
+router.post('/upload', upload.single('recording') as any, async (req, res) => {
   try {
     const file = req.file;
     const { sessionId, roomId, consultationId, chunkIndex, isFinal, timestamp } = req.body;
@@ -74,7 +74,7 @@ router.post('/upload', upload.single('recording'), async (req, res) => {
     const recordingId = uuidv4();
     const datePrefix = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
     const isChunkFinal = isFinal === 'true';
-    
+
     let filePath: string;
     if (consultationId) {
       // Se tiver consultation_id, organizar por consulta
@@ -112,11 +112,11 @@ router.post('/upload', upload.single('recording'), async (req, res) => {
       console.error('❌ [RECORDING] Detalhes:', {
         message: uploadError.message,
         name: uploadError.name,
-        cause: uploadError.cause,
+        cause: (uploadError as any).cause,
       });
-      return res.status(500).json({ 
+      return res.status(500).json({
         error: 'Erro ao fazer upload',
-        details: uploadError.message 
+        details: uploadError.message
       });
     }
 
@@ -186,7 +186,7 @@ router.post('/upload', upload.single('recording'), async (req, res) => {
 
   } catch (error) {
     console.error('❌ [RECORDING] Erro geral:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Erro interno',
       message: error instanceof Error ? error.message : 'Erro desconhecido'
     });
@@ -212,7 +212,7 @@ router.get('/:sessionId', async (req, res) => {
 
   } catch (error) {
     console.error('❌ [RECORDING] Erro ao listar:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Erro ao listar gravações',
       message: error instanceof Error ? error.message : 'Erro desconhecido'
     });
@@ -238,7 +238,7 @@ router.get('/consultation/:consultationId', async (req, res) => {
 
   } catch (error) {
     console.error('❌ [RECORDING] Erro ao listar:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Erro ao listar gravações',
       message: error instanceof Error ? error.message : 'Erro desconhecido'
     });
@@ -279,7 +279,7 @@ router.get('/download/:recordingId', async (req, res) => {
 
   } catch (error) {
     console.error('❌ [RECORDING] Erro ao gerar download:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Erro ao gerar download',
       message: error instanceof Error ? error.message : 'Erro desconhecido'
     });
@@ -323,7 +323,7 @@ router.delete('/:recordingId', async (req, res) => {
 
   } catch (error) {
     console.error('❌ [RECORDING] Erro ao remover:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Erro ao remover gravação',
       message: error instanceof Error ? error.message : 'Erro desconhecido'
     });
