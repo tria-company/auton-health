@@ -24,8 +24,13 @@ COPY packages/utils/package.json packages/utils/package.json
 # Install all workspace deps (dev + prod) once at the root
 RUN npm ci
 
-# Copy full repository and build only the realtime-service package
+# Copy full repository
 COPY . .
+
+# Build shared-types first (required by realtime-service)
+RUN npm run build --workspace=packages/shared-types
+
+# Then build realtime-service
 RUN npm run build:realtime
 
 # ---------- Runtime ----------
@@ -41,6 +46,10 @@ RUN apt-get update \
 # Copy root manifests and node_modules from builder
 COPY --from=builder /app/package.json /app/package-lock.json /app/lerna.json ./
 COPY --from=builder /app/node_modules ./node_modules
+
+# Copy built shared-types package (required by realtime-service)
+COPY --from=builder /app/packages/shared-types/dist ./packages/shared-types/dist
+COPY --from=builder /app/packages/shared-types/package.json ./packages/shared-types/package.json
 
 # Copy built realtime-service artifacts and its package manifest
 COPY --from=builder /app/apps/backend/realtime-service/dist ./apps/backend/realtime-service/dist
