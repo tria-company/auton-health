@@ -107,6 +107,16 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 // Trust proxy
 app.set('trust proxy', 1);
 
+// ===== HEALTH CHECK (Cloud Run) =====
+// Este endpoint DEVE vir antes de qualquer middleware que possa bloquear
+app.get('/health', (req, res) => {
+    res.status(200).json({
+        service: 'realtime-service',
+        status: 'OK',
+        timestamp: new Date().toISOString()
+    });
+});
+
 // ===== ROTAS DA API =====
 
 // Rotas de transcrição com rate limit específico
