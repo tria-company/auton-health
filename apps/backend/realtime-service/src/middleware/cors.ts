@@ -119,6 +119,12 @@ export const corsMiddleware = cors({
       return callback(null, true);
     }
 
+    // Permitir domínio autonhealth.com.br e subdomínios
+    if (origin && origin.includes('autonhealth.com.br')) {
+      console.log(`✅ [CORS] Permitindo Autonhealth: ${origin}`);
+      return callback(null, true);
+    }
+
     // Obter origens permitidas (com cache)
     if (!cachedOrigins) {
       cachedOrigins = getAllowedOrigins();
