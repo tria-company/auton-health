@@ -58,6 +58,8 @@ RUN mkdir -p node_modules/@medcall && \
 # Copy built realtime-service artifacts and its package manifest
 COPY --from=builder /app/apps/backend/realtime-service/dist ./apps/backend/realtime-service/dist
 COPY --from=builder /app/apps/backend/realtime-service/package.json ./apps/backend/realtime-service/package.json
+# Copy realtime-service node_modules (dependencies may not be hoisted to root in npm workspaces)
+COPY --from=builder /app/apps/backend/realtime-service/node_modules ./apps/backend/realtime-service/node_modules
 
 # Environment - PORT will be set by Cloud Run (defaults to 8080)
 # EXPOSE 3002  # Removed - Cloud Run handles port exposure
