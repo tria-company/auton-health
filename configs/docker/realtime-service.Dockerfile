@@ -51,6 +51,10 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/packages/shared-types/dist ./packages/shared-types/dist
 COPY --from=builder /app/packages/shared-types/package.json ./packages/shared-types/package.json
 
+# Create symlink for @medcall/shared-types in node_modules (npm workspaces use symlinks)
+RUN mkdir -p node_modules/@medcall && \
+    ln -sf /app/packages/shared-types node_modules/@medcall/shared-types
+
 # Copy built realtime-service artifacts and its package manifest
 COPY --from=builder /app/apps/backend/realtime-service/dist ./apps/backend/realtime-service/dist
 COPY --from=builder /app/apps/backend/realtime-service/package.json ./apps/backend/realtime-service/package.json
