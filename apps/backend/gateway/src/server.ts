@@ -1,3 +1,8 @@
+// Log imediato para confirmar que o servidor está sendo executado
+console.log('🚀 [SERVER] Iniciando servidor gateway...');
+console.log('🚀 [SERVER] Node version:', process.version);
+console.log('🚀 [SERVER] Process PID:', process.pid);
+
 // Carregar variáveis de ambiente primeiro
 import * as dotenv from 'dotenv';
 dotenv.config();
