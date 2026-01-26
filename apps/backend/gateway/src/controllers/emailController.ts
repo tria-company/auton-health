@@ -31,7 +31,7 @@ export async function sendAnamneseEmail(req: AuthenticatedRequest, res: Response
     }
 
     const fromEmail = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
-    const appName = process.env.APP_NAME || 'TRIA';
+    const appName = process.env.APP_NAME || 'Auton Health';
 
     // Verificar se está em modo de teste
     const isTestMode = fromEmail.includes('@resend.dev');
