@@ -228,6 +228,12 @@ export async function updateConsultation(req: AuthenticatedRequest, res: Respons
     const updateData = req.body;
     const doctorAuthId = req.user.id;
 
+    console.log('📝 [UPDATE CONSULTATION] Iniciando atualização:', {
+      consultationId: id,
+      updateData,
+      doctorAuthId
+    });
+
     // Buscar médico
     const { data: medico, error: medicoError } = await supabase
       .from('medicos')
@@ -236,9 +242,42 @@ export async function updateConsultation(req: AuthenticatedRequest, res: Respons
       .single();
 
     if (medicoError || !medico) {
+      console.error('❌ [UPDATE CONSULTATION] Médico não encontrado:', {
+        doctorAuthId,
+        error: medicoError
+      });
       return res.status(404).json({
         success: false,
         error: 'Médico não encontrado'
+      });
+    }
+
+    console.log('✅ [UPDATE CONSULTATION] Médico encontrado:', medico.id);
+
+    // Verificar se a consulta existe e pertence ao médico antes de atualizar
+    const { data: existingConsultation, error: checkError } = await supabase
+      .from('consultations')
+      .select('id, doctor_id, status')
+      .eq('id', id)
+      .single();
+
+    if (checkError || !existingConsultation) {
+      console.error('Erro ao verificar consulta:', checkError);
+      return res.status(404).json({
+        success: false,
+        error: 'Consulta não encontrada'
+      });
+    }
+
+    // Verificar se a consulta pertence ao médico
+    if (existingConsultation.doctor_id !== medico.id) {
+      console.error('Tentativa de atualizar consulta de outro médico:', {
+        consultationDoctorId: existingConsultation.doctor_id,
+        currentMedicoId: medico.id
+      });
+      return res.status(403).json({
+        success: false,
+        error: 'Você não tem permissão para atualizar esta consulta'
       });
     }
 
@@ -254,11 +293,27 @@ export async function updateConsultation(req: AuthenticatedRequest, res: Respons
       .select()
       .single();
 
-    if (error || !consultation) {
-      console.error('Erro ao atualizar consulta:', error);
+    if (error) {
+      console.error('Erro ao atualizar consulta no Supabase:', {
+        error,
+        consultationId: id,
+        updateData,
+        medicoId: medico.id
+      });
       return res.status(500).json({
         success: false,
-        error: 'Erro ao atualizar consulta'
+        error: error.message || 'Erro ao atualizar consulta'
+      });
+    }
+
+    if (!consultation) {
+      console.error('Consulta não retornada após atualização:', {
+        consultationId: id,
+        medicoId: medico.id
+      });
+      return res.status(500).json({
+        success: false,
+        error: 'Consulta não foi atualizada'
       });
     }
 

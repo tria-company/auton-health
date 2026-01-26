@@ -227,9 +227,7 @@ export function ActiveConsultationBanner() {
       
       // Atualizar status para PROCESSING (inicia o processamento da consulta)
       const response = await gatewayClient.patch(`/consultations/${activeConsultation.id}`, {
-        body: {
-          status: 'PROCESSING',
-        },
+        status: 'PROCESSING',
       });
 
       if (!response.success) {
