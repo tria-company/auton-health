@@ -1,7 +1,7 @@
 # Multi-stage Dockerfile for MedCall Gateway (Node/Express + Socket.IO)
 # Optimized for monorepo with npm workspaces and production runtime
 
-FROM node:18-bookworm-slim AS base
+FROM node:20-bookworm-slim AS base
 ENV NODE_ENV=production
 WORKDIR /app
 
