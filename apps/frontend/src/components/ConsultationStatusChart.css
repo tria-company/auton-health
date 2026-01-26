@@ -244,16 +244,32 @@
   color: #2EA04F;
 }
 
+.metric-change-indicator.positive {
+  color: #2EA04F;
+}
+
+.metric-change-indicator.negative {
+  color: #EF4444;
+}
+
 .trend-icon {
   width: 12px;
   height: 12px;
+  transition: transform 0.2s ease;
 }
 
 .change-value {
   font-size: 11px;
   font-weight: 600;
-  color: #2EA04F;
   line-height: 1;
+}
+
+.metric-change-indicator.positive .change-value {
+  color: #2EA04F;
+}
+
+.metric-change-indicator.negative .change-value {
+  color: #EF4444;
 }
 
 /* Divisor */

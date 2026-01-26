@@ -69,6 +69,38 @@ export async function getDashboardData(req: AuthenticatedRequest, res: Response)
       .select('*', { count: 'exact', head: true })
       .eq('doctor_id', medico.id);
 
+    // Calcular variação de pacientes (mês atual vs mês anterior)
+    const inicioMesAtual = new Date();
+    inicioMesAtual.setDate(1);
+    inicioMesAtual.setHours(0, 0, 0, 0);
+    const fimMesAtual = new Date();
+    fimMesAtual.setMonth(fimMesAtual.getMonth() + 1, 0);
+    fimMesAtual.setHours(23, 59, 59, 999);
+    
+    const inicioMesAnterior = new Date(inicioMesAtual);
+    inicioMesAnterior.setMonth(inicioMesAnterior.getMonth() - 1);
+    const fimMesAnterior = new Date(inicioMesAtual);
+    fimMesAnterior.setDate(0);
+    fimMesAnterior.setHours(23, 59, 59, 999);
+
+    const { count: pacientesMesAtual } = await supabase
+      .from('patients')
+      .select('*', { count: 'exact', head: true })
+      .eq('doctor_id', medico.id)
+      .gte('created_at', inicioMesAtual.toISOString())
+      .lte('created_at', fimMesAtual.toISOString());
+
+    const { count: pacientesMesAnterior } = await supabase
+      .from('patients')
+      .select('*', { count: 'exact', head: true })
+      .eq('doctor_id', medico.id)
+      .gte('created_at', inicioMesAnterior.toISOString())
+      .lte('created_at', fimMesAnterior.toISOString());
+
+    const variacaoPacientes = pacientesMesAnterior && pacientesMesAnterior > 0
+      ? Math.round(((pacientesMesAtual || 0) - pacientesMesAnterior) / pacientesMesAnterior * 100)
+      : pacientesMesAtual && pacientesMesAtual > 0 ? 100 : 0;
+
     // Consultas do dia
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -102,6 +134,32 @@ export async function getDashboardData(req: AuthenticatedRequest, res: Response)
     }
     
     const { count: consultasConcluidasMes } = await consultasConcluidasQuery;
+
+    // Calcular variação de consultas concluídas (mês atual vs mês anterior)
+    const inicioMesAtualConsultas = new Date();
+    inicioMesAtualConsultas.setDate(1);
+    inicioMesAtualConsultas.setHours(0, 0, 0, 0);
+    const fimMesAtualConsultas = new Date();
+    fimMesAtualConsultas.setMonth(fimMesAtualConsultas.getMonth() + 1, 0);
+    fimMesAtualConsultas.setHours(23, 59, 59, 999);
+    
+    const inicioMesAnteriorConsultas = new Date(inicioMesAtualConsultas);
+    inicioMesAnteriorConsultas.setMonth(inicioMesAnteriorConsultas.getMonth() - 1);
+    const fimMesAnteriorConsultas = new Date(inicioMesAtualConsultas);
+    fimMesAnteriorConsultas.setDate(0);
+    fimMesAnteriorConsultas.setHours(23, 59, 59, 999);
+
+    const { count: consultasConcluidasMesAnterior } = await supabase
+      .from('consultations')
+      .select('*', { count: 'exact', head: true })
+      .eq('doctor_id', medico.id)
+      .eq('status', 'COMPLETED')
+      .gte('created_at', inicioMesAnteriorConsultas.toISOString())
+      .lte('created_at', fimMesAnteriorConsultas.toISOString());
+
+    const variacaoConsultas = consultasConcluidasMesAnterior && consultasConcluidasMesAnterior > 0
+      ? Math.round(((consultasConcluidasMes || 0) - consultasConcluidasMesAnterior) / consultasConcluidasMesAnterior * 100)
+      : consultasConcluidasMes && consultasConcluidasMes > 0 ? 100 : 0;
 
     // Duração média das consultas
     const calcularDuracaoEmSegundos = (c: any) => {
@@ -344,7 +402,9 @@ export async function getDashboardData(req: AuthenticatedRequest, res: Response)
           duracaoMediaSegundos: Math.round(duracaoMedia),
           duracaoMediaPresencialSegundos: Math.round(duracaoMediaPresencial),
           duracaoMediaTelemedicinaSegundos: Math.round(duracaoMediaTelemedicina),
-          taxaSucesso: Math.round(taxaSucesso * 100) / 100
+          taxaSucesso: Math.round(taxaSucesso * 100) / 100,
+          variacaoPacientes: variacaoPacientes,
+          variacaoConsultas: variacaoConsultas
         },
         distribuicoes: {
           porStatus: statusCounts,

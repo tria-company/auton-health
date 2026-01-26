@@ -153,6 +153,8 @@ interface DashboardData {
     duracaoMediaPresencialSegundos?: number;
     duracaoMediaTelemedicinaSegundos?: number;
     taxaSucesso: number;
+    variacaoPacientes?: number;
+    variacaoConsultas?: number;
   };
   distribuicoes: {
     porStatus: Record<string, number>;
@@ -876,14 +878,14 @@ export default function DashboardPage() {
               { 
                 label: 'Consultas concluídas', 
                 value: dashboardData?.estatisticas?.consultasConcluidasMes || 0, 
-                change: 12, 
-                isPositive: true 
+                change: dashboardData?.estatisticas?.variacaoConsultas || 0, 
+                isPositive: (dashboardData?.estatisticas?.variacaoConsultas || 0) >= 0
               },
               { 
                 label: 'Total de pacientes', 
                 value: dashboardData?.estatisticas?.totalPacientes || 0, 
-                change: 12, 
-                isPositive: true 
+                change: dashboardData?.estatisticas?.variacaoPacientes || 0, 
+                isPositive: (dashboardData?.estatisticas?.variacaoPacientes || 0) >= 0
               }
             ]}
             selectedPeriod={selectedPeriod}
