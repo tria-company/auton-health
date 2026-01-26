@@ -201,16 +201,21 @@ export async function getDashboardData(req: AuthenticatedRequest, res: Response)
     };
 
     // Buscar consultas com duração - incluir mais status e usar call_sessions como fallback
+    // Para o cálculo de duração média, vamos buscar consultas finalizadas no período
+    // IMPORTANTE: Filtrado por doctor_id para garantir que apenas consultas do médico logado sejam consideradas
     let consultasComDuracaoQuery = supabase
       .from('consultations')
       .select('id, duration, duracao, consultation_type, created_at, updated_at, consulta_inicio, consulta_fim, status')
-      .eq('doctor_id', medico.id)
-      .in('status', ['COMPLETED', 'PROCESSING', 'VALID_SOLUCAO', 'VALID_ANAMNESE', 'VALID_DIAGNOSTICO', 'RECORDING']);
+      .eq('doctor_id', medico.id) // ✅ FILTRO POR MÉDICO
+      .in('status', ['COMPLETED', 'PROCESSING', 'VALID_SOLUCAO']);
     
+    // Aplicar filtro de período baseado na data real da consulta
+    // Para períodos específicos, filtrar por updated_at (quando foi finalizada) ou consulta_fim
     if (period === 'hoje' || period === '7d' || period === '15d' || period === '30d') {
+      // Filtrar por updated_at (data de finalização) dentro do período
       consultasComDuracaoQuery = consultasComDuracaoQuery
-        .gte('created_at', startDateRange.toISOString())
-        .lte('created_at', endDateRange.toISOString());
+        .gte('updated_at', startDateRange.toISOString())
+        .lte('updated_at', endDateRange.toISOString());
     }
     
     const { data: todasConsultas, error: consultasError } = await consultasComDuracaoQuery;
@@ -219,6 +224,13 @@ export async function getDashboardData(req: AuthenticatedRequest, res: Response)
       console.error('Erro ao buscar consultas para cálculo de duração:', consultasError);
     }
 
+    console.log('🔍 [DASHBOARD] Consultas encontradas para cálculo de duração:', {
+      medicoId: medico.id,
+      medicoName: medico.name,
+      totalConsultas: todasConsultas?.length || 0,
+      periodo: period
+    });
+
     // Sempre tentar buscar duração de call_sessions para complementar os dados
     let consultasComDuracao = todasConsultas?.filter(c => {
       const duracao = calcularDuracaoEmSegundos(c);
@@ -226,6 +238,7 @@ export async function getDashboardData(req: AuthenticatedRequest, res: Response)
     }) || [];
 
     // Buscar duração de call_sessions para consultas que não têm duration
+    // Aplicar filtro de período também nas call_sessions
     if (todasConsultas && todasConsultas.length > 0) {
       const consultationIds = todasConsultas.map(c => c.id);
       const consultasSemDuracao = todasConsultas.filter(c => {
@@ -234,13 +247,26 @@ export async function getDashboardData(req: AuthenticatedRequest, res: Response)
       });
 
       if (consultasSemDuracao.length > 0) {
-        const { data: callSessions } = await supabase
+        // ✅ IMPORTANTE: consultationIds já está filtrado por doctor_id (vem de todasConsultas)
+        // Então as call_sessions também estarão filtradas por médico indiretamente
+        let callSessionsQuery = supabase
           .from('call_sessions')
           .select('consultation_id, started_at, ended_at')
-          .in('consultation_id', consultationIds)
+          .in('consultation_id', consultationIds) // ✅ Já filtrado por médico via consultations
           .eq('status', 'ended')
           .not('started_at', 'is', null)
           .not('ended_at', 'is', null);
+
+        // Aplicar filtro de período nas call_sessions baseado em ended_at
+        // Consideramos apenas sessões que terminaram no período para ter duração válida
+        if (period === 'hoje' || period === '7d' || period === '15d' || period === '30d') {
+          // Filtrar por ended_at (quando a sessão terminou) dentro do período
+          callSessionsQuery = callSessionsQuery
+            .gte('ended_at', startDateRange.toISOString())
+            .lte('ended_at', endDateRange.toISOString());
+        }
+
+        const { data: callSessions } = await callSessionsQuery;
 
         if (callSessions && callSessions.length > 0) {
           // Mapear duração de call_sessions para consultas
@@ -274,18 +300,44 @@ export async function getDashboardData(req: AuthenticatedRequest, res: Response)
       }
     }
 
+    // Filtrar consultas finalizadas no período (validação final)
+    // Isso garante que mesmo consultas com call_sessions estejam no período correto
+    if (period === 'hoje' || period === '7d' || period === '15d' || period === '30d') {
+      const inicioPeriodo = startDateRange.getTime();
+      const fimPeriodo = endDateRange.getTime();
+      
+      consultasComDuracao = consultasComDuracao.filter(c => {
+        // Priorizar consulta_fim, depois updated_at, depois created_at (para call_sessions)
+        const dataFinalizacao = c.consulta_fim 
+          ? new Date(c.consulta_fim).getTime() 
+          : (c.updated_at ? new Date(c.updated_at).getTime() : new Date(c.created_at).getTime());
+        
+        // Se a consulta tem duração de call_session, ela já foi filtrada por ended_at na query
+        // Então podemos confiar que está no período se passou pelos filtros anteriores
+        return dataFinalizacao >= inicioPeriodo && dataFinalizacao <= fimPeriodo;
+      });
+    }
+
     const duracaoMedia = consultasComDuracao.length > 0
       ? consultasComDuracao.reduce((acc, c) => acc + calcularDuracaoEmSegundos(c), 0) / consultasComDuracao.length
       : 0;
 
-    console.log('📊 [DASHBOARD] Cálculo de duração média:', {
-      totalConsultas: todasConsultas?.length || 0,
-      consultasComDuracao: consultasComDuracao.length,
-      duracaoMediaSegundos: Math.round(duracaoMedia)
-    });
-
     const consultasPresencial = consultasComDuracao?.filter(c => c.consultation_type === 'PRESENCIAL') || [];
     const consultasTelemedicina = consultasComDuracao?.filter(c => c.consultation_type === 'TELEMEDICINA') || [];
+
+    console.log('📊 [DASHBOARD] Cálculo de duração média:', {
+      medicoId: medico.id,
+      medicoNome: medico.name,
+      periodo: period,
+      dataInicio: startDateRange.toISOString(),
+      dataFim: endDateRange.toISOString(),
+      totalConsultas: todasConsultas?.length || 0,
+      consultasComDuracao: consultasComDuracao.length,
+      duracaoMediaSegundos: Math.round(duracaoMedia),
+      duracaoMediaMinutos: Math.round(duracaoMedia / 60),
+      consultasPresencial: consultasPresencial.length,
+      consultasTelemedicina: consultasTelemedicina.length
+    });
     
     const duracaoMediaPresencial = consultasPresencial.length > 0
       ? consultasPresencial.reduce((acc, c) => acc + calcularDuracaoEmSegundos(c), 0) / consultasPresencial.length
