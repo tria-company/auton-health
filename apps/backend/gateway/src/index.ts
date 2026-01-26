@@ -38,12 +38,19 @@ setTimeout(() => {
 }, 5000); // Aguarda 5 segundos para servidor iniciar completamente
 
 // Tratamento de erros não capturados
+// ⚠️ Em produção, não matar o processo imediatamente para permitir que o servidor inicie
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
-  process.exit(1);
+  console.error('❌ [ERROR] Unhandled Rejection at:', promise, 'reason:', reason);
+  // Em produção, apenas logar o erro, não matar o processo
+  if (process.env.NODE_ENV === 'development') {
+    process.exit(1);
+  }
 });
 
 process.on('uncaughtException', (error) => {
-  console.error('❌ Uncaught Exception:', error);
-  process.exit(1);
+  console.error('❌ [ERROR] Uncaught Exception:', error);
+  // Em produção, apenas logar o erro, não matar o processo imediatamente
+  if (process.env.NODE_ENV === 'development') {
+    process.exit(1);
+  }
 });
