@@ -41,6 +41,7 @@
     "node-cron": "^3.0.3",
     "node-fetch": "^2.7.0",
     "openai": "^4.104.0",
+    "resend": "^6.8.0",
     "sharp": "^0.32.6",
     "socket.io": "^4.8.1",
     "twilio": "^5.10.3",

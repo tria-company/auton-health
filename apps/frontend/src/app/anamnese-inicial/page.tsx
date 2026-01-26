@@ -171,10 +171,10 @@ function AnamneseInicialContent() {
 
       // Atualizar anamnese no Supabase
       const { data: updatedAnamnese, error: updateError } = await supabase
-        .from('anamnese_inicial')
+        .from('a_cadastro_anamnese')
         .update({
           ...invertedFormData,
-          status: 'COMPLETADA'
+          status: 'preenchida'
         })
         .eq('paciente_id', pacienteId)
         .select()

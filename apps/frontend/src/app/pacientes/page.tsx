@@ -305,9 +305,19 @@ export default function PatientsPage() {
         throw new Error('Usuário não autenticado');
       }
 
-      // Criar ou atualizar anamnese inicial no Supabase
+      // Buscar dados do paciente para obter email e nome
+      const patient = patients.find(p => p.id === patientId);
+      if (!patient) {
+        throw new Error('Paciente não encontrado');
+      }
+
+      if (!patient.email) {
+        throw new Error('Paciente não possui email cadastrado');
+      }
+
+      // Criar ou atualizar anamnese inicial no Supabase (tabela correta: a_cadastro_anamnese)
       const { data: existingAnamnese } = await supabase
-        .from('anamnese_inicial')
+        .from('a_cadastro_anamnese')
         .select('*')
         .eq('paciente_id', patientId)
         .single();
@@ -317,9 +327,9 @@ export default function PatientsPage() {
       if (existingAnamnese) {
         // Atualizar existente
         const { data, error } = await supabase
-          .from('anamnese_inicial')
+          .from('a_cadastro_anamnese')
           .update({ 
-            status: 'PENDENTE',
+            status: 'pendente',
             updated_at: new Date().toISOString()
           })
           .eq('paciente_id', patientId)
@@ -331,11 +341,11 @@ export default function PatientsPage() {
       } else {
         // Criar nova
         const { data, error } = await supabase
-          .from('anamnese_inicial')
+          .from('a_cadastro_anamnese')
           .insert({
             paciente_id: patientId,
             user_id: user.id,
-            status: 'PENDENTE'
+            status: 'pendente'
           })
           .select()
           .single();
@@ -344,7 +354,24 @@ export default function PatientsPage() {
         anamneseResult = data;
       }
 
-      showSuccess('Anamnese criada com sucesso!', 'Anamnese Enviada');
+      // Gerar link para anamnese
+      const anamneseLink = `${window.location.origin}/anamnese-inicial?pacienteId=${patientId}`;
+
+      // Enviar email via API do gateway
+      const emailResponse = await gatewayClient.post('/email/anamnese', {
+        to: patient.email,
+        patientName: patient.name,
+        anamneseLink
+      });
+
+      if (emailResponse.success) {
+        showSuccess('Anamnese enviada por email com sucesso!', 'Anamnese Enviada');
+      } else {
+        showWarning(
+          `Anamnese criada, mas email não foi enviado: ${emailResponse.error || 'Erro desconhecido'}. Use o link abaixo para copiar.`,
+          'Atenção'
+        );
+      }
       
       // Recarregar lista de pacientes para atualizar status
       fetchPatients(pagination.page, searchTerm, statusFilter, false);

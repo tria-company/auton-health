@@ -23,6 +23,7 @@ import adminRoutes from './routes/admin';
 import examesRoutes from './routes/exames';
 import googleCalendarRoutes from './routes/google-calendar';
 import consultasAdminRoutes from './routes/consultas-admin';
+import emailRoutes from './routes/email';
 
 // Rotas de Proxy
 import proxyRoutes from './routes/proxy';
@@ -129,6 +130,7 @@ app.use('/exames', examesRoutes);
 app.use('/processar-exames', examesRoutes);
 app.use('/auth/google-calendar', googleCalendarRoutes);
 app.use('/admin/consultations', consultasAdminRoutes);
+app.use('/email', emailRoutes);
 
 // Health check do Gateway
 app.get('/api/health', (req, res) => {

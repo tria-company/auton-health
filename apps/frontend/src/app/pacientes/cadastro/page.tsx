@@ -256,9 +256,14 @@ export default function CadastrarPaciente() {
         throw new Error('Usuário não autenticado');
       }
 
-      // Criar ou atualizar anamnese inicial no Supabase
+      // Verificar se paciente tem email
+      if (!formData.email) {
+        throw new Error('Paciente não possui email cadastrado. Por favor, adicione um email antes de enviar a anamnese.');
+      }
+
+      // Criar ou atualizar anamnese inicial no Supabase (tabela correta: a_cadastro_anamnese)
       const { data: existingAnamnese } = await supabase
-        .from('anamnese_inicial')
+        .from('a_cadastro_anamnese')
         .select('*')
         .eq('paciente_id', patientId)
         .single();
@@ -268,9 +273,9 @@ export default function CadastrarPaciente() {
       if (existingAnamnese) {
         // Atualizar existente
         const { data, error } = await supabase
-          .from('anamnese_inicial')
+          .from('a_cadastro_anamnese')
           .update({ 
-            status: 'PENDENTE',
+            status: 'pendente',
             updated_at: new Date().toISOString()
           })
           .eq('paciente_id', patientId)
@@ -282,11 +287,11 @@ export default function CadastrarPaciente() {
       } else {
         // Criar nova
         const { data, error } = await supabase
-          .from('anamnese_inicial')
+          .from('a_cadastro_anamnese')
           .insert({
             paciente_id: patientId,
             user_id: user.id,
-            status: 'PENDENTE'
+            status: 'pendente'
           })
           .select()
           .single();
@@ -301,15 +306,24 @@ export default function CadastrarPaciente() {
       
       // Buscar status da anamnese
       if (anamneseResult?.status) {
-        setAnamneseStatus(result.anamnese.status);
+        setAnamneseStatus(anamneseResult.status);
       }
+
+      // Enviar email via API do gateway
+      const emailResponse = await gatewayClient.post('/email/anamnese', {
+        to: formData.email,
+        patientName: formData.name,
+        anamneseLink
+      });
       
-      showSuccess(
-        result.emailSent 
-          ? 'Anamnese enviada por email com sucesso!'
-          : 'Anamnese criada com sucesso! Use o botão abaixo para copiar o link.',
-        'Anamnese Enviada'
-      );
+      if (emailResponse.success) {
+        showSuccess('Anamnese enviada por email com sucesso!', 'Anamnese Enviada');
+      } else {
+        showWarning(
+          `Anamnese criada, mas email não foi enviado: ${emailResponse.error || 'Erro desconhecido'}. Use o botão abaixo para copiar o link.`,
+          'Atenção'
+        );
+      }
     } catch (error) {
       console.error('Erro ao enviar anamnese:', error);
       showError(`Erro ao enviar anamnese: ${error instanceof Error ? error.message : 'Erro desconhecido'}`, 'Erro');
