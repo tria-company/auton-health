@@ -180,10 +180,12 @@ app.use('*', (req, res) => {
   });
 });
 
-const PORT = parseInt(process.env.PORT || '3001', 10);
+// Cloud Run define PORT=8080, mas aceita qualquer porta via env
+const PORT = parseInt(process.env.PORT || '8080', 10);
 
 console.log('🔧 [STARTUP] Iniciando servidor...');
-console.log('🔧 [STARTUP] PORT:', PORT);
+console.log('🔧 [STARTUP] PORT (process.env.PORT):', process.env.PORT);
+console.log('🔧 [STARTUP] PORT (usado):', PORT);
 console.log('🔧 [STARTUP] NODE_ENV:', process.env.NODE_ENV);
 
 // Tratamento de erros no servidor
@@ -195,15 +197,23 @@ httpServer.on('error', (error: NodeJS.ErrnoException) => {
   process.exit(1);
 });
 
-httpServer.listen(PORT, '0.0.0.0', () => {
-  console.log('🚀 MedCall Gateway Server Started');
-  console.log(`📡 Listening on port ${PORT}`);
-  console.log(`✅ Health check disponível em: http://0.0.0.0:${PORT}/health`);
-  console.log(`twisted_rightwards_arrows Proxying /api requests to Microservices\n`);
-}).on('error', (error: NodeJS.ErrnoException) => {
-  console.error('❌ [SERVER] Erro ao iniciar servidor:', error);
+// Iniciar servidor imediatamente
+try {
+  httpServer.listen(PORT, '0.0.0.0', () => {
+    console.log('🚀 MedCall Gateway Server Started');
+    console.log(`📡 Listening on port ${PORT} (0.0.0.0:${PORT})`);
+    console.log(`✅ Health check disponível em: http://0.0.0.0:${PORT}/health`);
+    console.log(`twisted_rightwards_arrows Proxying /api requests to Microservices\n`);
+  }).on('error', (error: NodeJS.ErrnoException) => {
+    console.error('❌ [SERVER] Erro ao iniciar servidor:', error);
+    console.error('❌ [SERVER] Error code:', error.code);
+    console.error('❌ [SERVER] Error message:', error.message);
+    process.exit(1);
+  });
+} catch (error) {
+  console.error('❌ [SERVER] Erro ao tentar iniciar servidor (catch):', error);
   process.exit(1);
-});
+}
 
 // Tratamento de sinais de encerramento
 process.on('SIGTERM', () => {
