@@ -197,21 +197,43 @@ httpServer.on('error', (error: NodeJS.ErrnoException) => {
   process.exit(1);
 });
 
-// Iniciar servidor imediatamente
+// Iniciar servidor imediatamente - CRÍTICO para Cloud Run
+console.log('🔧 [SERVER] Chamando httpServer.listen()...');
+console.log('🔧 [SERVER] Porta:', PORT);
+console.log('🔧 [SERVER] Host: 0.0.0.0');
+
 try {
-  httpServer.listen(PORT, '0.0.0.0', () => {
+  const server = httpServer.listen(PORT, '0.0.0.0', () => {
+    console.log('✅ [SERVER] CALLBACK: Servidor iniciado com sucesso!');
     console.log('🚀 MedCall Gateway Server Started');
     console.log(`📡 Listening on port ${PORT} (0.0.0.0:${PORT})`);
     console.log(`✅ Health check disponível em: http://0.0.0.0:${PORT}/health`);
+    console.log(`✅ Health check disponível em: http://localhost:${PORT}/health`);
     console.log(`twisted_rightwards_arrows Proxying /api requests to Microservices\n`);
-  }).on('error', (error: NodeJS.ErrnoException) => {
-    console.error('❌ [SERVER] Erro ao iniciar servidor:', error);
+    
+    // Verificar se realmente está escutando
+    const address = server.address();
+    console.log('🔧 [SERVER] Server address:', address);
+  });
+  
+  server.on('error', (error: NodeJS.ErrnoException) => {
+    console.error('❌ [SERVER] Erro no servidor HTTP:', error);
     console.error('❌ [SERVER] Error code:', error.code);
     console.error('❌ [SERVER] Error message:', error.message);
+    console.error('❌ [SERVER] Error stack:', error.stack);
     process.exit(1);
   });
+  
+  server.on('listening', () => {
+    console.log('✅ [SERVER] Evento "listening" disparado');
+    const address = server.address();
+    console.log('✅ [SERVER] Servidor escutando em:', address);
+  });
+  
+  console.log('✅ [SERVER] httpServer.listen() chamado (não bloqueante)');
 } catch (error) {
   console.error('❌ [SERVER] Erro ao tentar iniciar servidor (catch):', error);
+  console.error('❌ [SERVER] Error stack:', error instanceof Error ? error.stack : 'N/A');
   process.exit(1);
 }
 
