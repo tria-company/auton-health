@@ -99,7 +99,7 @@ router.post('/upload', upload.single('recording') as any, async (req, res) => {
 
     // Upload para Supabase Storage
     const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('consultas')
+        .from('consultations')
       .upload(filePath, file.buffer, {
         contentType: contentType,
         upsert: true, // Sobrescrever se existir
@@ -124,7 +124,7 @@ router.post('/upload', upload.single('recording') as any, async (req, res) => {
 
     // Verificar se o arquivo realmente foi criado
     const { data: fileList, error: listError } = await supabase.storage
-      .from('consultas')
+        .from('consultations')
       .list(filePath.split('/').slice(0, -1).join('/'));
 
     if (listError) {
@@ -135,7 +135,7 @@ router.post('/upload', upload.single('recording') as any, async (req, res) => {
 
     // Obter URL pública ou assinada
     const { data: urlData } = supabase.storage
-      .from('consultas')
+        .from('consultations')
       .getPublicUrl(filePath);
 
     const publicUrl = urlData?.publicUrl;
@@ -262,7 +262,7 @@ router.get('/download/:recordingId', async (req, res) => {
 
     // Gerar URL assinada para download seguro
     const { data: signedUrlData, error: signedUrlError } = await supabase.storage
-      .from('consultas')
+        .from('consultations')
       .createSignedUrl(recording.file_path, expiresIn);
 
     if (signedUrlError) {
@@ -302,7 +302,7 @@ router.delete('/:recordingId', async (req, res) => {
 
     // Remover do storage
     const { error: deleteError } = await supabase.storage
-      .from('consultas')
+        .from('consultations')
       .remove([recording.file_path]);
 
     if (deleteError) {

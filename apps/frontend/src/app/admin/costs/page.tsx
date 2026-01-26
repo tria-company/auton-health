@@ -122,7 +122,7 @@ export default function CostsMonitorPage() {
 
       // Buscar consultas ativas (RECORDING)
       const { data: activeConsults, error: consultsError } = await supabase
-        .from('consultas')
+        .from('consultations')
         .select(`
           id,
           status,
@@ -254,7 +254,7 @@ export default function CostsMonitorPage() {
     try {
       // Atualizar status da consulta para COMPLETED (forçar encerramento)
       const { error: updateError } = await supabase
-        .from('consultas')
+        .from('consultations')
         .update({
           status: 'COMPLETED',
           consulta_fim: new Date().toISOString(),
@@ -267,7 +267,7 @@ export default function CostsMonitorPage() {
 
       // Buscar room_id para atualizar call_session
       const { data: consulta } = await supabase
-        .from('consultas')
+        .from('consultations')
         .select('room_id')
         .eq('id', consultationId)
         .single();
@@ -306,7 +306,7 @@ export default function CostsMonitorPage() {
     try {
       // Buscar todas as consultas RECORDING
       const { data: recordingConsultations, error: fetchError } = await supabase
-        .from('consultas')
+        .from('consultations')
         .select('id, room_id')
         .eq('status', 'RECORDING');
 
@@ -324,7 +324,7 @@ export default function CostsMonitorPage() {
 
       // Atualizar todas as consultas RECORDING para COMPLETED
       const { error: updateError } = await supabase
-        .from('consultas')
+        .from('consultations')
         .update({
           status: 'COMPLETED',
           consulta_fim: new Date().toISOString(),

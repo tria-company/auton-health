@@ -472,14 +472,14 @@ export function CreateConsultationRoom({
 
         // Criar consulta no Supabase
         const { data: consultation, error: insertError } = await supabase
-          .from('consultas')
+          .from('consultations')
           .insert({
             patient_id: selectedPatient,
             patient_name: selectedPatientData.name,
             consultation_type: consultationType === 'online' ? 'TELEMEDICINA' : 'PRESENCIAL',
             status: 'AGENDAMENTO',
             consulta_inicio: consultaInicio,
-            user_id: user.id,
+            doctor_id: user.id,
           })
           .select()
           .single();
@@ -511,13 +511,13 @@ export function CreateConsultationRoom({
 
         // Criar consulta presencial via Supabase
         const { data: consultation, error: insertError } = await supabase
-          .from('consultas')
+          .from('consultations')
           .insert({
             patient_id: selectedPatient,
             patient_name: selectedPatientData.name,
             consultation_type: 'PRESENCIAL',
             status: 'RECORDING',
-            user_id: userAuth,
+            doctor_id: userAuth,
           })
           .select()
           .single();

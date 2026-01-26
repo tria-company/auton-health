@@ -212,10 +212,10 @@ export async function createConsultation(consultationData: {
 
     // Criar consulta no Supabase
     const { data: consultation, error: insertError } = await supabase
-      .from('consultas')
+      .from('consultations')
       .insert({
         ...consultationData,
-        user_id: user.id,
+        doctor_id: user.id,
       })
       .select()
       .single();
