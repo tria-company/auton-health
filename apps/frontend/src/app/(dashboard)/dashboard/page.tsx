@@ -824,16 +824,26 @@ export default function DashboardPage() {
           <div className="title">Tempo médio de consulta</div>
           <div className="value">
             {(() => {
-              const minutes = Math.floor(dashboardData.estatisticas.duracaoMediaSegundos / 60);
-              const seconds = dashboardData.estatisticas.duracaoMediaSegundos % 60;
-              return `${minutes}:${String(seconds).padStart(2, '0')} min`;
+              const duracaoSegundos = dashboardData.estatisticas.duracaoMediaSegundos || 0;
+              if (duracaoSegundos === 0) {
+                return 'N/A';
+              }
+              const minutes = Math.floor(duracaoSegundos / 60);
+              const seconds = duracaoSegundos % 60;
+              if (minutes > 0) {
+                return `${minutes}:${String(seconds).padStart(2, '0')} min`;
+              }
+              return `${seconds} seg`;
             })()}
           </div>
           <div className="subtitle">
             {(() => {
               const presencialMin = Math.round((dashboardData.estatisticas.duracaoMediaPresencialSegundos || 0) / 60);
               const telemedicinaMin = Math.round((dashboardData.estatisticas.duracaoMediaTelemedicinaSegundos || 0) / 60);
-              return `Telemedicina: ${telemedicinaMin} min Presencial: ${presencialMin} min`;
+              if (presencialMin === 0 && telemedicinaMin === 0) {
+                return 'Sem dados disponíveis';
+              }
+              return `Telemedicina: ${telemedicinaMin} min | Presencial: ${presencialMin} min`;
             })()}
           </div>
         </div>

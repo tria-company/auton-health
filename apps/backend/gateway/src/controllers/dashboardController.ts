@@ -163,20 +163,36 @@ export async function getDashboardData(req: AuthenticatedRequest, res: Response)
 
     // Duração média das consultas
     const calcularDuracaoEmSegundos = (c: any) => {
+      // 1. Tentar usar campo duration direto (em segundos)
       if (c.duration != null && c.duration !== undefined && c.duration > 0) {
         return Number(c.duration);
       }
       
+      // 2. Tentar usar campo duracao (pode estar em minutos)
       if (c.duracao != null && c.duracao !== undefined && c.duracao > 0) {
         const duracaoValue = Number(c.duracao);
+        // Se for menor que 60, provavelmente está em minutos
         return duracaoValue < 60 && duracaoValue > 0 ? duracaoValue * 60 : duracaoValue;
       }
       
+      // 3. Tentar usar consulta_inicio e consulta_fim
       if (c.consulta_inicio && c.consulta_fim) {
         const inicio = new Date(c.consulta_inicio).getTime();
         const fim = new Date(c.consulta_fim).getTime();
         const diffSegundos = Math.max(0, Math.round((fim - inicio) / 1000));
-        if (diffSegundos > 0) {
+        if (diffSegundos > 0 && diffSegundos < 86400) { // Menos de 24 horas (razoável)
+          return diffSegundos;
+        }
+      }
+      
+      // 4. Fallback: usar created_at e updated_at para consultas COMPLETED ou PROCESSING
+      if ((c.status === 'COMPLETED' || c.status === 'PROCESSING' || c.status === 'VALID_SOLUCAO') && c.created_at && c.updated_at) {
+        const inicio = new Date(c.created_at).getTime();
+        const fim = new Date(c.updated_at).getTime();
+        const diffSegundos = Math.max(0, Math.round((fim - inicio) / 1000));
+        // Só usar se for razoável (entre 30 segundos e 6 horas)
+        // Aumentado o limite superior para capturar consultas mais longas
+        if (diffSegundos >= 30 && diffSegundos <= 21600) {
           return diffSegundos;
         }
       }
@@ -184,11 +200,12 @@ export async function getDashboardData(req: AuthenticatedRequest, res: Response)
       return 0;
     };
 
+    // Buscar consultas com duração - incluir mais status e usar call_sessions como fallback
     let consultasComDuracaoQuery = supabase
       .from('consultations')
-      .select('id, duration, duracao, consultation_type, created_at, consulta_inicio, consulta_fim, status')
+      .select('id, duration, duracao, consultation_type, created_at, updated_at, consulta_inicio, consulta_fim, status')
       .eq('doctor_id', medico.id)
-      .in('status', ['COMPLETED', 'PROCESSING', 'VALID_SOLUCAO']);
+      .in('status', ['COMPLETED', 'PROCESSING', 'VALID_SOLUCAO', 'VALID_ANAMNESE', 'VALID_DIAGNOSTICO', 'RECORDING']);
     
     if (period === 'hoje' || period === '7d' || period === '15d' || period === '30d') {
       consultasComDuracaoQuery = consultasComDuracaoQuery
@@ -196,16 +213,76 @@ export async function getDashboardData(req: AuthenticatedRequest, res: Response)
         .lte('created_at', endDateRange.toISOString());
     }
     
-    const { data: todasConsultas } = await consultasComDuracaoQuery;
+    const { data: todasConsultas, error: consultasError } = await consultasComDuracaoQuery;
 
-    const consultasComDuracao = todasConsultas?.filter(c => {
+    if (consultasError) {
+      console.error('Erro ao buscar consultas para cálculo de duração:', consultasError);
+    }
+
+    // Sempre tentar buscar duração de call_sessions para complementar os dados
+    let consultasComDuracao = todasConsultas?.filter(c => {
       const duracao = calcularDuracaoEmSegundos(c);
       return duracao > 0;
     }) || [];
 
+    // Buscar duração de call_sessions para consultas que não têm duration
+    if (todasConsultas && todasConsultas.length > 0) {
+      const consultationIds = todasConsultas.map(c => c.id);
+      const consultasSemDuracao = todasConsultas.filter(c => {
+        const duracao = calcularDuracaoEmSegundos(c);
+        return duracao === 0;
+      });
+
+      if (consultasSemDuracao.length > 0) {
+        const { data: callSessions } = await supabase
+          .from('call_sessions')
+          .select('consultation_id, started_at, ended_at')
+          .in('consultation_id', consultationIds)
+          .eq('status', 'ended')
+          .not('started_at', 'is', null)
+          .not('ended_at', 'is', null);
+
+        if (callSessions && callSessions.length > 0) {
+          // Mapear duração de call_sessions para consultas
+          const duracaoPorConsulta = new Map<string, number>();
+          callSessions.forEach(session => {
+            if (session.started_at && session.ended_at && session.consultation_id) {
+              const inicio = new Date(session.started_at).getTime();
+              const fim = new Date(session.ended_at).getTime();
+              const diffSegundos = Math.max(0, Math.round((fim - inicio) / 1000));
+              // Validar duração razoável (entre 30 segundos e 4 horas)
+              if (diffSegundos >= 30 && diffSegundos <= 14400) {
+                duracaoPorConsulta.set(session.consultation_id, diffSegundos);
+              }
+            }
+          });
+
+          // Adicionar duração das call_sessions às consultas que não têm
+          todasConsultas.forEach(consulta => {
+            const duracaoSession = duracaoPorConsulta.get(consulta.id);
+            if (duracaoSession && !consulta.duration) {
+              consulta.duration = duracaoSession;
+            }
+          });
+
+          // Recalcular consultas com duração
+          consultasComDuracao = todasConsultas.filter(c => {
+            const duracao = calcularDuracaoEmSegundos(c);
+            return duracao > 0;
+          });
+        }
+      }
+    }
+
     const duracaoMedia = consultasComDuracao.length > 0
       ? consultasComDuracao.reduce((acc, c) => acc + calcularDuracaoEmSegundos(c), 0) / consultasComDuracao.length
       : 0;
+
+    console.log('📊 [DASHBOARD] Cálculo de duração média:', {
+      totalConsultas: todasConsultas?.length || 0,
+      consultasComDuracao: consultasComDuracao.length,
+      duracaoMediaSegundos: Math.round(duracaoMedia)
+    });
 
     const consultasPresencial = consultasComDuracao?.filter(c => c.consultation_type === 'PRESENCIAL') || [];
     const consultasTelemedicina = consultasComDuracao?.filter(c => c.consultation_type === 'TELEMEDICINA') || [];
