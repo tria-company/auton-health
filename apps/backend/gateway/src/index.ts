@@ -10,7 +10,15 @@ import { testDatabaseConnection } from './config/database';
 
 // Importar o servidor configurado IMEDIATAMENTE
 // Isso garante que o servidor comece a escutar na porta o mais rápido possível
-import './server';
+try {
+  import('./server').catch((error) => {
+    console.error('❌ [STARTUP] Erro ao importar servidor:', error);
+    process.exit(1);
+  });
+} catch (error) {
+  console.error('❌ [STARTUP] Erro ao importar servidor (síncrono):', error);
+  process.exit(1);
+}
 
 // Função para verificar conexão com banco (executa APÓS o servidor iniciar)
 async function verifyDatabaseConnection() {

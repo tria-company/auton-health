@@ -2,7 +2,15 @@ import { Request, Response } from 'express';
 import { Resend } from 'resend';
 import { AuthenticatedRequest } from '../middleware/auth';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy initialization do Resend para evitar problemas na inicialização
+let resendInstance: Resend | null = null;
+
+function getResend(): Resend {
+  if (!resendInstance) {
+    resendInstance = new Resend(process.env.RESEND_API_KEY);
+  }
+  return resendInstance;
+}
 
 /**
  * POST /email/anamnese
@@ -51,6 +59,7 @@ export async function sendAnamneseEmail(req: AuthenticatedRequest, res: Response
     console.log('  - Para:', to);
     console.log('  - Link:', anamneseLink);
 
+    const resend = getResend();
     const { data, error } = await resend.emails.send({
       from: `${appName} <${fromEmail}>`,
       to: [to],

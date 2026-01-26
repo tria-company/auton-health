@@ -181,11 +181,23 @@ console.log('🔧 [STARTUP] Iniciando servidor...');
 console.log('🔧 [STARTUP] PORT:', PORT);
 console.log('🔧 [STARTUP] NODE_ENV:', process.env.NODE_ENV);
 
+// Tratamento de erros no servidor
+httpServer.on('error', (error: NodeJS.ErrnoException) => {
+  console.error('❌ [SERVER] Erro no servidor HTTP:', error);
+  if (error.code === 'EADDRINUSE') {
+    console.error(`❌ [SERVER] Porta ${PORT} já está em uso`);
+  }
+  process.exit(1);
+});
+
 httpServer.listen(PORT, '0.0.0.0', () => {
   console.log('🚀 MedCall Gateway Server Started');
   console.log(`📡 Listening on port ${PORT}`);
   console.log(`✅ Health check disponível em: http://0.0.0.0:${PORT}/health`);
   console.log(`twisted_rightwards_arrows Proxying /api requests to Microservices\n`);
+}).on('error', (error: NodeJS.ErrnoException) => {
+  console.error('❌ [SERVER] Erro ao iniciar servidor:', error);
+  process.exit(1);
 });
 
 // Tratamento de sinais de encerramento
