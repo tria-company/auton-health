@@ -470,6 +470,19 @@ export function CreateConsultationRoom({
           return;
         }
 
+        // Buscar médico na tabela medicos usando a FK do auth.users
+        const { data: medico, error: medicoError } = await supabase
+          .from('medicos')
+          .select('id')
+          .eq('user_auth', user.id)
+          .single();
+
+        if (medicoError || !medico) {
+          setIsCreatingRoom(false);
+          showError('Médico não encontrado. Verifique se sua conta está sincronizada.', 'Erro ao Criar');
+          return;
+        }
+
         // Criar consulta no Supabase
         const { data: consultation, error: insertError } = await supabase
           .from('consultations')
@@ -479,7 +492,7 @@ export function CreateConsultationRoom({
             consultation_type: consultationType === 'online' ? 'TELEMEDICINA' : 'PRESENCIAL',
             status: 'AGENDAMENTO',
             consulta_inicio: consultaInicio,
-            doctor_id: user.id,
+            doctor_id: medico.id,
           })
           .select()
           .single();
@@ -509,6 +522,17 @@ export function CreateConsultationRoom({
           throw new Error('Usuário não autenticado');
         }
 
+        // Buscar médico na tabela medicos usando a FK do auth.users
+        const { data: medico, error: medicoError } = await supabase
+          .from('medicos')
+          .select('id')
+          .eq('user_auth', userAuth)
+          .single();
+
+        if (medicoError || !medico) {
+          throw new Error('Médico não encontrado. Verifique se sua conta está sincronizada.');
+        }
+
         // Criar consulta presencial via Supabase
         const { data: consultation, error: insertError } = await supabase
           .from('consultations')
@@ -517,7 +541,7 @@ export function CreateConsultationRoom({
             patient_name: selectedPatientData.name,
             consultation_type: 'PRESENCIAL',
             status: 'RECORDING',
-            doctor_id: userAuth,
+            doctor_id: medico.id,
           })
           .select()
           .single();
