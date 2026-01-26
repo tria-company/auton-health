@@ -1,16 +1,28 @@
 #!/usr/bin/env node
 
+// Log imediato para confirmar que o processo está sendo executado
+console.log('🚀 [INDEX] Processo iniciado');
+console.log('🚀 [INDEX] Node version:', process.version);
+console.log('🚀 [INDEX] Process PID:', process.pid);
+console.log('🚀 [INDEX] PORT env:', process.env.PORT);
+
 // Carregar variáveis de ambiente
 import * as dotenv from 'dotenv';
 dotenv.config();
+
+console.log('🚀 [INDEX] Dotenv carregado');
 
 // ✅ Verificar configuração do Supabase antes de iniciar
 import { config } from './config';
 import { testDatabaseConnection } from './config/database';
 
+console.log('🚀 [INDEX] Config importado, importando servidor...');
+
 // Importar o servidor configurado IMEDIATAMENTE
 // Isso garante que o servidor comece a escutar na porta o mais rápido possível
 import './server';
+
+console.log('🚀 [INDEX] Servidor importado');
 
 // Função para verificar conexão com banco (executa APÓS o servidor iniciar)
 async function verifyDatabaseConnection() {

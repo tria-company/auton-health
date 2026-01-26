@@ -22,7 +22,11 @@ COPY packages/shared-types/package.json packages/shared-types/package.json
 COPY packages/utils/package.json packages/utils/package.json
 
 # Install all workspace deps (dev + prod) once at the root
-RUN npm ci
+# Usar --include=dev para garantir que todas as dependências sejam instaladas
+RUN npm ci --include=dev && \
+    echo "Verificando se resend foi instalado..." && \
+    ls -la node_modules | grep resend || echo "⚠️ resend não encontrado em node_modules" && \
+    npm list resend || echo "⚠️ resend não listado"
 
 # Copy full repository and build only the gateway package
 COPY . .
@@ -44,6 +48,11 @@ COPY --from=builder /app/node_modules ./node_modules
 # Copy built gateway artifacts and its package manifest
 COPY --from=builder /app/apps/backend/gateway/dist ./apps/backend/gateway/dist
 COPY --from=builder /app/apps/backend/gateway/package.json ./apps/backend/gateway/package.json
+
+# Verificar se resend está presente no runtime
+RUN echo "Verificando resend no runtime..." && \
+    ls -la node_modules | grep resend || echo "❌ resend NÃO encontrado" && \
+    test -d node_modules/resend && echo "✅ resend encontrado" || (echo "❌ resend NÃO encontrado - instalando..." && npm install resend@^6.8.0 --no-save)
 
 # Environment - PORT will be set by Cloud Run
 # ENV PORT=3001  # Removed - Cloud Run sets this dynamically
