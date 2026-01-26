@@ -132,7 +132,15 @@ app.use('/auth/google-calendar', googleCalendarRoutes);
 app.use('/admin/consultations', consultasAdminRoutes);
 app.use('/email', emailRoutes);
 
-// Health check do Gateway
+// Health check do Gateway (para Cloud Run e Docker)
+app.get('/health', (req, res) => {
+  res.json({
+    service: 'gateway',
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+  });
+});
+
 app.get('/api/health', (req, res) => {
   res.json({
     service: 'gateway',
