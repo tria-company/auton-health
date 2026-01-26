@@ -177,9 +177,14 @@ app.use('*', (req, res) => {
 
 const PORT = parseInt(process.env.PORT || '3001', 10);
 
+console.log('🔧 [STARTUP] Iniciando servidor...');
+console.log('🔧 [STARTUP] PORT:', PORT);
+console.log('🔧 [STARTUP] NODE_ENV:', process.env.NODE_ENV);
+
 httpServer.listen(PORT, '0.0.0.0', () => {
   console.log('🚀 MedCall Gateway Server Started');
   console.log(`📡 Listening on port ${PORT}`);
+  console.log(`✅ Health check disponível em: http://0.0.0.0:${PORT}/health`);
   console.log(`twisted_rightwards_arrows Proxying /api requests to Microservices\n`);
 });
 
