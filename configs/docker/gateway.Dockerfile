@@ -49,10 +49,15 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/apps/backend/gateway/dist ./apps/backend/gateway/dist
 COPY --from=builder /app/apps/backend/gateway/package.json ./apps/backend/gateway/package.json
 
-# Verificar se resend está presente no runtime
-RUN echo "Verificando resend no runtime..." && \
-    ls -la node_modules | grep resend || echo "❌ resend NÃO encontrado" && \
-    test -d node_modules/resend && echo "✅ resend encontrado" || (echo "❌ resend NÃO encontrado - instalando..." && npm install resend@^6.8.0 --no-save)
+# Garantir que resend está instalado (pode não estar devido a hoisting do workspace)
+RUN if [ ! -d "node_modules/resend" ]; then \
+      echo "⚠️ resend não encontrado, instalando..." && \
+      npm install resend@^6.8.0 --no-save --legacy-peer-deps && \
+      echo "✅ resend instalado"; \
+    else \
+      echo "✅ resend já está presente"; \
+    fi && \
+    ls -la node_modules/resend 2>/dev/null || echo "❌ resend ainda não encontrado após instalação"
 
 # Environment - PORT will be set by Cloud Run
 # ENV PORT=3001  # Removed - Cloud Run sets this dynamically
