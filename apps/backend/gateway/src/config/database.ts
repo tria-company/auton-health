@@ -4,8 +4,8 @@ import { config } from './index';
 // Configuração do cliente Supabase
 // ✅ IMPORTANTE: Usar service role key para bypassar RLS
 export const supabase = createClient(
-  config.SUPABASE_URL,
-  config.SUPABASE_SERVICE_ROLE_KEY,
+  config.SUPABASE_URL || 'https://placeholder.supabase.co',
+  config.SUPABASE_SERVICE_ROLE_KEY || 'placeholder-key',
   {
     auth: {
       autoRefreshToken: false,
@@ -21,7 +21,7 @@ export const supabase = createClient(
       headers: {
         'x-application-name': 'medcall-gateway',
         // ✅ Garantir que estamos usando service role
-        'apikey': config.SUPABASE_SERVICE_ROLE_KEY,
+        'apikey': config.SUPABASE_SERVICE_ROLE_KEY || 'placeholder-key',
       },
     },
   }

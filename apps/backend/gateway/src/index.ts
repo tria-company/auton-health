@@ -30,11 +30,12 @@ async function verifyDatabaseConnection() {
 }
 
 // Verificar conexão APÓS importar o servidor (não bloqueia startup)
+// Aumentado para 5 segundos para garantir que o servidor já iniciou
 setTimeout(() => {
   verifyDatabaseConnection().catch((error) => {
     console.error('❌ [STARTUP] Erro ao verificar conexão:', error);
   });
-}, 1000); // Aguarda 1 segundo para servidor iniciar
+}, 5000); // Aguarda 5 segundos para servidor iniciar completamente
 
 // Tratamento de erros não capturados
 process.on('unhandledRejection', (reason, promise) => {
