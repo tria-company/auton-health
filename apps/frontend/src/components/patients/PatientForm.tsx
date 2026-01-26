@@ -34,8 +34,8 @@ interface Patient {
 
 interface CreatePatientData {
   name: string;
-  email?: string;
-  phone?: string;
+  email: string;
+  phone: string;
   city?: string;
   state?: string;
   birth_date?: string;
@@ -147,8 +147,14 @@ export function PatientForm({ patient, onSubmit, onCancel, title }: PatientFormP
       newErrors.name = 'Nome é obrigatório';
     }
 
-    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+    if (!formData.email || !formData.email.trim()) {
+      newErrors.email = 'Email é obrigatório';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = 'Email inválido';
+    }
+
+    if (!formData.phone || !formData.phone.trim()) {
+      newErrors.phone = 'Telefone é obrigatório';
     }
 
     if (formData.cpf && !/^\d{3}\.\d{3}\.\d{3}-\d{2}$/.test(formData.cpf)) {
@@ -193,12 +199,14 @@ export function PatientForm({ patient, onSubmit, onCancel, title }: PatientFormP
     setIsSubmitting(true);
     
     try {
-      // Limpar campos vazios antes de enviar
+      // Limpar campos vazios antes de enviar (mas manter email e phone que são obrigatórios)
       const cleanedData: CreatePatientData = {
-        name: formData.name,
+        name: formData.name.trim(),
+        email: formData.email.trim(),
+        phone: formData.phone.trim(),
         ...Object.fromEntries(
           Object.entries(formData).filter(([key, value]) => 
-            key !== 'name' && value !== '' && value !== undefined && value !== null
+            !['name', 'email', 'phone'].includes(key) && value !== '' && value !== undefined && value !== null
           )
         ),
         profile_pic: profilePicUrl || undefined
@@ -451,7 +459,7 @@ export function PatientForm({ patient, onSubmit, onCancel, title }: PatientFormP
 
             <div className="form-field">
               <label htmlFor="email" className="field-label">
-                Email
+                Email *
               </label>
               <input
                 id="email"
@@ -460,22 +468,25 @@ export function PatientForm({ patient, onSubmit, onCancel, title }: PatientFormP
                 onChange={(e) => handleChange('email', e.target.value)}
                 className={`form-input ${errors.email ? 'error' : ''}`}
                 placeholder="email@exemplo.com"
+                required
               />
               {errors.email && <span className="field-error">{errors.email}</span>}
             </div>
 
             <div className="form-field">
               <label htmlFor="phone" className="field-label">
-                Telefone
+                Telefone *
               </label>
               <input
                 id="phone"
                 type="tel"
                 value={formData.phone}
                 onChange={(e) => handleChange('phone', formatPhone(e.target.value))}
-                className="form-input"
+                className={`form-input ${errors.phone ? 'error' : ''}`}
                 placeholder="(11) 99999-9999"
+                required
               />
+              {errors.phone && <span className="field-error">{errors.phone}</span>}
             </div>
 
             <div className="form-field">

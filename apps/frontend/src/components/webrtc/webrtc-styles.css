@@ -491,6 +491,11 @@
   color: #FFFFFF;
 }
 
+/* Ícone do calendário branco quando botão está ativo */
+.consultation-type-btn.active .btn-icon-calendar {
+  filter: brightness(0) invert(1) !important;
+}
+
 .consultation-type-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -505,6 +510,12 @@
   width: 19.06px;
   height: 19.06px;
   object-fit: contain;
+  transition: filter 0.2s ease;
+}
+
+/* Ícone do calendário branco quando botão está ativo */
+.consultation-type-btn.active .btn-icon-calendar {
+  filter: brightness(0) invert(1) !important;
 }
 
 .btn-arrow {
