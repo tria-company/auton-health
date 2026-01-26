@@ -198,6 +198,11 @@ function PresencialConsultationContent() {
   useEffect(() => {
     // Usar diretamente a URL do Realtime Service (WebSocket)
     let realtimeUrl = process.env.NEXT_PUBLIC_REALTIME_WS_URL || 'ws://localhost:3002';
+    
+    // Verificar se a URL está configurada
+    if (!process.env.NEXT_PUBLIC_REALTIME_WS_URL && typeof window !== 'undefined') {
+      console.warn('⚠️ NEXT_PUBLIC_REALTIME_WS_URL não configurada, usando fallback');
+    }
 
     // Socket.IO espera HTTP/HTTPS, não WS/WSS
     // Converter automaticamente
@@ -209,20 +214,28 @@ function PresencialConsultationContent() {
 
     console.log('🔌 Conectando Socket.IO para:', realtimeUrl);
 
+    // Tentar polling primeiro (mais confiável em Cloud Run), depois upgrade para websocket
     const newSocket = io(realtimeUrl, {
       auth: {
         userName: 'Doctor',
         password: 'x'
       },
-      transports: ['websocket', 'polling'],
+      // Tentar polling primeiro, depois websocket (mais confiável quando backend pode estar lento)
+      transports: ['polling', 'websocket'],
       reconnection: true,
-      reconnectionAttempts: 5,
+      reconnectionAttempts: 10,
       reconnectionDelay: 1000,
-      timeout: 10000
+      reconnectionDelayMax: 5000,
+      timeout: 20000,
+      // Forçar upgrade para websocket após conectar via polling
+      upgrade: true,
+      // Configurações adicionais para Cloud Run
+      forceNew: false,
+      rememberUpgrade: true
     });
 
     newSocket.on('connect', () => {
-      console.log('✅ Socket conectado');
+      console.log('✅ Socket conectado via', newSocket.io.engine.transport.name);
       setSocketConnected(true);
       setError(null); // Limpar erro ao conectar
     });
@@ -230,12 +243,40 @@ function PresencialConsultationContent() {
     newSocket.on('disconnect', (reason) => {
       console.log('❌ Socket desconectado:', reason);
       setSocketConnected(false);
+      
+      // Se foi desconexão forçada pelo servidor, não tentar reconectar
+      if (reason === 'io server disconnect') {
+        console.warn('⚠️ Servidor desconectou a conexão');
+        setError('Conexão encerrada pelo servidor');
+      }
     });
 
     newSocket.on('connect_error', (error) => {
       console.error('❌ Erro de conexão Socket.IO:', error);
       setSocketConnected(false);
-      setError(`Erro de conexão WebSocket: ${error.message}`);
+      
+      // Mensagem de erro mais amigável
+      let errorMessage = 'Erro de conexão WebSocket';
+      if (error.message.includes('websocket error')) {
+        errorMessage = 'Falha ao conectar ao servidor. Tentando novamente...';
+      } else if (error.message.includes('timeout')) {
+        errorMessage = 'Timeout ao conectar. Verifique sua conexão.';
+      } else {
+        errorMessage = `Erro de conexão: ${error.message}`;
+      }
+      
+      setError(errorMessage);
+    });
+
+    // Listener para upgrade de transporte (polling -> websocket)
+    newSocket.io.on('upgrade', () => {
+      console.log('🔄 Transporte atualizado para:', newSocket.io.engine.transport.name);
+    });
+
+    // Listener para erros de upgrade
+    newSocket.io.on('upgradeError', (error) => {
+      console.warn('⚠️ Erro ao fazer upgrade para websocket, continuando com polling:', error);
+      // Não definir erro aqui, pois polling ainda funciona
     });
 
     // Receber transcrições
