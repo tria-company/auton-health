@@ -3654,7 +3654,7 @@ export function ConsultationRoom({
             try {
               const response = await gatewayClient.get(`/consultations/${consultationId}`);
               if (response.success) {
-                const consultation = response;
+                const consultation = response.data || response;
 
                 // Se está em PROCESSING com etapa ANAMNESE, iniciar polling
                 if (consultation.status === 'PROCESSING' && consultation.etapa === 'ANAMNESE') {
@@ -3887,6 +3887,27 @@ export function ConsultationRoom({
     }, async (response: any) => {
 
       if (response.success) {
+
+        // ✅ NOVO: Atualizar call_sessions.status = 'ended' diretamente no banco
+        try {
+          const { supabase } = await import('@/lib/supabase');
+          const { error: updateError } = await supabase
+            .from('call_sessions')
+            .update({
+              status: 'ended',
+              ended_at: new Date().toISOString(),
+              webrtc_active: false
+            })
+            .eq('room_id', roomId);
+
+          if (updateError) {
+            console.error('❌ Erro ao atualizar call_sessions:', updateError);
+          } else {
+            console.log('✅ call_sessions atualizado para status: ended');
+          }
+        } catch (err) {
+          console.error('❌ Erro ao atualizar status da sessão:', err);
+        }
 
         // ✅ Enviar transcrição para o webhook ANTES do redirect (aguardar envio)
         try {
