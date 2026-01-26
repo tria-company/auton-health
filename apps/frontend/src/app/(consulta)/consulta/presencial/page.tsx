@@ -197,24 +197,45 @@ function PresencialConsultationContent() {
   // Conectar Socket.IO
   useEffect(() => {
     // Usar diretamente a URL do Realtime Service (WebSocket)
-    const realtimeUrl = process.env.NEXT_PUBLIC_REALTIME_WS_URL || 'ws://localhost:3002';
+    let realtimeUrl = process.env.NEXT_PUBLIC_REALTIME_WS_URL || 'ws://localhost:3002';
+
+    // Socket.IO espera HTTP/HTTPS, não WS/WSS
+    // Converter automaticamente
+    if (realtimeUrl.startsWith('wss://')) {
+      realtimeUrl = realtimeUrl.replace('wss://', 'https://');
+    } else if (realtimeUrl.startsWith('ws://')) {
+      realtimeUrl = realtimeUrl.replace('ws://', 'http://');
+    }
+
+    console.log('🔌 Conectando Socket.IO para:', realtimeUrl);
 
     const newSocket = io(realtimeUrl, {
       auth: {
         userName: 'Doctor',
         password: 'x'
       },
-      transports: ['websocket', 'polling']
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      timeout: 10000
     });
 
     newSocket.on('connect', () => {
       console.log('✅ Socket conectado');
       setSocketConnected(true);
+      setError(null); // Limpar erro ao conectar
     });
 
-    newSocket.on('disconnect', () => {
-      console.log('❌ Socket desconectado');
+    newSocket.on('disconnect', (reason) => {
+      console.log('❌ Socket desconectado:', reason);
       setSocketConnected(false);
+    });
+
+    newSocket.on('connect_error', (error) => {
+      console.error('❌ Erro de conexão Socket.IO:', error);
+      setSocketConnected(false);
+      setError(`Erro de conexão WebSocket: ${error.message}`);
     });
 
     // Receber transcrições
@@ -245,12 +266,15 @@ function PresencialConsultationContent() {
 
       try {
         const response = await gatewayClient.get(`/consultations/${consultationId}`);
-        if (response.success) {
-          const data = response;
-          setPatientName(data.consultation.patient_name);
+        if (response.success && response.patient_name) {
+          setPatientName(response.patient_name);
+        } else if (response.error) {
+          console.error('Erro ao carregar consulta:', response.error);
+          setError(response.error);
         }
       } catch (error) {
         console.error('Erro ao carregar consulta:', error);
+        setError(error instanceof Error ? error.message : 'Erro desconhecido');
       }
     };
 
