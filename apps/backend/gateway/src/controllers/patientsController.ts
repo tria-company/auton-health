@@ -444,6 +444,11 @@ export async function syncPatientUser(req: AuthenticatedRequest, res: Response) 
     let userAuthId: string | null = patient.user_auth || null;
     let userStatus: 'active' | 'inactive' = (patient.user_status as 'active' | 'inactive') || 'inactive';
 
+    // Variáveis para controle de email (declaradas no escopo da função)
+    let emailSent = false;
+    let emailError: any = null;
+    let generatedPassword: string | null = null;
+
     // Função para gerar senha temporária segura
     const generateTemporaryPassword = (): string => {
       const length = 12;
@@ -470,7 +475,6 @@ export async function syncPatientUser(req: AuthenticatedRequest, res: Response) 
     };
 
     // Criar ou atualizar usuário no banco de dados (Supabase Auth)
-    let generatedPassword: string | null = null;
     
     if (!userAuthId || action === 'create') {
       // Gerar senha temporária segura
@@ -503,8 +507,6 @@ export async function syncPatientUser(req: AuthenticatedRequest, res: Response) 
       userStatus = 'active';
 
       // Enviar email com credenciais
-      let emailSent = false;
-      let emailError: any = null;
       try {
         console.log('📧 [USER] Tentando enviar email com credenciais para:', patient.email);
         await sendCredentialsEmail(patient.email!, patient.name, patient.email!, generatedPassword, true);
