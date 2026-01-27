@@ -4,7 +4,10 @@ import {
   getPatients, 
   getPatientById, 
   updatePatient, 
-  deletePatient 
+  deletePatient,
+  syncPatientUser,
+  togglePatientUserStatus,
+  resendPatientCredentials
 } from '../controllers/patientsController';
 
 const router = Router();
@@ -32,5 +35,23 @@ router.put('/:id', authenticateToken, updatePatient);
  * Remove um paciente
  */
 router.delete('/:id', authenticateToken, deletePatient);
+
+/**
+ * POST /patients/:id/sync-user
+ * Cria ou sincroniza usuário do paciente no sistema externo
+ */
+router.post('/:id/sync-user', authenticateToken, syncPatientUser);
+
+/**
+ * PATCH /patients/:id/user-status
+ * Ativa ou desativa usuário do paciente
+ */
+router.patch('/:id/user-status', authenticateToken, togglePatientUserStatus);
+
+/**
+ * POST /patients/:id/resend-credentials
+ * Reenvia email com credenciais de acesso para o paciente
+ */
+router.post('/:id/resend-credentials', authenticateToken, resendPatientCredentials);
 
 export default router;

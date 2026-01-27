@@ -41,9 +41,34 @@ import { securityConfig } from './config';
 const app = express();
 const httpServer = createServer(app);
 
+// Desabilitar redirect automático de trailing slash
+// Isso evita que /dashboard seja redirecionado para /dashboard/
+app.set('strict routing', false);
+
 // Obter origens CORS configuradas
 const allowedOrigins = getCorsOrigins();
 console.log('🔧 [GATEWAY] CORS Origins:', allowedOrigins);
+
+// ===== MIDDLEWARE CRÍTICO: Interceptar OPTIONS ANTES de tudo =====
+// Este middleware DEVE ser o primeiro para evitar redirects que quebram CORS preflight
+// Usar app.all() para interceptar antes do roteamento
+app.all('*', (req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    console.log('🔍 [OPTIONS HANDLER] Interceptando requisição OPTIONS:', req.url);
+    // Aplicar CORS manualmente
+    const origin = req.headers.origin;
+    if (origin) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD');
+      res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Session-ID, X-User-ID, X-Audio-Format, X-Sample-Rate, X-Request-ID, Cache-Control, Pragma');
+      res.setHeader('Access-Control-Max-Age', '86400');
+    }
+    console.log('✅ [OPTIONS HANDLER] Respondendo 200 para OPTIONS');
+    return res.status(200).end();
+  }
+  next();
+});
 
 // ===== MIDDLEWARES DE SEGURANÇA =====
 
@@ -121,7 +146,17 @@ app.use('/api/clinic', clinicRoutes);
 app.use('/api', twilioRoutes);
 
 // Rotas migradas do Frontend (Monolito legado que ainda vive no Gateway por enquanto)
+// Handler específico para OPTIONS /dashboard antes de registrar as rotas
+app.options('/dashboard', corsMiddleware, (req, res) => {
+  res.status(200).end();
+});
+app.options('/dashboard/', corsMiddleware, (req, res) => {
+  res.status(200).end();
+});
+
 app.use('/dashboard', dashboardRoutes);
+// Também registrar explicitamente sem trailing slash para evitar redirects
+app.use('/dashboard/', dashboardRoutes);
 app.use('/consultations', consultationsRoutes);
 app.use('/patients', patientsRoutes);
 app.use('/cadastro-anamnese', cadastroAnamneseRoutes);
