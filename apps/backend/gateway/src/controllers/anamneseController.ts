@@ -149,7 +149,7 @@ export async function updateAnamneseField(req: AuthenticatedRequest, res: Respon
 
 /**
  * GET /anamnese-inicial
- * Busca anamnese inicial do paciente
+ * Busca anamnese inicial do paciente (tabela a_cadastro_anamnese, coluna paciente_id)
  */
 export async function getAnamneseInicial(req: AuthenticatedRequest, res: Response) {
   try {
@@ -170,9 +170,9 @@ export async function getAnamneseInicial(req: AuthenticatedRequest, res: Respons
     }
 
     const { data: anamnese, error } = await supabase
-      .from('a_anamnese_inicial')
+      .from('a_cadastro_anamnese')
       .select('*')
-      .eq('patient_id', patient_id)
+      .eq('paciente_id', patient_id)
       .maybeSingle();
 
     if (error) {

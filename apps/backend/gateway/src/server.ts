@@ -21,6 +21,8 @@ import patientsRoutes from './routes/patients';
 import cadastroAnamneseRoutes from './routes/cadastro-anamnese';
 import sinteseAnaliticaRoutes from './routes/sintese-analitica';
 import anamneseRoutes from './routes/anamnese';
+import { getAnamneseInicial } from './controllers/anamneseController';
+import { authenticateToken } from './middleware/auth';
 import diagnosticoRoutes from './routes/diagnostico';
 import solucoesRoutes from './routes/solucoes';
 import agendaRoutes from './routes/agenda';
@@ -164,6 +166,8 @@ app.use('/consultations', consultationsRoutes);
 app.use('/patients', patientsRoutes);
 app.use('/cadastro-anamnese', cadastroAnamneseRoutes);
 app.use('/sintese-analitica', sinteseAnaliticaRoutes);
+// Rota direta GET /anamnese-inicial (compatibilidade com frontend que chama sem prefixo /anamnese)
+app.get('/anamnese-inicial', authenticateToken, getAnamneseInicial);
 app.use('/anamnese', anamneseRoutes);
 app.use('/diagnostico', diagnosticoRoutes);
 app.use('/', solucoesRoutes);

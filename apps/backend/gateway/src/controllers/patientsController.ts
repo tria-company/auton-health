@@ -71,13 +71,35 @@ export async function getPatients(req: AuthenticatedRequest, res: Response) {
       });
     }
 
+    // Buscar status da anamnese (a_cadastro_anamnese) para cada paciente
+    const patientIds = (patients || []).map((p: { id: string }) => p.id);
+    const anamneseByPaciente: Record<string, { status: string }> = {};
+
+    if (patientIds.length > 0) {
+      const { data: anamneseList } = await supabase
+        .from('a_cadastro_anamnese')
+        .select('paciente_id, status')
+        .in('paciente_id', patientIds);
+
+      if (anamneseList) {
+        for (const row of anamneseList) {
+          anamneseByPaciente[row.paciente_id] = { status: row.status || 'pendente' };
+        }
+      }
+    }
+
+    const patientsWithAnamnese = (patients || []).map((p: { id: string; [key: string]: unknown }) => ({
+      ...p,
+      anamnese: anamneseByPaciente[p.id] || undefined
+    }));
+
     // Calcular paginação
     const total = count || 0;
     const totalPages = Math.ceil(total / limit);
 
     return res.json({
       success: true,
-      patients: patients || [],
+      patients: patientsWithAnamnese,
       pagination: {
         page,
         limit,

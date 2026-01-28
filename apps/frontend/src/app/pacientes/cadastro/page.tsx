@@ -356,7 +356,7 @@ export default function CadastrarPaciente() {
     if (!patientId) return;
 
     try {
-      const response = await gatewayClient.get(`/anamnese-inicial?patient_id=${patientId}`);
+      const response = await gatewayClient.get(`/anamnese/anamnese-inicial?patient_id=${patientId}`);
       if (response.success) {
         const data = response;
         if (data.anamnese) {

@@ -15,7 +15,8 @@ interface AnamneseFormData {
   genero?: string;
   data_nascimento?: string;
   idade?: string;
-  tipo_sanguineo?: string;
+  /** Coluna na tabela a_cadastro_anamnese (nome no DB: tipo_saguineo) */
+  tipo_saguineo?: string;
   estado_civil?: string;
   profissao?: string;
   altura?: string;
@@ -68,7 +69,7 @@ function AnamneseInicialContent() {
 
   const fetchAnamnese = async () => {
     try {
-      const response = await gatewayClient.get(`/anamnese-inicial?patient_id=${pacienteId}`);
+      const response = await gatewayClient.get(`/anamnese/anamnese-inicial?patient_id=${pacienteId}`);
       if (!response.success) { throw new Error(response.error || "Erro na requisição"); }
       const data = response;
       if (data.anamnese) {
@@ -169,18 +170,36 @@ function AnamneseInicialContent() {
         invertedFormData.frutas = frutasOptions.filter(item => !(formData.frutas || []).includes(item));
       }
 
+      // Whitelist: apenas colunas que existem em a_cadastro_anamnese (evita PGRST204 por tipo_sanguineo etc)
+      const allowedKeys = [
+        'nome_completo', 'cpf', 'email', 'genero', 'data_nascimento', 'idade', 'tipo_saguineo',
+        'estado_civil', 'profissao', 'altura', 'peso_atual', 'peso_antigo', 'peso_desejado',
+        'objetivo_principal', 'patrica_atividade_fisica', 'frequencia_deseja_treinar',
+        'restricao_movimento', 'informacoes_importantes', 'NecessidadeEnergeticaDiaria',
+        'proteinas', 'carboidratos', 'vegetais', 'legumes', 'leguminosas', 'gorduras', 'frutas',
+        'status', 'updated_at'
+      ] as const;
+      const raw: Record<string, unknown> = { ...invertedFormData, status: 'preenchida' };
+      const payload: Record<string, unknown> = {};
+      for (const key of allowedKeys) {
+        if (Object.prototype.hasOwnProperty.call(raw, key)) payload[key] = raw[key];
+      }
+      // Garantir tipo_saguineo (coluna no DB); valor pode vir como tipo_sanguineo no form (cache)
+      const tipoVal = raw.tipo_saguineo ?? (raw as any).tipo_sanguineo;
+      if (tipoVal !== undefined) payload.tipo_saguineo = tipoVal;
+      payload.updated_at = new Date().toISOString();
+      // Sempre marcar como preenchida ao salvar
+      payload.status = 'preenchida';
+
       // Atualizar anamnese no Supabase
       const { data: updatedAnamnese, error: updateError } = await supabase
         .from('a_cadastro_anamnese')
-        .update({
-          ...invertedFormData,
-          status: 'preenchida'
-        })
+        .update(payload)
         .eq('paciente_id', pacienteId)
         .select()
-        .single();
+        .maybeSingle();
 
-      if (updateError || !updatedAnamnese) {
+      if (updateError) {
         const errorMessage = updateError?.message || 'Erro ao salvar anamnese';
         console.error('Erro ao atualizar anamnese:', updateError);
         throw new Error(errorMessage);
@@ -325,11 +344,11 @@ function AnamneseInicialContent() {
             </div>
 
             <div className="form-field">
-              <label htmlFor="tipo_sanguineo" className="field-label">Tipo Sanguíneo *</label>
+              <label htmlFor="tipo_saguineo" className="field-label">Tipo Sanguíneo *</label>
               <select
-                id="tipo_sanguineo"
-                value={formData.tipo_sanguineo || ''}
-                onChange={(e) => handleChange('tipo_sanguineo', e.target.value)}
+                id="tipo_saguineo"
+                value={formData.tipo_saguineo || ''}
+                onChange={(e) => handleChange('tipo_saguineo', e.target.value)}
                 className="form-input"
                 required
               >
