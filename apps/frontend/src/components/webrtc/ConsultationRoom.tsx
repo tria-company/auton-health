@@ -88,6 +88,9 @@ export function ConsultationRoom({
   // ✅ NOVO: Flag quando o navegador bloqueia o autoplay do vídeo remoto
   const [isRemotePlaybackBlocked, setIsRemotePlaybackBlocked] = useState(false);
 
+  // ✅ Aviso: usuário não permitiu câmera/microfone
+  const [mediaPermissionDenied, setMediaPermissionDenied] = useState(false);
+
   const [transcriptionText, setTranscriptionText] = useState('');
 
   const [transcriptionStatus, setTranscriptionStatus] = useState('Desconectado');
@@ -2911,6 +2914,7 @@ export function ConsultationRoom({
 
       localStreamRef.current = stream;
       setIsMediaReady(true); // ✅ REACTIVE STATE MACHINE
+      setMediaPermissionDenied(false); // Permissão concedida
 
       // Configurar estados iniciais dos controles
       const videoTrack = stream.getVideoTracks()[0];
@@ -2962,6 +2966,16 @@ export function ConsultationRoom({
     } catch (err) {
 
       console.error('❌ Erro ao obter mídia:', err);
+
+      // ✅ Aviso quando o usuário nega permissão de câmera/microfone
+      if (err instanceof DOMException && err.name === 'NotAllowedError') {
+        setMediaPermissionDenied(true);
+        showError(
+          'Câmera e/ou microfone não foram permitidos. Para usar a consulta, permita o acesso nas configurações do navegador e clique em "Tentar novamente" abaixo.',
+          'Permissão negada'
+        );
+        return;
+      }
 
       // ✅ NOVO: Se erro for "Device in use", tentar liberar e tentar novamente
       if (err instanceof DOMException && err.name === 'NotReadableError') {
@@ -4188,6 +4202,33 @@ export function ConsultationRoom({
 
       {/* Layout de vídeos */}
       <div className="video-layout">
+
+        {/* Aviso quando câmera/microfone não foram permitidos (médico e paciente) */}
+        {mediaPermissionDenied && (
+          <div className="media-permission-alert">
+            <div className="media-permission-alert-content">
+              <span className="media-permission-alert-icon">⚠️</span>
+              <div>
+                <strong>Câmera e microfone não permitidos</strong>
+                <p>
+                  Para participar da consulta com vídeo e áudio, é necessário permitir o acesso à câmera e ao microfone.
+                  <br />
+                  <strong>Como permitir:</strong> Clique no ícone de cadeado ou "i" na barra de endereço do navegador → Permissões do site → Ative &quot;Câmera&quot; e &quot;Microfone&quot;. Depois clique em &quot;Tentar novamente&quot; abaixo.
+                </p>
+                <button
+                  type="button"
+                  className="media-permission-alert-retry"
+                  onClick={() => {
+                    setMediaPermissionDenied(false);
+                    fetchUserMedia();
+                  }}
+                >
+                  Tentar novamente
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Sidebar lateral esquerda com informações do paciente - apenas para médico */}
         {userType === 'doctor' && (

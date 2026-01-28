@@ -1848,6 +1848,66 @@
   min-height: 0; /* Permitir que o flex funcione */
 }
 
+/* Aviso quando câmera/microfone não foram permitidos (médico e paciente) */
+.media-permission-alert {
+  flex: 0 0 100%;
+  width: 100%;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border: 1px solid #f59e0b;
+  border-radius: 12px;
+  margin-bottom: 12px;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2);
+  z-index: 100;
+}
+
+.media-permission-alert-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  color: #92400e;
+}
+
+.media-permission-alert-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.media-permission-alert-content strong {
+  display: block;
+  font-size: 1rem;
+  margin-bottom: 4px;
+}
+
+.media-permission-alert-content p {
+  margin: 0 0 12px 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: #78350f;
+}
+
+.media-permission-alert-retry {
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: none;
+  background: linear-gradient(135deg, #1B4266 0%, #153350 100%);
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 4px 12px rgba(27, 66, 102, 0.3);
+}
+
+.media-permission-alert-retry:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(27, 66, 102, 0.4);
+}
+
+.media-permission-alert-retry:active {
+  transform: translateY(0);
+}
+
 .remote-playback-overlay {
   position: absolute;
   inset: 0;
