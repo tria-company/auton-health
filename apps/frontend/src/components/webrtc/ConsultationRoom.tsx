@@ -18,7 +18,7 @@ import './webrtc-styles.css';
 
 import { getPatientNameById } from '@/lib/supabase';
 import { gatewayClient } from '@/lib/gatewayClient';
-import { Video, Mic, CheckCircle, Copy, Check, Brain, Sparkles, ChevronDown, ChevronUp, MoreVertical, Minimize2, Maximize2, Circle, Clock, Scale, Ruler, Droplet, User as UserIcon, FileText } from 'lucide-react';
+import { Video, Mic, CheckCircle, Copy, Check, Brain, Sparkles, ChevronDown, ChevronUp, MoreVertical, Minimize2, Maximize2, Circle, Clock, Scale, Ruler, Droplet, User as UserIcon, FileText, ShieldAlert, X } from 'lucide-react';
 import Image from 'next/image';
 import { useRecording } from '@/hooks/useRecording';
 import { useAdaptiveQuality, QualityMode } from '@/hooks/useAdaptiveQuality';
@@ -4203,29 +4203,41 @@ export function ConsultationRoom({
       {/* Layout de vídeos */}
       <div className="video-layout">
 
-        {/* Aviso quando câmera/microfone não foram permitidos (médico e paciente) */}
+        {/* Modal de permissão de câmera/microfone (médico e paciente) */}
         {mediaPermissionDenied && (
-          <div className="media-permission-alert">
-            <div className="media-permission-alert-content">
-              <span className="media-permission-alert-icon">⚠️</span>
-              <div>
-                <strong>Câmera e microfone não permitidos</strong>
-                <p>
-                  Para participar da consulta com vídeo e áudio, é necessário permitir o acesso à câmera e ao microfone.
-                  <br />
-                  <strong>Como permitir:</strong> Clique no ícone de cadeado ou "i" na barra de endereço do navegador → Permissões do site → Ative &quot;Câmera&quot; e &quot;Microfone&quot;. Depois clique em &quot;Tentar novamente&quot; abaixo.
-                </p>
-                <button
-                  type="button"
-                  className="media-permission-alert-retry"
-                  onClick={() => {
-                    setMediaPermissionDenied(false);
-                    fetchUserMedia();
-                  }}
-                >
-                  Tentar novamente
-                </button>
+          <div
+            className="media-permission-modal-overlay"
+            onClick={(e) => e.target === e.currentTarget && setMediaPermissionDenied(false)}
+          >
+            <div className="media-permission-modal" onClick={(e) => e.stopPropagation()}>
+              <button
+                type="button"
+                className="media-permission-modal-close"
+                onClick={() => setMediaPermissionDenied(false)}
+                aria-label="Fechar"
+              >
+                <X size={20} />
+              </button>
+              <div className="media-permission-modal-icon">
+                <ShieldAlert size={48} strokeWidth={1.5} />
               </div>
+              <h2 className="media-permission-modal-title">Permissão necessária</h2>
+              <p className="media-permission-modal-message">
+                Para participar da consulta com vídeo e áudio, permita o acesso à câmera e ao microfone nas configurações do navegador.
+              </p>
+              <p className="media-permission-modal-hint">
+                Clique no ícone de cadeado ou &quot;i&quot; na barra de endereço → Permissões do site → ative Câmera e Microfone.
+              </p>
+              <button
+                type="button"
+                className="media-permission-modal-retry"
+                onClick={() => {
+                  setMediaPermissionDenied(false);
+                  fetchUserMedia();
+                }}
+              >
+                Tentar novamente
+              </button>
             </div>
           </div>
         )}
