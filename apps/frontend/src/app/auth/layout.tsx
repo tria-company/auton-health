@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Autenticação - TRIA',
-  description: 'Entre ou crie sua conta na plataforma TRIA',
+  title: 'Auton Health - Plataforma de Consultas',
+  description: 'Entre ou crie sua conta na plataforma Auton Health',
 };
 
 export default function AuthLayout({

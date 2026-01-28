@@ -3,6 +3,7 @@ import { authenticateToken } from '../middleware/auth';
 import { 
   getPatients, 
   getPatientById, 
+  getPatientMetrics,
   updatePatient, 
   deletePatient,
   syncPatientUser,
@@ -17,6 +18,12 @@ const router = Router();
  * Lista todos os pacientes do médico autenticado
  */
 router.get('/', authenticateToken, getPatients);
+
+/**
+ * GET /patients/:id/metrics
+ * Métricas de check-in diário do paciente (sono, atividade, alimentação, equilíbrio)
+ */
+router.get('/:id/metrics', authenticateToken, getPatientMetrics);
 
 /**
  * GET /patients/:id

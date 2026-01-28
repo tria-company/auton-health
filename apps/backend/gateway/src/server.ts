@@ -29,6 +29,7 @@ import examesRoutes from './routes/exames';
 import googleCalendarRoutes from './routes/google-calendar';
 import consultasAdminRoutes from './routes/consultas-admin';
 import emailRoutes from './routes/email';
+import whatsappRoutes from './routes/whatsapp';
 
 // Rotas de Proxy
 import proxyRoutes from './routes/proxy';
@@ -171,6 +172,7 @@ app.use('/processar-exames', examesRoutes);
 app.use('/auth/google-calendar', googleCalendarRoutes);
 app.use('/admin/consultations', consultasAdminRoutes);
 app.use('/email', emailRoutes);
+app.use('/whatsapp', whatsappRoutes);
 
 // Health check do Gateway (para Cloud Run e Docker)
 app.get('/health', (req, res) => {

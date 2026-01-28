@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useNotifications } from '@/components/shared/NotificationSystem';
-import { Plus, Search, MoreVertical, Edit, Trash2, Phone, Mail, MapPin, Calendar, Grid3X3, List, Link2, Copy, User, Trash, FileText, CheckCircle, Clock, Loader2, UserPlus, UserCheck, UserX } from 'lucide-react';
+import Link from 'next/link';
+import { Plus, Search, MoreVertical, Edit, Trash2, Phone, Mail, MapPin, Calendar, Grid3X3, List, Link2, Copy, User, Trash, FileText, CheckCircle, Clock, Loader2, UserPlus, UserCheck, UserX, Eye, Send } from 'lucide-react';
 import { PatientForm } from '@/components/patients/PatientForm';
 import { supabase } from '@/lib/supabase';
 import { gatewayClient } from '@/lib/gatewayClient';
@@ -409,87 +410,83 @@ export default function PatientsPage() {
     }
   };
 
-  // Enviar anamnese por email
+  // Enviar anamnese por email e WhatsApp
   const [sendingAnamnese, setSendingAnamnese] = useState<string | null>(null);
-  const handleSendAnamneseEmail = async (patientId: string) => {
+  const handleSendAnamneseEmailAndWhatsApp = async (patientId: string) => {
     setSendingAnamnese(patientId);
     try {
-      // Buscar usuário autenticado
       const { data: { user }, error: userError } = await supabase.auth.getUser();
-      
       if (userError || !user) {
         throw new Error('Usuário não autenticado');
       }
 
-      // Buscar dados do paciente para obter email e nome
       const patient = patients.find(p => p.id === patientId);
       if (!patient) {
         throw new Error('Paciente não encontrado');
       }
 
-      if (!patient.email) {
-        throw new Error('Paciente não possui email cadastrado');
+      if (!patient.email && !patient.phone) {
+        throw new Error('Paciente não possui email nem telefone cadastrado');
       }
 
-      // Criar ou atualizar anamnese inicial no Supabase (tabela correta: a_cadastro_anamnese)
       const { data: existingAnamnese } = await supabase
         .from('a_cadastro_anamnese')
         .select('*')
         .eq('paciente_id', patientId)
         .single();
 
-      let anamneseResult;
-      
       if (existingAnamnese) {
-        // Atualizar existente
-        const { data, error } = await supabase
+        const { error } = await supabase
           .from('a_cadastro_anamnese')
-          .update({ 
-            status: 'pendente',
-            updated_at: new Date().toISOString()
-          })
-          .eq('paciente_id', patientId)
-          .select()
-          .single();
-        
+          .update({ status: 'pendente', updated_at: new Date().toISOString() })
+          .eq('paciente_id', patientId);
         if (error) throw error;
-        anamneseResult = data;
       } else {
-        // Criar nova
-        const { data, error } = await supabase
+        const { error } = await supabase
           .from('a_cadastro_anamnese')
           .insert({
             paciente_id: patientId,
             user_id: user.id,
             status: 'pendente'
-          })
-          .select()
-          .single();
-        
+          });
         if (error) throw error;
-        anamneseResult = data;
       }
 
-      // Gerar link para anamnese
       const anamneseLink = `${window.location.origin}/anamnese-inicial?pacienteId=${patientId}`;
+      let emailOk = false;
+      let whatsappOk = false;
 
-      // Enviar email via API do gateway
-      const emailResponse = await gatewayClient.post('/email/anamnese', {
-        to: patient.email,
-        patientName: patient.name,
-        anamneseLink
-      });
+      if (patient.email) {
+        const emailResponse = await gatewayClient.post('/email/anamnese', {
+          to: patient.email,
+          patientName: patient.name,
+          anamneseLink
+        });
+        emailOk = !!emailResponse.success;
+      }
 
-      if (emailResponse.success) {
-        showSuccess('Anamnese enviada por email com sucesso!', 'Anamnese Enviada');
+      if (patient.phone) {
+        const whatsappResponse = await gatewayClient.post('/whatsapp/anamnese', {
+          phone: patient.phone,
+          patientName: patient.name,
+          anamneseLink
+        });
+        whatsappOk = !!whatsappResponse.success;
+      }
+
+      if (emailOk && whatsappOk) {
+        showSuccess('Anamnese enviada por email e WhatsApp com sucesso!', 'Enviado');
+      } else if (emailOk) {
+        showSuccess('Anamnese enviada por email. WhatsApp não enviado (verifique o telefone).', 'Enviado');
+      } else if (whatsappOk) {
+        showSuccess('Anamnese enviada por WhatsApp. Email não enviado (verifique o email).', 'Enviado');
       } else {
         showWarning(
-          `Anamnese criada, mas email não foi enviado: ${emailResponse.error || 'Erro desconhecido'}. Use o link abaixo para copiar.`,
+          'Anamnese criada, mas nenhum envio concluído. Use "Copiar Link" e envie manualmente.',
           'Atenção'
         );
       }
-      
-      // Recarregar lista de pacientes para atualizar status
+
       fetchPatients(pagination.page, searchTerm, statusFilter, false);
     } catch (error) {
       console.error('Erro ao enviar anamnese:', error);
@@ -726,10 +723,10 @@ export default function PatientsPage() {
                           className="action-btn-table email"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleSendAnamneseEmail(patient.id);
+                            handleSendAnamneseEmailAndWhatsApp(patient.id);
                           }}
                           disabled={sendingAnamnese === patient.id}
-                          title="Enviar anamnese por email"
+                          title="Enviar anamnese por email e WhatsApp"
                         >
                           {sendingAnamnese === patient.id ? (
                             <>
@@ -738,8 +735,8 @@ export default function PatientsPage() {
                             </>
                           ) : (
                             <>
-                              <Mail size={16} />
-                              <span>Enviar Email</span>
+                              <Send size={16} />
+                              <span>Email e WhatsApp</span>
                             </>
                           )}
                         </button>
@@ -754,6 +751,14 @@ export default function PatientsPage() {
                           <Copy size={16} />
                           <span>Copiar Link</span>
                         </button>
+                        <Link
+                          href={`/pacientes/detalhes/?id=${patient.id}`}
+                          className="action-btn-table details"
+                          title="Ver detalhes e métricas do paciente"
+                        >
+                          <Eye size={16} />
+                          <span>Ver detalhes</span>
+                        </Link>
                         {/* Botão para gerenciar acesso do paciente */}
                         <button 
                           className="action-btn-table user-manage"

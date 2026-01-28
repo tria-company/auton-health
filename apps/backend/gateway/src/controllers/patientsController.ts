@@ -139,6 +139,248 @@ export async function getPatientById(req: AuthenticatedRequest, res: Response) {
 }
 
 /**
+ * GET /patients/:id/metrics
+ * Retorna métricas de check-in diário do paciente (sono, atividade, alimentação, equilíbrio geral)
+ */
+export async function getPatientMetrics(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        error: 'Não autorizado'
+      });
+    }
+
+    const { id: pacienteId } = req.params;
+    const dias = Math.min(parseInt(req.query.dias as string) || 90, 365);
+    const debug = req.query.debug === '1' || req.query.debug === 'true';
+
+    // Buscar médico autenticado
+    const { data: medico, error: medicoError } = await supabase
+      .from('medicos')
+      .select('id')
+      .eq('user_auth', req.user.id)
+      .single();
+
+    if (medicoError || !medico) {
+      return res.status(404).json({
+        success: false,
+        error: 'Médico não encontrado'
+      });
+    }
+
+    // Verificar se paciente existe e pertence ao médico
+    const { data: patient, error: patientError } = await supabase
+      .from('patients')
+      .select('id, doctor_id')
+      .eq('id', pacienteId)
+      .eq('doctor_id', medico.id)
+      .single();
+
+    if (patientError || !patient) {
+      return res.status(404).json({
+        success: false,
+        error: 'Paciente não encontrado'
+      });
+    }
+
+    const toNum = (v: unknown): number | null =>
+      v != null && !Number.isNaN(Number(v)) ? Math.round(Number(v) * 10) / 10 : null;
+
+    // 1a) Tabela com várias linhas por paciente (tipo_metrica + valor)
+    const tableNamesMulti = (process.env.PATIENT_METRICS_TABLE_MULTI || 'patient_metrics_values,paciente_metricas_valores,metricas_paciente').split(',');
+    for (const tableName of tableNamesMulti) {
+      try {
+        const { data: rows, error: err } = await supabase
+          .from(tableName.trim())
+          .select('*')
+          .eq('paciente_id', pacienteId);
+        if (err || !rows?.length) continue;
+        const tipoKey = Object.keys(rows[0]).find(k => /tipo|type|metric|metrica|nome|name/i.test(k)) || 'tipo_metrica';
+        const valorKey = Object.keys(rows[0]).find(k => /valor|value|score|media/i.test(k)) || 'valor';
+        const map: Record<string, number> = {};
+        for (const r of rows) {
+          const tipo = String(r[tipoKey] ?? r.metric_type ?? r.tipo ?? '').toLowerCase().replace(/\s/g, '_');
+          const val = toNum(r[valorKey] ?? r.value ?? r.valor);
+          if (tipo && val != null) map[tipo] = val;
+        }
+        const sono = map['sono'] ?? map['media_sono'] ?? map['sono_media'];
+        const atividade = map['atividade_fisica'] ?? map['atividade'] ?? map['media_atividade'];
+        const alimentacao = map['alimentacao'] ?? map['media_alimentacao'];
+        const equilibrio = map['equilibrio_geral'] ?? map['equilibrio'];
+        if (sono != null || atividade != null || alimentacao != null || equilibrio != null) {
+          return res.json({
+            success: true,
+            metrics: {
+              media_sono: sono != null ? { score: sono } : null,
+              atividade_fisica: atividade != null ? { score: atividade } : null,
+              alimentacao: alimentacao != null ? { score: alimentacao } : null,
+              equilibrio_geral: equilibrio ?? null,
+              total_registros: rows.length,
+              periodo_dias: dias
+            }
+          });
+        }
+      } catch {
+        /* próxima tabela */
+      }
+    }
+
+    // 1b) Uma linha por paciente (colunas: equilibrio_geral + sono, atividade, alimentacao)
+    const tableNames = (process.env.PATIENT_METRICS_TABLE || 'patient_metrics,paciente_metricas,resumo_metricas,metricas_resumo').split(',');
+    let rowMetrics: any = null;
+    for (const tableName of tableNames) {
+      try {
+        const result = await supabase
+          .from(tableName.trim())
+          .select('*')
+          .eq('paciente_id', pacienteId)
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (!result.error && result.data) {
+          rowMetrics = result.data;
+          break;
+        }
+      } catch {
+        /* próxima tabela */
+      }
+    }
+
+    if (rowMetrics && rowMetrics.paciente_id) {
+      const firstNum = (keys: string[], obj: any = rowMetrics): number | null => {
+        if (!obj || typeof obj !== 'object') return null;
+        const lowerKeys = Object.keys(obj).reduce((acc, k) => { acc[k.toLowerCase()] = k; return acc; }, {} as Record<string, string>);
+        for (const k of keys) {
+          const key = obj[k] !== undefined ? k : lowerKeys[k.toLowerCase()];
+          if (key == null) continue;
+          const n = toNum(obj[key]);
+          if (n != null) return n;
+        }
+        return null;
+      };
+      const byKeyContains = (sub: string, exclude?: string): number | null => {
+        const lower = sub.toLowerCase();
+        const excl = (exclude || '').toLowerCase();
+        for (const key of Object.keys(rowMetrics)) {
+          if (excl && key.toLowerCase().includes(excl)) continue;
+          if (key.toLowerCase().includes(lower)) {
+            const n = toNum(rowMetrics[key]);
+            if (n != null) return n;
+          }
+        }
+        return null;
+      };
+      const nested = rowMetrics.metricas ?? rowMetrics.metrics ?? rowMetrics.data;
+      // Tabela patient_metrics (trigger calculate_patient_metrics): equilibrio_sono, equilibrio_atividade_fisica, equilibrio_alimentacao, equilibrio_geral
+      const sono = firstNum(['equilibrio_sono', 'metrica_sono', 'media_sono', 'sono', 'sono_media', 'score_sono', 'avg_sono', 'media_sleep', 'pontuacao_sono', 'indice_sono', 'sono_score', 'metric_sono'], rowMetrics) ?? firstNum(['sono', 'media_sono', 'score_sono'], nested) ?? byKeyContains('sono', 'equilibrio_geral');
+      const atividade = firstNum(['equilibrio_atividade_fisica', 'metrica_atividade_fisica', 'metrica_atividade', 'media_atividade_fisica', 'atividade_fisica', 'atividade', 'media_atividade', 'atividade_media', 'score_atividade', 'pontuacao_atividade', 'indice_atividade', 'metric_atividade'], rowMetrics) ?? firstNum(['atividade_fisica', 'atividade', 'media_atividade'], nested) ?? byKeyContains('atividade', 'equilibrio_geral');
+      const alimentacao = firstNum(['equilibrio_alimentacao', 'metrica_alimentacao', 'media_alimentacao', 'alimentacao', 'alimentacao_media', 'score_alimentacao', 'avg_alimentacao', 'media_food', 'pontuacao_alimentacao', 'indice_alimentacao', 'metric_alimentacao'], rowMetrics) ?? firstNum(['alimentacao', 'media_alimentacao', 'score_alimentacao'], nested) ?? byKeyContains('alimentacao', 'equilibrio');
+      const equilibrio = firstNum(['equilibrio_geral', 'metrica_equilibrio_geral', 'metrica_equilibrio', 'equilibrio', 'equilibrio_media', 'score_equilibrio'], rowMetrics) ?? firstNum(['equilibrio', 'equilibrio_geral'], nested) ?? byKeyContains('equilibrio');
+      const body: any = {
+        success: true,
+        metrics: {
+          media_sono: sono != null ? { score: sono } : null,
+          atividade_fisica: atividade != null ? { score: atividade } : null,
+          alimentacao: alimentacao != null ? { score: alimentacao } : null,
+          equilibrio_geral: equilibrio,
+          total_registros: rowMetrics.total_registros ?? rowMetrics.total_registros ?? null,
+          periodo_dias: dias
+        }
+      };
+      if (debug) body._debug = { colunas: Object.keys(rowMetrics), valores: rowMetrics };
+      return res.json(body);
+    }
+
+    // 2) Fallback: agregar de daily_checkins com fórmulas alinhadas ao outro sistema
+    const dataInicio = new Date();
+    dataInicio.setDate(dataInicio.getDate() - dias);
+    const dataInicioStr = dataInicio.toISOString().split('T')[0];
+
+    const { data: checkins, error: checkinsError } = await supabase
+      .from('daily_checkins')
+      .select('sono_qualidade, sono_tempo_horas, atividade_tempo_horas, atividade_intensidade, alimentacao_refeicoes, alimentacao_agua_litros')
+      .eq('paciente_id', pacienteId)
+      .gte('data_checkin', dataInicioStr)
+      .order('data_checkin', { ascending: false });
+
+    if (checkinsError) {
+      console.error('Erro ao buscar check-ins:', checkinsError);
+      return res.status(500).json({
+        success: false,
+        error: 'Erro ao buscar métricas do paciente'
+      });
+    }
+
+    const totalRegistros = checkins?.length ?? 0;
+
+    if (totalRegistros === 0) {
+      return res.json({
+        success: true,
+        metrics: {
+          media_sono: null,
+          atividade_fisica: null,
+          alimentacao: null,
+          equilibrio_geral: null,
+          total_registros: 0,
+          periodo_dias: dias
+        }
+      });
+    }
+
+    const valid = (v: unknown): v is number => typeof v === 'number' && !Number.isNaN(v);
+    const round10 = (n: number) => Math.round(n * 10) / 10;
+
+    // Sono: outro sistema ~6.1. Escala comum 1-5 → *2 para 0-10; ou 1-10 direto
+    const sonoQualidade = (checkins as any[]).map(c => c.sono_qualidade).filter(valid);
+    const sonoTempo = (checkins as any[]).map(c => c.sono_tempo_horas).filter(valid);
+    const avgSonoQualidade = sonoQualidade.length ? sonoQualidade.reduce((a, b) => a + b, 0) / sonoQualidade.length : null;
+    const avgSonoTempo = sonoTempo.length ? sonoTempo.reduce((a, b) => a + b, 0) / sonoTempo.length : null;
+    const mediaSonoScore = avgSonoQualidade != null ? round10(Math.min(10, avgSonoQualidade <= 5 ? avgSonoQualidade * 2 : avgSonoQualidade)) : null;
+
+    // Atividade: outro sistema ~5.8. Usar apenas intensidade 1-5 → *2 para 0-10
+    const ativIntensidade = (checkins as any[]).map(c => c.atividade_intensidade).filter(valid);
+    const ativTempo = (checkins as any[]).map(c => c.atividade_tempo_horas).filter(valid);
+    const avgAtivIntensidade = ativIntensidade.length ? ativIntensidade.reduce((a, b) => a + b, 0) / ativIntensidade.length : null;
+    const avgAtivTempo = ativTempo.length ? ativTempo.reduce((a, b) => a + b, 0) / ativTempo.length : null;
+    const atividadeScore = avgAtivIntensidade != null ? round10(Math.min(10, avgAtivIntensidade <= 5 ? avgAtivIntensidade * 2 : avgAtivIntensidade)) : null;
+
+    // Alimentação: outro sistema ~7.8. Refeições (0-6) + água (0-3L) normalizado para 0-10
+    const refeicoes = (checkins as any[]).map(c => c.alimentacao_refeicoes).filter(valid);
+    const agua = (checkins as any[]).map(c => c.alimentacao_agua_litros).filter(valid);
+    const avgRefeicoes = refeicoes.length ? refeicoes.reduce((a, b) => a + b, 0) / refeicoes.length : null;
+    const avgAgua = agua.length ? agua.reduce((a, b) => a + b, 0) / agua.length : null;
+    const refeicoesScore = avgRefeicoes != null ? Math.min(10, (avgRefeicoes / 6) * 10) : null;
+    const aguaScore = avgAgua != null ? Math.min(10, (avgAgua / 3) * 10) : null;
+    const alimentacaoScore = (refeicoesScore != null && aguaScore != null)
+      ? round10((refeicoesScore + aguaScore) / 2)
+      : refeicoesScore ?? aguaScore;
+
+    // Equilíbrio geral: média dos 3 (como no outro sistema: 6.6)
+    const scores = [mediaSonoScore, atividadeScore, alimentacaoScore].filter((s): s is number => s != null);
+    const equilibrioGeral = scores.length ? round10(scores.reduce((a, b) => a + b, 0) / scores.length) : null;
+
+    return res.json({
+      success: true,
+      metrics: {
+        media_sono: mediaSonoScore != null ? { score: mediaSonoScore, tempo_medio_horas: avgSonoTempo } : null,
+        atividade_fisica: atividadeScore != null ? { score: atividadeScore, tempo_medio_horas: avgAtivTempo, intensidade_media: avgAtivIntensidade } : null,
+        alimentacao: alimentacaoScore != null ? { score: alimentacaoScore, refeicoes_media: avgRefeicoes, agua_media_litros: avgAgua } : null,
+        equilibrio_geral: equilibrioGeral,
+        total_registros: totalRegistros,
+        periodo_dias: dias
+      }
+    });
+  } catch (error: any) {
+    console.error('Erro ao buscar métricas do paciente:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Erro interno do servidor'
+    });
+  }
+}
+
+/**
  * PUT /patients/:id
  * Atualiza um paciente existente
  */

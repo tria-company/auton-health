@@ -4,7 +4,7 @@ import { ProvidersWrapper } from '@/components/providers/ProvidersWrapper';
 import { SuppressHydrationWarnings } from './suppress-warnings';
 
 export const metadata: Metadata = {
-  title: 'TRIA - Plataforma de Consultas Médicas com IA',
+  title: 'Auton Health - Plataforma de Consultas',
   description: 'Sistema de transcrição e análise de consultas médicas em tempo real',
   icons: {
     icon: '/favicon.png',

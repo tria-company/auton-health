@@ -3039,6 +3039,30 @@
   border: none;
 }
 
+.action-btn-table.details {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-decoration: none;
+  background: #4b5563;
+  color: white;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+
+.action-btn-table.details:hover {
+  background: #374151;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(75, 85, 99, 0.3);
+}
+
 .action-btn-table.user-manage:hover {
   background: linear-gradient(135deg, #153350 0%, #0f2538 100%);
   transform: translateY(-2px);
@@ -3056,4 +3080,333 @@
   to {
     transform: rotate(360deg);
   }
+}
+
+/* =====================================================
+   PÁGINA DETALHES DO PACIENTE + MÉTRICAS CHECK-IN
+   ===================================================== */
+
+.patient-details-container {
+  max-width: 1000px;
+}
+
+.patient-details-header {
+  margin-bottom: 32px;
+}
+
+.btn-back-details {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #1B4266;
+  font-weight: 600;
+  font-size: 14px;
+  text-decoration: none;
+  margin-bottom: 24px;
+  transition: color 0.2s ease;
+}
+
+.btn-back-details:hover {
+  color: #153350;
+}
+
+.dark .btn-back-details {
+  color: #93c5fd;
+}
+
+.dark .btn-back-details:hover {
+  color: #bfdbfe;
+}
+
+.patient-details-title-row {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.patient-details-avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #1B4266 0%, #153350 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.patient-details-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.patient-details-initials {
+  color: white;
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.patient-details-name {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0 0 12px 0;
+}
+
+.dark .patient-details-name {
+  color: #ffffff;
+}
+
+.patient-details-contact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.contact-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: #f3f4f6;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #4b5563;
+}
+
+.dark .contact-chip {
+  background: rgba(255, 255, 255, 0.1);
+  color: #d1d5db;
+}
+
+/* Métricas */
+.patient-metrics-section {
+  margin-bottom: 40px;
+}
+
+.patient-metrics-section-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0 0 8px 0;
+}
+
+.dark .patient-metrics-section-title {
+  color: #ffffff;
+}
+
+.patient-metrics-section-desc {
+  font-size: 14px;
+  color: #6b7280;
+  margin: 0 0 24px 0;
+}
+
+.dark .patient-metrics-section-desc {
+  color: #9ca3af;
+}
+
+.patient-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 20px;
+}
+
+.patient-metric-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  transition: box-shadow 0.2s ease;
+}
+
+.patient-metric-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.dark .patient-metric-card {
+  background: #1f1f1f;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.patient-metric-card.equilibrio {
+  border-color: #1B4266;
+  background: linear-gradient(135deg, rgba(27, 66, 102, 0.08) 0%, rgba(21, 51, 80, 0.05) 100%);
+}
+
+.dark .patient-metric-card.equilibrio {
+  background: linear-gradient(135deg, rgba(27, 66, 102, 0.2) 0%, rgba(21, 51, 80, 0.1) 100%);
+  border-color: rgba(45, 98, 147, 0.5);
+}
+
+.patient-metric-icon-wrap {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.patient-metric-icon-wrap.sono {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.dark .patient-metric-icon-wrap.sono {
+  background: rgba(59, 130, 246, 0.25);
+  color: #93c5fd;
+}
+
+.patient-metric-icon-wrap.atividade {
+  background: #d1fae5;
+  color: #059669;
+}
+
+.dark .patient-metric-icon-wrap.atividade {
+  background: rgba(16, 185, 129, 0.25);
+  color: #6ee7b7;
+}
+
+.patient-metric-icon-wrap.alimentacao {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.dark .patient-metric-icon-wrap.alimentacao {
+  background: rgba(245, 158, 11, 0.25);
+  color: #fbbf24;
+}
+
+.patient-metric-icon-wrap.equilibrio {
+  background: linear-gradient(135deg, #1B4266 0%, #153350 100%);
+  color: white;
+}
+
+.patient-metric-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #6b7280;
+  margin-bottom: 8px;
+}
+
+.dark .patient-metric-label {
+  color: #9ca3af;
+}
+
+.patient-metric-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.dark .patient-metric-value {
+  color: #ffffff;
+}
+
+.patient-metric-value .score {
+  color: #1B4266;
+}
+
+.dark .patient-metric-value .score {
+  color: #93c5fd;
+}
+
+.patient-metric-value .unit {
+  font-size: 18px;
+  font-weight: 500;
+  color: #6b7280;
+  margin-left: 2px;
+}
+
+.patient-metric-value .no-data {
+  font-size: 16px;
+  font-weight: 500;
+  color: #9ca3af;
+}
+
+.patient-metric-extra {
+  font-size: 13px;
+  color: #6b7280;
+  margin-top: 8px;
+}
+
+.dark .patient-metric-extra {
+  color: #9ca3af;
+}
+
+.patient-metrics-empty {
+  font-size: 14px;
+  color: #6b7280;
+  margin-top: 16px;
+  padding: 16px;
+  background: #f9fafb;
+  border-radius: 8px;
+}
+
+.dark .patient-metrics-empty {
+  color: #9ca3af;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* Dados cadastrais resumidos */
+.patient-info-section {
+  margin-top: 40px;
+  padding-top: 32px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.dark .patient-info-section {
+  border-top-color: rgba(255, 255, 255, 0.1);
+}
+
+.patient-info-section-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0 0 20px 0;
+}
+
+.dark .patient-info-section-title {
+  color: #ffffff;
+}
+
+.patient-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.patient-info-item {
+  padding: 12px 16px;
+  background: #f9fafb;
+  border-radius: 8px;
+}
+
+.patient-info-item.full-width {
+  grid-column: 1 / -1;
+}
+
+.dark .patient-info-item {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.patient-info-item .label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  margin-bottom: 4px;
+}
+
+.patient-info-item .value {
+  font-size: 14px;
+  color: #1f2937;
+}
+
+.dark .patient-info-item .value {
+  color: #e5e7eb;
 }
