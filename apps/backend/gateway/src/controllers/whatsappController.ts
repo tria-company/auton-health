@@ -78,13 +78,13 @@ Esta é uma mensagem automática.`;
       })
     });
 
-    const data = await response.json().catch(() => ({}));
+    const data = (await response.json().catch(() => ({}))) as { message?: string; error?: string };
 
     if (!response.ok) {
       console.error('❌ [WHATSAPP] Erro Evolution API:', response.status, data);
       res.status(response.status >= 500 ? 502 : 400).json({
         success: false,
-        error: (data as { message?: string }).message || data?.error || `Evolution API retornou ${response.status}`
+        error: data.message || data.error || `Evolution API retornou ${response.status}`
       });
       return;
     }
