@@ -1,7 +1,7 @@
 # Multi-stage Dockerfile for MedCall Gateway (Node/Express + Socket.IO)
 # Optimized for monorepo with npm workspaces and production runtime
 
-FROM node:18-bookworm-slim AS base
+FROM node:20-bookworm-slim AS base
 ENV NODE_ENV=production
 WORKDIR /app
 
@@ -22,7 +22,18 @@ COPY packages/shared-types/package.json packages/shared-types/package.json
 COPY packages/utils/package.json packages/utils/package.json
 
 # Install all workspace deps (dev + prod) once at the root
-RUN npm ci
+# Usar --include=dev para garantir que todas as dependências sejam instaladas
+RUN npm ci --include=dev
+
+# Garantir que resend está instalado (pode não estar devido a hoisting do workspace)
+RUN if [ ! -d "node_modules/resend" ]; then \
+      echo "⚠️ resend não encontrado após npm ci, instalando..." && \
+      npm install resend@^6.8.0 --save --legacy-peer-deps && \
+      echo "✅ resend instalado no build"; \
+    else \
+      echo "✅ resend já está presente no build"; \
+    fi && \
+    npm list resend || echo "⚠️ resend não listado"
 
 # Copy full repository and build only the gateway package
 COPY . .
@@ -44,6 +55,16 @@ COPY --from=builder /app/node_modules ./node_modules
 # Copy built gateway artifacts and its package manifest
 COPY --from=builder /app/apps/backend/gateway/dist ./apps/backend/gateway/dist
 COPY --from=builder /app/apps/backend/gateway/package.json ./apps/backend/gateway/package.json
+
+# Garantir que resend está instalado no runtime (backup caso não tenha sido copiado)
+RUN if [ ! -d "node_modules/resend" ]; then \
+      echo "⚠️ resend não encontrado no runtime, instalando..." && \
+      npm install resend@^6.8.0 --no-save --legacy-peer-deps && \
+      echo "✅ resend instalado no runtime"; \
+    else \
+      echo "✅ resend já está presente no runtime"; \
+    fi && \
+    test -d node_modules/resend && echo "✅ resend confirmado presente" || echo "❌ resend ainda não encontrado"
 
 # Environment - PORT will be set by Cloud Run
 # ENV PORT=3001  # Removed - Cloud Run sets this dynamically

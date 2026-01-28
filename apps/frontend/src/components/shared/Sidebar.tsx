@@ -34,6 +34,10 @@ const menuItems = [
   { icon: Settings, label: 'Configurações', href: '/configuracoes' },
 ];
 
+const clinicMenuItems = [
+  { icon: LayoutDashboard, label: 'Gestão de Clínica', href: '/clinica/gestao' },
+];
+
 const adminMenuItems = [
   { icon: Building2, label: 'Administração', href: '/administracao' },
   { icon: ShieldCheck, label: 'Admin Sistema', href: '/consultas-admin' }
@@ -43,14 +47,16 @@ export function Sidebar({ expanded, onExpandedChange, isTopMenu = false }: Sideb
   const pathname = usePathname();
   const router = useRouter();
   const { signOut, user } = useAuth();
-  const [roles, setRoles] = useState({ admin: false, clinica_admin: false });
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isClinicAdmin, setIsClinicAdmin] = useState(false);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Verificar se o usuário é admin
   useEffect(() => {
     const checkAdminStatus = async () => {
       if (!user?.id) {
-        setRoles({ admin: false, clinica_admin: false });
+        setIsAdmin(false);
+        setIsClinicAdmin(false);
         return;
       }
 
@@ -63,16 +69,21 @@ export function Sidebar({ expanded, onExpandedChange, isTopMenu = false }: Sideb
 
         if (error) {
           console.error('Erro ao verificar status de admin:', error);
-          setRoles({ admin: false, clinica_admin: false });
+          setIsAdmin(false);
+          setIsClinicAdmin(false);
         } else {
-          setRoles({
-            admin: data?.admin === true,
-            clinica_admin: data?.clinica_admin === true
-          });
+          const isSystemAdmin = data?.admin === true;
+          const isClinicAdminValue = data?.clinica_admin === true;
+
+          // ✅ Admin do sistema (para menu de administração)
+          setIsAdmin(isSystemAdmin);
+          // ✅ Admin de clínica (para menu de gestão de clínica)
+          setIsClinicAdmin(isClinicAdminValue || isSystemAdmin);
         }
       } catch (err) {
         console.error('Erro ao verificar status de admin:', err);
-        setRoles({ admin: false, clinica_admin: false });
+        setIsAdmin(false);
+        setIsClinicAdmin(false);
       }
     };
 
@@ -157,37 +168,37 @@ export function Sidebar({ expanded, onExpandedChange, isTopMenu = false }: Sideb
           );
         })}
 
-        {/* Menu Admin - visível apenas para administradores */}
-        {/* Menu Admin - visível apenas para administradores */}
-        {roles.admin && (
-          <>
+        {/* Menu Gestão de Clínica - visível apenas para administradores de clínica */}
+        {isClinicAdmin && clinicMenuItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = pathname === item.href;
+          return (
             <Link
-              href="/administracao"
-              className={`nav-btn nav-btn-admin ${pathname === '/administracao' ? 'is-active' : ''}`}
+              key={item.href}
+              href={item.href}
+              className={`nav-btn ${isActive ? 'is-active' : ''}`}
             >
-              <Building2 size={24} />
-              <span className="nav-label">Administração</span>
+              <Icon size={24} />
+              <span className="nav-label">{item.label}</span>
             </Link>
-            <Link
-              href="/consultas-admin"
-              className={`nav-btn nav-btn-admin ${pathname === '/consultas-admin' ? 'is-active' : ''}`}
-            >
-              <ShieldCheck size={24} />
-              <span className="nav-label">Admin Sistema</span>
-            </Link>
-          </>
-        )}
+          );
+        })}
 
-        {/* Menu Gestão de Clínica - visível apenas para admin de clínica */}
-        {roles.clinica_admin && (
-          <Link
-            href="/clinica/gestao"
-            className={`nav-btn nav-btn-admin ${pathname === '/clinica/gestao' ? 'is-active' : ''}`}
-          >
-            <LayoutDashboard size={24} />
-            <span className="nav-label">Gestão de Clínica</span>
-          </Link>
-        )}
+        {/* Menu Admin - visível apenas para administradores do sistema */}
+        {isAdmin && adminMenuItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = pathname === item.href;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`nav-btn nav-btn-admin ${isActive ? 'is-active' : ''}`}
+            >
+              <Icon size={24} />
+              <span className="nav-label">{item.label}</span>
+            </Link>
+          );
+        })}
       </nav>
 
       <div className="bottom">

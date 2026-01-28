@@ -180,12 +180,14 @@
 .form-select {
   height: 44px;
   cursor: pointer;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
   background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
   background-position: right 12px center;
   background-repeat: no-repeat;
   background-size: 16px;
   padding-right: 40px;
-  appearance: none;
 }
 
 .form-textarea {
@@ -659,4 +661,240 @@
     width: 100%;
     justify-content: center;
   }
+}
+
+/* =====================================================
+   DARK MODE - PatientForm
+   ===================================================== */
+
+.dark .form-container {
+  background: #1A1A1A !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5) !important;
+}
+
+.dark .form-header {
+  background: #1A1A1A !important;
+  border-bottom-color: #374151 !important;
+}
+
+.dark .form-title {
+  color: #FFFFFF !important;
+}
+
+.dark .form-close-btn {
+  color: #9CA3AF !important;
+}
+
+.dark .form-close-btn:hover {
+  background: #2D2D2D !important;
+  color: #FFFFFF !important;
+}
+
+.dark .form-content {
+  scrollbar-color: #374151 #1A1A1A !important;
+}
+
+.dark .form-content::-webkit-scrollbar-track {
+  background: #1A1A1A !important;
+}
+
+.dark .form-content::-webkit-scrollbar-thumb {
+  background: #374151 !important;
+}
+
+.dark .form-content::-webkit-scrollbar-thumb:hover {
+  background: #4B5563 !important;
+}
+
+.dark .section-icon {
+  color: #9CA3AF !important;
+}
+
+.dark .section-title {
+  color: #FFFFFF !important;
+}
+
+.dark .field-label {
+  color: #E5E7EB !important;
+}
+
+.dark .form-input,
+.dark .form-select,
+.dark .form-textarea {
+  background-color: #2D2D2D !important;
+  border-color: #374151 !important;
+  color: #FFFFFF !important;
+}
+
+.dark .form-input::placeholder,
+.dark .form-textarea::placeholder {
+  color: #6B7280 !important;
+}
+
+.dark .form-input:focus,
+.dark .form-select:focus,
+.dark .form-textarea:focus {
+  border-color: #1B4266 !important;
+  background-color: #1F1F1F !important;
+  box-shadow: 0 0 0 3px rgba(27, 66, 102, 0.3) !important;
+}
+
+.dark .form-input:hover:not(:focus),
+.dark .form-select:hover:not(:focus),
+.dark .form-textarea:hover:not(:focus) {
+  border-color: #4B5563 !important;
+  background-color: #252525 !important;
+}
+
+.dark .form-select {
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  appearance: none !important;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%239CA3AF' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e") !important;
+  background-position: right 12px center !important;
+  background-repeat: no-repeat !important;
+  background-size: 16px !important;
+}
+
+.dark .form-input.error,
+.dark .form-select.error,
+.dark .form-textarea.error {
+  border-color: #EF4444 !important;
+  background-color: #2D1B1B !important;
+}
+
+.dark .field-error {
+  color: #FCA5A5 !important;
+}
+
+.dark .form-actions {
+  border-top-color: #374151 !important;
+}
+
+.dark .btn-secondary {
+  background-color: #2D2D2D !important;
+  color: #E5E7EB !important;
+  border-color: #374151 !important;
+}
+
+.dark .btn-secondary:hover:not(:disabled) {
+  background-color: #374151 !important;
+  border-color: #4B5563 !important;
+  color: #FFFFFF !important;
+}
+
+.dark .btn-primary {
+  background: linear-gradient(135deg, #1B4266 0%, #153350 100%) !important;
+  box-shadow: 0 2px 8px rgba(27, 66, 102, 0.4) !important;
+}
+
+.dark .btn-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #2D6293 0%, #1B4266 100%) !important;
+  box-shadow: 0 4px 12px rgba(45, 98, 147, 0.5) !important;
+}
+
+.dark .btn-update {
+  background: linear-gradient(135deg, #1B4266 0%, #153350 100%) !important;
+  box-shadow: 0 2px 8px rgba(27, 66, 102, 0.4) !important;
+}
+
+.dark .btn-update:hover:not(:disabled) {
+  background: linear-gradient(135deg, #2D6293 0%, #1B4266 100%) !important;
+  box-shadow: 0 4px 12px rgba(45, 98, 147, 0.5) !important;
+}
+
+.dark .medical-info-card {
+  background: #2D2D2D !important;
+  border-color: #374151 !important;
+}
+
+.dark .medical-info-card:hover {
+  border-color: #4B5563 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+}
+
+.dark .medical-label {
+  color: #FFFFFF !important;
+}
+
+.dark .field-icon {
+  color: #9CA3AF !important;
+}
+
+.dark .char-count {
+  color: #6B7280 !important;
+}
+
+.dark .medical-textarea {
+  background: #1F1F1F !important;
+  border-color: #374151 !important;
+  color: #FFFFFF !important;
+}
+
+.dark .medical-textarea:focus {
+  border-color: #1B4266 !important;
+  box-shadow: 0 0 0 3px rgba(27, 66, 102, 0.3) !important;
+}
+
+.dark .medical-textarea:hover:not(:focus) {
+  border-color: #4B5563 !important;
+}
+
+.dark .medical-textarea::placeholder {
+  color: #6B7280 !important;
+}
+
+.dark .field-hint {
+  border-top-color: #374151 !important;
+}
+
+.dark .hint-text {
+  color: #9CA3AF !important;
+}
+
+.dark .medical-files-label {
+  color: #E5E7EB !important;
+}
+
+.dark .medical-files-upload-btn {
+  background: #2D2D2D !important;
+  border-color: #374151 !important;
+  color: #E5E7EB !important;
+}
+
+.dark .medical-files-upload-btn:hover:not(:disabled) {
+  background: #374151 !important;
+  border-color: #4B5563 !important;
+  color: #FFFFFF !important;
+}
+
+.dark .medical-files-hint {
+  color: #6B7280 !important;
+}
+
+.dark .medical-file-item {
+  background: #1F1F1F !important;
+  border-color: #374151 !important;
+}
+
+.dark .medical-file-item:hover {
+  border-color: #4B5563 !important;
+  background: #252525 !important;
+}
+
+.dark .medical-file-icon {
+  color: #9CA3AF !important;
+}
+
+.dark .medical-file-name {
+  color: #E5E7EB !important;
+}
+
+.dark .medical-file-status {
+  color: #6B7280 !important;
+}
+
+.dark .medical-file-remove:hover:not(:disabled) {
+  background: #3D1B1B !important;
+  color: #FCA5A5 !important;
 }

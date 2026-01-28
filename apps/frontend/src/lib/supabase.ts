@@ -210,12 +210,24 @@ export async function createConsultation(consultationData: {
       throw new Error('Usuário não autenticado');
     }
 
+    // Buscar médico na tabela medicos usando a FK do auth.users
+    const { data: medico, error: medicoError } = await supabase
+      .from('medicos')
+      .select('id')
+      .eq('user_auth', user.id)
+      .single();
+
+    if (medicoError || !medico) {
+      console.error('❌ Médico não encontrado:', medicoError);
+      throw new Error('Médico não encontrado. Verifique se sua conta está sincronizada.');
+    }
+
     // Criar consulta no Supabase
     const { data: consultation, error: insertError } = await supabase
       .from('consultations')
       .insert({
         ...consultationData,
-        user_id: user.id,
+        doctor_id: medico.id,
       })
       .select()
       .single();

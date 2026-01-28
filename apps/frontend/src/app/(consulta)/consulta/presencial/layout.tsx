@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Consulta Presencial - MedCall AI',
+  title: 'Auton Health - Plataforma de Consultas',
   description: 'Sistema de consulta presencial com transcrição em tempo real',
 };
 

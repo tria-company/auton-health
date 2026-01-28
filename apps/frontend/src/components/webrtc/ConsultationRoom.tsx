@@ -18,7 +18,7 @@ import './webrtc-styles.css';
 
 import { getPatientNameById, supabase } from '@/lib/supabase';
 import { gatewayClient } from '@/lib/gatewayClient';
-import { Video, Mic, CheckCircle, Copy, Check, Brain, Sparkles, ChevronDown, ChevronUp, MoreVertical, Minimize2, Maximize2, Circle, Clock, Scale, Ruler, Droplet, User as UserIcon, FileText } from 'lucide-react';
+import { Video, Mic, CheckCircle, Copy, Check, Brain, Sparkles, ChevronDown, ChevronUp, MoreVertical, Minimize2, Maximize2, Circle, Clock, Scale, Ruler, Droplet, User as UserIcon, FileText, ShieldAlert, X } from 'lucide-react';
 import Image from 'next/image';
 import { useRecording } from '@/hooks/useRecording';
 import { useAdaptiveQuality, QualityMode } from '@/hooks/useAdaptiveQuality';
@@ -92,6 +92,9 @@ export function ConsultationRoom({
 
   // ✅ NOVO: Flag quando o navegador bloqueia o autoplay do vídeo remoto
   const [isRemotePlaybackBlocked, setIsRemotePlaybackBlocked] = useState(false);
+
+  // ✅ Aviso: usuário não permitiu câmera/microfone
+  const [mediaPermissionDenied, setMediaPermissionDenied] = useState(false);
 
   const [transcriptionText, setTranscriptionText] = useState('');
 
@@ -2975,6 +2978,7 @@ export function ConsultationRoom({
 
       localStreamRef.current = stream;
       setIsMediaReady(true); // ✅ REACTIVE STATE MACHINE
+      setMediaPermissionDenied(false); // Permissão concedida
 
 
       // Configurar estados iniciais dos controles
@@ -3027,6 +3031,16 @@ export function ConsultationRoom({
     } catch (err) {
 
       console.error('❌ Erro ao obter mídia:', err);
+
+      // ✅ Aviso quando o usuário nega permissão de câmera/microfone
+      if (err instanceof DOMException && err.name === 'NotAllowedError') {
+        setMediaPermissionDenied(true);
+        showError(
+          'Câmera e/ou microfone não foram permitidos. Para usar a consulta, permita o acesso nas configurações do navegador e clique em "Tentar novamente" abaixo.',
+          'Permissão negada'
+        );
+        return;
+      }
 
       // ✅ NOVO: Se erro for "Device in use", tentar liberar e tentar novamente
       if (err instanceof DOMException && err.name === 'NotReadableError') {
@@ -3974,7 +3988,7 @@ export function ConsultationRoom({
             try {
               const response = await gatewayClient.get(`/consultations/${consultationId}`);
               if (response.success) {
-                const consultation = response;
+                const consultation = response.data || response;
 
                 // Se está em PROCESSING com etapa ANAMNESE, iniciar polling
                 if (consultation.status === 'PROCESSING' && consultation.etapa === 'ANAMNESE') {
@@ -4207,6 +4221,27 @@ export function ConsultationRoom({
     }, async (response: any) => {
 
       if (response.success) {
+
+        // ✅ NOVO: Atualizar call_sessions.status = 'ended' diretamente no banco
+        try {
+          const { supabase } = await import('@/lib/supabase');
+          const { error: updateError } = await supabase
+            .from('call_sessions')
+            .update({
+              status: 'ended',
+              ended_at: new Date().toISOString(),
+              webrtc_active: false
+            })
+            .eq('room_id', roomId);
+
+          if (updateError) {
+            console.error('❌ Erro ao atualizar call_sessions:', updateError);
+          } else {
+            console.log('✅ call_sessions atualizado para status: ended');
+          }
+        } catch (err) {
+          console.error('❌ Erro ao atualizar status da sessão:', err);
+        }
 
         // ✅ Enviar transcrição para o webhook ANTES do redirect (aguardar envio)
         try {
@@ -4487,6 +4522,45 @@ export function ConsultationRoom({
 
       {/* Layout de vídeos */}
       <div className="video-layout">
+
+        {/* Modal de permissão de câmera/microfone (médico e paciente) */}
+        {mediaPermissionDenied && (
+          <div
+            className="media-permission-modal-overlay"
+            onClick={(e) => e.target === e.currentTarget && setMediaPermissionDenied(false)}
+          >
+            <div className="media-permission-modal" onClick={(e) => e.stopPropagation()}>
+              <button
+                type="button"
+                className="media-permission-modal-close"
+                onClick={() => setMediaPermissionDenied(false)}
+                aria-label="Fechar"
+              >
+                <X size={20} />
+              </button>
+              <div className="media-permission-modal-icon">
+                <ShieldAlert size={48} strokeWidth={1.5} />
+              </div>
+              <h2 className="media-permission-modal-title">Permissão necessária</h2>
+              <p className="media-permission-modal-message">
+                Para participar da consulta com vídeo e áudio, permita o acesso à câmera e ao microfone nas configurações do navegador.
+              </p>
+              <p className="media-permission-modal-hint">
+                Clique no ícone de cadeado ou &quot;i&quot; na barra de endereço → Permissões do site → ative Câmera e Microfone.
+              </p>
+              <button
+                type="button"
+                className="media-permission-modal-retry"
+                onClick={() => {
+                  setMediaPermissionDenied(false);
+                  fetchUserMedia();
+                }}
+              >
+                Tentar novamente
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Sidebar lateral esquerda com informações do paciente - apenas para médico */}
         {userType === 'doctor' && (

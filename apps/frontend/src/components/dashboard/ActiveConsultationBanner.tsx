@@ -226,17 +226,13 @@ export function ActiveConsultationBanner() {
       setIsFinishing(true);
       
       // Atualizar status para PROCESSING (inicia o processamento da consulta)
-      const response = await fetch(`/api/consultations/${activeConsultation.id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          status: 'PROCESSING',
-        }),
+      const response = await gatewayClient.patch(`/consultations/${activeConsultation.id}`, {
+        status: 'PROCESSING',
       });
 
-      if (!response.success) { throw new Error(response.error || "Erro na requisição"); }
+      if (!response.success) {
+        throw new Error(response.error || "Erro na requisição");
+      }
 
       // Remover o banner
       activeConsultationRef.current = null;

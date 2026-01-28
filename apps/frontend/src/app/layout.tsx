@@ -4,8 +4,13 @@ import { ProvidersWrapper } from '@/components/providers/ProvidersWrapper';
 import { SuppressHydrationWarnings } from './suppress-warnings';
 
 export const metadata: Metadata = {
-  title: 'TRIA - Plataforma de Consultas Médicas com IA',
+  title: 'Auton Health - Plataforma de Consultas',
   description: 'Sistema de transcrição e análise de consultas médicas em tempo real',
+  icons: {
+    icon: '/favicon.png',
+    shortcut: '/favicon.png',
+    apple: '/favicon.png',
+  },
 };
 
 export default function RootLayout({
@@ -16,6 +21,11 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <head>
+        {/* Favicon */}
+        <link rel="icon" type="image/png" href="/favicon.png" />
+        <link rel="shortcut icon" type="image/png" href="/favicon.png" />
+        <link rel="apple-touch-icon" href="/favicon.png" />
+        
         {/* Google Fonts - Inter */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />

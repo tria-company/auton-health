@@ -471,16 +471,16 @@ export function CreateConsultationRoom({
           return;
         }
 
-        // Buscar ID do médico ligado ao usuário
-        const { data: medicoData, error: medicoError } = await supabase
+        // Buscar médico na tabela medicos usando a FK do auth.users
+        const { data: medico, error: medicoError } = await supabase
           .from('medicos')
           .select('id')
           .eq('user_auth', user.id)
           .single();
 
-        if (medicoError || !medicoData) {
+        if (medicoError || !medico) {
           setIsCreatingRoom(false);
-          showError('Médico não encontrado para este usuário', 'Erro ao Criar');
+          showError('Médico não encontrado. Verifique se sua conta está sincronizada.', 'Erro ao Criar');
           return;
         }
 
@@ -493,7 +493,7 @@ export function CreateConsultationRoom({
             consultation_type: consultationType === 'online' ? 'TELEMEDICINA' : 'PRESENCIAL',
             status: 'AGENDAMENTO',
             consulta_inicio: consultaInicio,
-            doctor_id: medicoData.id,
+            doctor_id: medico.id,
           })
           .select()
           .single();
@@ -569,15 +569,15 @@ export function CreateConsultationRoom({
           throw new Error('Usuário não autenticado');
         }
 
-        // Buscar ID do médico ligado ao usuário
-        const { data: medicoData, error: medicoError } = await supabase
+        // Buscar médico na tabela medicos usando a FK do auth.users
+        const { data: medico, error: medicoError } = await supabase
           .from('medicos')
           .select('id')
           .eq('user_auth', userAuth)
           .single();
 
-        if (medicoError || !medicoData) {
-          throw new Error('Médico não encontrado para este usuário');
+        if (medicoError || !medico) {
+          throw new Error('Médico não encontrado. Verifique se sua conta está sincronizada.');
         }
 
         // Criar consulta presencial via Supabase
@@ -588,7 +588,7 @@ export function CreateConsultationRoom({
             patient_name: selectedPatientData.name,
             consultation_type: 'PRESENCIAL',
             status: 'RECORDING',
-            doctor_id: medicoData.id,
+            doctor_id: medico.id,
           })
           .select()
           .single();

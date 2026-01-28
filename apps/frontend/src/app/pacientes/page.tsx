@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useNotifications } from '@/components/shared/NotificationSystem';
-import { Plus, Search, MoreVertical, Edit, Trash2, Phone, Mail, MapPin, Calendar, Grid3X3, List, Link2, Copy, User, Trash, FileText, CheckCircle, Clock, Loader2 } from 'lucide-react';
+import Link from 'next/link';
+import { Plus, Search, MoreVertical, Edit, Trash2, Phone, Mail, MapPin, Calendar, Grid3X3, List, Link2, Copy, User, Trash, FileText, CheckCircle, Clock, Loader2, UserPlus, UserCheck, UserX, Eye, Send } from 'lucide-react';
 import { PatientForm } from '@/components/patients/PatientForm';
 import { supabase } from '@/lib/supabase';
 import { gatewayClient } from '@/lib/gatewayClient';
@@ -35,6 +36,9 @@ interface Patient {
   anamnese?: {
     status: 'pendente' | 'preenchida';
   };
+  // Campos para usuário do sistema externo
+  user_auth?: string;
+  user_status?: 'active' | 'inactive';
 }
 
 interface CreatePatientData {
@@ -65,7 +69,7 @@ interface PatientsResponse {
 }
 
 export default function PatientsPage() {
-  const { showSuccess, showError } = useNotifications();
+  const { showSuccess, showError, showWarning } = useNotifications();
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -82,6 +86,8 @@ export default function PatientsPage() {
   });
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [copySuccess, setCopySuccess] = useState<string | null>(null);
+  const [showUserManagementModal, setShowUserManagementModal] = useState<Patient | null>(null);
+  const [resendingEmail, setResendingEmail] = useState(false);
   const isInitialMount = useRef(true);
 
   // Buscar pacientes
@@ -134,10 +140,16 @@ export default function PatientsPage() {
         if (editingPatient) {
           setEditingPatient(null);
         }
+        if (showUserManagementModal) {
+          setShowUserManagementModal(null);
+        }
+        if (showDeleteConfirm) {
+          setShowDeleteConfirm(null);
+        }
       }
     };
 
-    if (showForm || editingPatient) {
+    if (showForm || editingPatient || showUserManagementModal || showDeleteConfirm) {
       document.addEventListener('keydown', handleKeyDown);
       // Prevenir scroll do body quando modal está aberto
       document.body.style.overflow = 'hidden';
@@ -149,7 +161,7 @@ export default function PatientsPage() {
       document.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = 'unset';
     };
-  }, [showForm, editingPatient]);
+  }, [showForm, editingPatient, showUserManagementModal, showDeleteConfirm]);
 
   // Buscar pacientes quando filtros mudarem (com debounce)
   useEffect(() => {
@@ -170,6 +182,101 @@ export default function PatientsPage() {
 
   // Estado para controlar se está criando paciente
   const [isCreatingPatient, setIsCreatingPatient] = useState(false);
+  const [syncingUser, setSyncingUser] = useState<string | null>(null);
+
+  // Criar ou sincronizar usuário do paciente
+  const handleSyncUser = async (patientId: string, action: 'create' | 'activate' | 'deactivate' = 'create') => {
+    setSyncingUser(patientId);
+    try {
+      const response = await gatewayClient.post(`/patients/${patientId}/sync-user`, { action });
+
+      if (!response.success) {
+        throw new Error(response.error || 'Erro ao sincronizar usuário');
+      }
+
+      // Verificar se o email foi enviado
+      if (action === 'create') {
+        if (response.emailSent) {
+          showSuccess(`${response.message || 'Usuário criado com sucesso!'} Email com credenciais enviado.`, 'Sucesso');
+        } else {
+          const passwordInfo = response.password ? `\n\nSenha gerada: ${response.password}\n\nPor favor, informe esta senha ao paciente manualmente.` : '';
+          showWarning(
+            `${response.message || 'Usuário criado com sucesso!'}\n\n⚠️ Email não foi enviado: ${response.emailError || 'Erro desconhecido'}${passwordInfo}`,
+            'Atenção - Email não enviado'
+          );
+        }
+      } else {
+        showSuccess(response.message || 'Usuário sincronizado com sucesso!', 'Sucesso');
+      }
+      
+      // Atualizar paciente no modal se estiver aberto
+      if (showUserManagementModal && showUserManagementModal.id === patientId && response.patient) {
+        setShowUserManagementModal(response.patient);
+      }
+      
+      fetchPatients(pagination.page, searchTerm, statusFilter, false);
+    } catch (error) {
+      console.error('Erro ao sincronizar usuário:', error);
+      showError(`Erro ao sincronizar usuário: ${error instanceof Error ? error.message : 'Erro desconhecido'}`, 'Erro');
+      throw error; // Re-throw para que o chamador saiba que houve erro
+    } finally {
+      setSyncingUser(null);
+    }
+  };
+
+  // Ativar/Desativar usuário do paciente
+  const handleToggleUserStatus = async (patientId: string, currentStatus: 'active' | 'inactive') => {
+    setSyncingUser(patientId);
+    try {
+      const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+      const response = await gatewayClient.patch(`/patients/${patientId}/user-status`, { status: newStatus });
+
+      if (!response.success) {
+        throw new Error(response.error || 'Erro ao alterar status do usuário');
+      }
+
+      showSuccess(response.message || `Usuário ${newStatus === 'active' ? 'ativado' : 'desativado'} com sucesso!`, 'Sucesso');
+      
+      // Atualizar paciente no modal se estiver aberto
+      if (showUserManagementModal && showUserManagementModal.id === patientId && response.patient) {
+        setShowUserManagementModal(response.patient);
+      }
+      
+      fetchPatients(pagination.page, searchTerm, statusFilter, false);
+    } catch (error) {
+      console.error('Erro ao alterar status do usuário:', error);
+      showError(`Erro ao alterar status: ${error instanceof Error ? error.message : 'Erro desconhecido'}`, 'Erro');
+    } finally {
+      setSyncingUser(null);
+    }
+  };
+
+  // Reenviar email com credenciais
+  const handleResendCredentials = async (patientId: string) => {
+    setResendingEmail(true);
+    try {
+      const response = await gatewayClient.post(`/patients/${patientId}/resend-credentials`, {});
+
+      if (!response.success) {
+        throw new Error(response.error || 'Erro ao reenviar email');
+      }
+
+      if (response.emailSent) {
+        showSuccess('Email com credenciais reenviado com sucesso!', 'Email Enviado');
+      } else {
+        const passwordInfo = response.password ? `\n\nNova senha gerada: ${response.password}\n\nPor favor, informe esta senha ao paciente manualmente.` : '';
+        showWarning(
+          `Email não foi enviado: ${response.emailError || 'Erro desconhecido'}${passwordInfo}`,
+          'Atenção - Email não enviado'
+        );
+      }
+    } catch (error) {
+      console.error('Erro ao reenviar email:', error);
+      showError(`Erro ao reenviar email: ${error instanceof Error ? error.message : 'Erro desconhecido'}`, 'Erro');
+    } finally {
+      setResendingEmail(false);
+    }
+  };
 
   // Criar novo paciente
   const handleCreatePatient = async (patientData: CreatePatientData) => {
@@ -207,6 +314,16 @@ export default function PatientsPage() {
       }
 
       console.log('✅ Paciente criado com sucesso:', result);
+
+      // Criar usuário automaticamente se email estiver presente
+      if (result.email && patientData.email) {
+        try {
+          await handleSyncUser(result.id, 'create');
+        } catch (error) {
+          console.warn('Paciente criado, mas não foi possível criar usuário:', error);
+          // Não mostrar erro, apenas logar - o usuário pode criar depois manualmente
+        }
+      }
 
       setShowForm(false);
       setIsCreatingPatient(false); // Reabilitar o botão após sucesso
@@ -293,60 +410,82 @@ export default function PatientsPage() {
     }
   };
 
-  // Enviar anamnese por email
+  // Enviar anamnese por email e WhatsApp
   const [sendingAnamnese, setSendingAnamnese] = useState<string | null>(null);
-  const handleSendAnamneseEmail = async (patientId: string) => {
+  const handleSendAnamneseEmailAndWhatsApp = async (patientId: string) => {
     setSendingAnamnese(patientId);
     try {
-      // Buscar usuário autenticado
       const { data: { user }, error: userError } = await supabase.auth.getUser();
-      
       if (userError || !user) {
         throw new Error('Usuário não autenticado');
       }
 
-      // Criar ou atualizar anamnese inicial no Supabase
-      const { data: existingAnamnese } = await supabase
-        .from('anamnese_inicial')
-        .select('*')
-        .eq('paciente_id', patientId)
-        .single();
-
-      let anamneseResult;
-      
-      if (existingAnamnese) {
-        // Atualizar existente
-        const { data, error } = await supabase
-          .from('anamnese_inicial')
-          .update({ 
-            status: 'PENDENTE',
-            updated_at: new Date().toISOString()
-          })
-          .eq('paciente_id', patientId)
-          .select()
-          .single();
-        
-        if (error) throw error;
-        anamneseResult = data;
-      } else {
-        // Criar nova
-        const { data, error } = await supabase
-          .from('anamnese_inicial')
-          .insert({
-            paciente_id: patientId,
-            user_id: user.id,
-            status: 'PENDENTE'
-          })
-          .select()
-          .single();
-        
-        if (error) throw error;
-        anamneseResult = data;
+      const patient = patients.find(p => p.id === patientId);
+      if (!patient) {
+        throw new Error('Paciente não encontrado');
       }
 
-      showSuccess('Anamnese criada com sucesso!', 'Anamnese Enviada');
-      
-      // Recarregar lista de pacientes para atualizar status
+      if (!patient.email && !patient.phone) {
+        throw new Error('Paciente não possui email nem telefone cadastrado');
+      }
+
+      const { data: existingAnamnese } = await supabase
+        .from('a_cadastro_anamnese')
+        .select('*')
+        .eq('paciente_id', patientId)
+        .maybeSingle();
+
+      if (existingAnamnese) {
+        const { error } = await supabase
+          .from('a_cadastro_anamnese')
+          .update({ status: 'pendente', updated_at: new Date().toISOString() })
+          .eq('paciente_id', patientId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('a_cadastro_anamnese')
+          .insert({
+            paciente_id: patientId,
+            status: 'pendente'
+          });
+        if (error) throw error;
+      }
+
+      const anamneseLink = `${window.location.origin}/anamnese-inicial?pacienteId=${patientId}`;
+      let emailOk = false;
+      let whatsappOk = false;
+
+      if (patient.email) {
+        const emailResponse = await gatewayClient.post('/email/anamnese', {
+          to: patient.email,
+          patientName: patient.name,
+          anamneseLink
+        });
+        emailOk = !!emailResponse.success;
+      }
+
+      if (patient.phone) {
+        const whatsappResponse = await gatewayClient.post('/whatsapp/anamnese', {
+          phone: patient.phone,
+          patientName: patient.name,
+          anamneseLink
+        });
+        whatsappOk = !!whatsappResponse.success;
+      }
+
+      if (emailOk && whatsappOk) {
+        showSuccess('Anamnese enviada por email e WhatsApp com sucesso!', 'Enviado');
+      } else if (emailOk) {
+        showSuccess('Anamnese enviada por email. WhatsApp não enviado (verifique o telefone).', 'Enviado');
+      } else if (whatsappOk) {
+        showSuccess('Anamnese enviada por WhatsApp. Email não enviado (verifique o email).', 'Enviado');
+      } else {
+        showWarning(
+          'Anamnese criada, mas nenhum envio concluído. Use "Copiar Link" e envie manualmente.',
+          'Atenção'
+        );
+      }
+
       fetchPatients(pagination.page, searchTerm, statusFilter, false);
     } catch (error) {
       console.error('Erro ao enviar anamnese:', error);
@@ -531,6 +670,30 @@ export default function PatientsPage() {
                                 <span>Anamnese Não Enviada</span>
                               </span>
                             )}
+                            {patient.user_auth && (
+                              <span 
+                                className="patient-status-badge" 
+                                style={{
+                                  backgroundColor: patient.user_status === 'active' ? '#dbeafe' : '#fee2e2',
+                                  color: patient.user_status === 'active' ? '#1e40af' : '#991b1b',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}
+                              >
+                                {patient.user_status === 'active' ? (
+                                  <>
+                                    <UserCheck size={14} />
+                                    <span>Usuário Ativo</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <UserX size={14} />
+                                    <span>Usuário Inativo</span>
+                                  </>
+                                )}
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -559,10 +722,10 @@ export default function PatientsPage() {
                           className="action-btn-table email"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleSendAnamneseEmail(patient.id);
+                            handleSendAnamneseEmailAndWhatsApp(patient.id);
                           }}
                           disabled={sendingAnamnese === patient.id}
-                          title="Enviar anamnese por email"
+                          title="Enviar anamnese por email e WhatsApp"
                         >
                           {sendingAnamnese === patient.id ? (
                             <>
@@ -571,8 +734,8 @@ export default function PatientsPage() {
                             </>
                           ) : (
                             <>
-                              <Mail size={16} />
-                              <span>Enviar Email</span>
+                              <Send size={16} />
+                              <span>Email e WhatsApp</span>
                             </>
                           )}
                         </button>
@@ -586,6 +749,26 @@ export default function PatientsPage() {
                         >
                           <Copy size={16} />
                           <span>Copiar Link</span>
+                        </button>
+                        <Link
+                          href={`/pacientes/detalhes/?id=${patient.id}`}
+                          className="action-btn-table details"
+                          title="Ver detalhes e métricas do paciente"
+                        >
+                          <Eye size={16} />
+                          <span>Ver detalhes</span>
+                        </Link>
+                        {/* Botão para gerenciar acesso do paciente */}
+                        <button 
+                          className="action-btn-table user-manage"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowUserManagementModal(patient);
+                          }}
+                          title="Gerenciar acesso do paciente"
+                        >
+                          <User size={16} />
+                          <span>Gerenciar Acesso</span>
                         </button>
                         <button 
                           className="action-btn-table edit"
@@ -762,6 +945,178 @@ export default function PatientsPage() {
                   <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
                 Excluir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Gerenciamento de Acesso */}
+      {showUserManagementModal && (
+        <div 
+          className="modal-overlay"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowUserManagementModal(null);
+            }
+          }}
+        >
+          <div className="modal-content user-management-modal">
+            <div className="modal-header">
+              <h3 className="modal-title">Gerenciar Acesso do Paciente</h3>
+              <button 
+                className="modal-close-btn"
+                onClick={() => setShowUserManagementModal(null)}
+                aria-label="Fechar"
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+            </div>
+            
+            <div className="modal-body">
+              <div className="user-management-info">
+                <div className="user-management-patient-info">
+                  <h4>{showUserManagementModal.name}</h4>
+                  {showUserManagementModal.email && (
+                    <p className="user-management-email">
+                      <Mail size={16} />
+                      {showUserManagementModal.email}
+                    </p>
+                  )}
+                </div>
+
+                <div className="user-management-status">
+                  {!showUserManagementModal.user_auth ? (
+                    <div className="status-badge status-none">
+                      <UserX size={16} />
+                      <span>Usuário não criado</span>
+                    </div>
+                  ) : showUserManagementModal.user_status === 'active' ? (
+                    <div className="status-badge status-active">
+                      <UserCheck size={16} />
+                      <span>Usuário Ativo</span>
+                    </div>
+                  ) : (
+                    <div className="status-badge status-inactive">
+                      <UserX size={16} />
+                      <span>Usuário Inativo</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="user-management-actions">
+                {!showUserManagementModal.user_auth ? (
+                  <button
+                    className="btn btn-primary user-action-btn"
+                    onClick={async () => {
+                      try {
+                        await handleSyncUser(showUserManagementModal.id, 'create');
+                      } catch (error) {
+                        // Erro já tratado em handleSyncUser
+                      }
+                    }}
+                    disabled={syncingUser === showUserManagementModal.id || !showUserManagementModal.email}
+                  >
+                    {syncingUser === showUserManagementModal.id ? (
+                      <>
+                        <Loader2 size={16} className="spinning" style={{ animation: 'spin 1s linear infinite' }} />
+                        Criando Usuário...
+                      </>
+                    ) : (
+                      <>
+                        <UserPlus size={16} />
+                        Criar Usuário de Acesso
+                      </>
+                    )}
+                  </button>
+                ) : (
+                  <>
+                    {showUserManagementModal.user_status === 'active' ? (
+                      <button
+                        className="btn btn-warning user-action-btn"
+                        onClick={async () => {
+                          await handleToggleUserStatus(showUserManagementModal.id, 'active');
+                        }}
+                        disabled={syncingUser === showUserManagementModal.id}
+                      >
+                        {syncingUser === showUserManagementModal.id ? (
+                          <>
+                            <Loader2 size={16} className="spinning" style={{ animation: 'spin 1s linear infinite' }} />
+                            Desativando...
+                          </>
+                        ) : (
+                          <>
+                            <UserX size={16} />
+                            Desativar Usuário
+                          </>
+                        )}
+                      </button>
+                    ) : (
+                      <button
+                        className="btn btn-success user-action-btn"
+                        onClick={async () => {
+                          await handleToggleUserStatus(showUserManagementModal.id, 'inactive');
+                        }}
+                        disabled={syncingUser === showUserManagementModal.id}
+                      >
+                        {syncingUser === showUserManagementModal.id ? (
+                          <>
+                            <Loader2 size={16} className="spinning" style={{ animation: 'spin 1s linear infinite' }} />
+                            Ativando...
+                          </>
+                        ) : (
+                          <>
+                            <UserCheck size={16} />
+                            Ativar Usuário
+                          </>
+                        )}
+                      </button>
+                    )}
+                    
+                    {showUserManagementModal.user_auth && (
+                      <button
+                        className="btn btn-secondary user-action-btn"
+                        onClick={async () => {
+                          await handleResendCredentials(showUserManagementModal.id);
+                        }}
+                        disabled={resendingEmail || !showUserManagementModal.email}
+                      >
+                        {resendingEmail ? (
+                          <>
+                            <Loader2 size={16} className="spinning" style={{ animation: 'spin 1s linear infinite' }} />
+                            Reenviando...
+                          </>
+                        ) : (
+                          <>
+                            <Mail size={16} />
+                            Reenviar Email com Credenciais
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {!showUserManagementModal.email && (
+                <div className="user-management-warning">
+                  <p>⚠️ Este paciente não possui email cadastrado. É necessário ter um email para criar ou gerenciar o acesso.</p>
+                </div>
+              )}
+            </div>
+
+            <div className="modal-actions">
+              <button 
+                className="btn btn-secondary"
+                onClick={() => {
+                  setShowUserManagementModal(null);
+                  fetchPatients(pagination.page, searchTerm, statusFilter, false);
+                }}
+              >
+                Fechar
               </button>
             </div>
           </div>

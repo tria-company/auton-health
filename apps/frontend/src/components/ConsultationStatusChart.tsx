@@ -131,12 +131,12 @@ export function ConsultationStatusChart({
           
           <div className="legend-item">
             <span className="legend-dot legend-cancelados1"></span>
-            <span className="legend-label">Cancelados</span>
+            <span className="legend-label">Concluídas</span>
           </div>
           
           <div className="legend-item">
             <span className="legend-dot legend-cancelados2"></span>
-            <span className="legend-label">Cancelados</span>
+            <span className="legend-label">Canceladas</span>
           </div>
         </div>
       </div>
@@ -163,10 +163,12 @@ export function ConsultationStatusChart({
           <div className="metric-label">{metrics[0]?.label || 'Consultas concluídas'}</div>
           <div className="metric-value-group">
             <span className="metric-value-large">{metrics[0]?.value || 0}</span>
-            {metrics[0]?.change !== undefined && metrics[0].change > 0 && (
-              <span className="metric-change-indicator">
-                <TrendingUp className="trend-icon" size={12} />
-                <span className="change-value">{metrics[0].change}</span>
+            {metrics[0]?.change !== undefined && metrics[0].change !== 0 && (
+              <span className={`metric-change-indicator ${metrics[0].isPositive ? 'positive' : 'negative'}`}>
+                <TrendingUp className="trend-icon" size={12} style={{ transform: metrics[0].isPositive ? 'none' : 'rotate(180deg)' }} />
+                <span className="change-value">
+                  {metrics[0].isPositive ? '+' : ''}{metrics[0].change}%
+                </span>
               </span>
             )}
           </div>
@@ -179,10 +181,12 @@ export function ConsultationStatusChart({
           <div className="metric-label">{metrics[1]?.label || 'Total de pacientes'}</div>
           <div className="metric-value-group">
             <span className="metric-value-large">{metrics[1]?.value || 0}</span>
-            {metrics[1]?.change !== undefined && metrics[1].change > 0 && (
-              <span className="metric-change-indicator">
-                <TrendingUp className="trend-icon" size={12} />
-                <span className="change-value">{metrics[1].change}</span>
+            {metrics[1]?.change !== undefined && metrics[1].change !== 0 && (
+              <span className={`metric-change-indicator ${metrics[1].isPositive ? 'positive' : 'negative'}`}>
+                <TrendingUp className="trend-icon" size={12} style={{ transform: metrics[1].isPositive ? 'none' : 'rotate(180deg)' }} />
+                <span className="change-value">
+                  {metrics[1].isPositive ? '+' : ''}{metrics[1].change}%
+                </span>
               </span>
             )}
           </div>

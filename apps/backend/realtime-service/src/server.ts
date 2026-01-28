@@ -26,9 +26,52 @@ const httpServer = createServer(app);
 const allowedOrigins = getCorsOrigins();
 console.log('🔧 [REALTIME-SERVICE] CORS Origins:', allowedOrigins);
 
+// Função para validar origem do Socket.IO (suporta wildcards e validação dinâmica)
+const validateSocketOrigin = (origin: string | undefined, callback: (err: Error | null, allow: boolean) => void) => {
+    // Permitir todas as origens se CORS_ALLOW_ALL estiver ativo
+    if (process.env.CORS_ALLOW_ALL === 'true') {
+        return callback(null, true);
+    }
+
+    // Permitir requisições sem origin (mobile apps, etc.)
+    if (!origin) {
+        return callback(null, true);
+    }
+
+    // Permitir Vercel
+    if (origin.includes('vercel.app')) {
+        return callback(null, true);
+    }
+
+    // Permitir autonhealth.com.br e subdomínios
+    if (origin.includes('autonhealth.com.br')) {
+        return callback(null, true);
+    }
+
+    // Verificar se está na lista de origens permitidas
+    if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+    }
+
+    // Verificar padrões com wildcard
+    for (const allowed of allowedOrigins) {
+        if (allowed.startsWith('*.')) {
+            const domain = allowed.slice(2);
+            const originWithoutProtocol = origin.replace(/^https?:\/\//, '');
+            if (originWithoutProtocol.endsWith(domain) || originWithoutProtocol.endsWith('.' + domain)) {
+                return callback(null, true);
+            }
+        }
+    }
+
+    // Bloquear origem não permitida
+    console.warn(`🚫 [SOCKET.IO CORS] Origem bloqueada: ${origin}`);
+    return callback(null, false);
+};
+
 const io = new SocketIOServer(httpServer, {
     cors: {
-        origin: process.env.CORS_ALLOW_ALL === 'true' ? '*' : allowedOrigins,
+        origin: validateSocketOrigin,
         methods: ["GET", "POST"],
         allowedHeaders: ["Content-Type", "Authorization", "X-Session-ID", "X-User-ID"],
         credentials: true

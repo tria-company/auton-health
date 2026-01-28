@@ -62,8 +62,8 @@ export default function ForgotPasswordPage() {
             <Image
               src={logoSrc}
               alt="TRIA Logo"
-              width={48}
-              height={48}
+              width={120}
+              height={120}
               className="forgot-password-logo-image"
               priority
             />

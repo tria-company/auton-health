@@ -21,6 +21,12 @@ export async function authenticateToken(
   next: NextFunction
 ): Promise<void> {
   try {
+    // Ignorar requisições OPTIONS (preflight CORS)
+    // O CORS middleware já trata essas requisições
+    if (req.method === 'OPTIONS') {
+      return next();
+    }
+
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
