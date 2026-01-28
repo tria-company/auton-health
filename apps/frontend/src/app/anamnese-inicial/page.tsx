@@ -38,7 +38,7 @@ interface AnamneseFormData {
 }
 
 // Opções para seleções múltiplas
-const proteinasOptions = ['Carne bovina', 'Carne suína', 'Frango', 'Peixe', 'Ovos', 'Queijo', 'Iogurte', 'Leite', 'Tofu', 'Lentilha', 'Grão de bico', 'Feijão'];
+const proteinasOptions = ['Carne bovina', 'Carne suína', 'Frango', 'Peixe', 'Ovos', 'Queijo', 'Iogurte', 'Tofu', 'Lentilha', 'Grão de bico', 'Feijão'];
 const carboidratosOptions = ['Arroz', 'Arroz integral', 'Batata', 'Batata doce', 'Massa', 'Pão', 'Pão integral', 'Aveia', 'Quinoa', 'Macarrão', 'Farinha'];
 const vegetaisOptions = ['Alface', 'Rúcula', 'Espinafre', 'Couve', 'Brócolis', 'Repolho', 'Acelga', 'Agrião', 'Salsinha', 'Cebolinha'];
 const legumesOptions = ['Abobrinha', 'Berinjela', 'Pimentão', 'Tomate', 'Cenoura', 'Chuchu', 'Vagem', 'Quiabo', 'Pepino', 'Abóbora'];
