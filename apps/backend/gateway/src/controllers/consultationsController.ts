@@ -280,6 +280,12 @@ export async function updateConsultation(req: AuthenticatedRequest, res: Respons
  * DELETE /consultations/:id
  * Deleta uma consulta
  */
+import { deleteCalendarEventInternal } from './googleCalendarController';
+
+/**
+ * DELETE /consultations/:id
+ * Deleta uma consulta
+ */
 export async function deleteConsultation(req: AuthenticatedRequest, res: Response) {
   try {
     if (!req.user) {
@@ -306,7 +312,35 @@ export async function deleteConsultation(req: AuthenticatedRequest, res: Respons
       });
     }
 
-    // Deletar consulta
+    // 🔍 Buscar consulta antes de deletar para verificar se tem evento no Google Calendar
+    const { data: consulta, error: consultaError } = await supabase
+      .from('consultations')
+      .select('id, google_event_id')
+      .eq('id', id)
+      .eq('doctor_id', medico.id)
+      .single();
+
+    if (consultaError || !consulta) {
+      return res.status(404).json({
+        success: false,
+        error: 'Consulta não encontrada'
+      });
+    }
+
+    // 📅 Se tiver evento no Google, tentar remover
+    if (consulta.google_event_id && consulta.google_event_id.length > 5) {
+      console.log(`🗑️ Removendo evento do Google Calendar: ${consulta.google_event_id}`);
+      // Não aguardar o resultado bloquear a deleção, mas rodar em background seria melhor
+      // Como é uma operação crítica, vamos aguardar (fast enough)
+      const deleted = await deleteCalendarEventInternal(doctorAuthId, consulta.google_event_id);
+      if (deleted) {
+        console.log('✅ Evento removido do Google Calendar com sucesso');
+      } else {
+        console.warn('⚠️ Falha ao remover evento do Google Calendar (pode já ter sido removido ou erro de token)');
+      }
+    }
+
+    // Deletar consulta do banco
     const { error } = await supabase
       .from('consultations')
       .delete()
@@ -334,3 +368,4 @@ export async function deleteConsultation(req: AuthenticatedRequest, res: Respons
     });
   }
 }
+

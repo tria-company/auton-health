@@ -40,10 +40,15 @@ const io = new SocketIOServer(httpServer, {
 const pcmHandler = new PCMTranscriptionHandler();
 
 // Configurar handlers de salas WebRTC
+// Configurar handlers de salas WebRTC
 setupRoomsWebSocket(io);
 
 // Configurar handlers de consultas presenciais
 setupPresencialWebSocket(io);
+
+// ✅ Configurar handlers gerais (Exam Upload, Session Join, etc.)
+import { setupWebSocketHandlers } from './websocket/index';
+setupWebSocketHandlers(io);
 
 // Passar referência do Socket.IO para as rotas REST de rooms (para notificações admin)
 setSocketIO(io);

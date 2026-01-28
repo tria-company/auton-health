@@ -378,7 +378,8 @@ export function setupRoomsWebSocket(io: SocketIOServer): void {
         patientPhone: patientPhone,
         userAuth: userAuth, // ID do user autenticado (Supabase Auth)
         callSessionId: null, // Será preenchido após criar no banco
-        doctorName: null // ✅ Nome do médico (será preenchido quando buscar dados do médico)
+        doctorName: null, // ✅ Nome do médico (será preenchido quando buscar dados do médico)
+        joinedPatientName: null // ✅ NOVO: Persistir se o paciente já entrou alguma vez
       };
       rooms.set(roomId, room);
       userToRoom.set(hostName, roomId);
@@ -691,6 +692,7 @@ export function setupRoomsWebSocket(io: SocketIOServer): void {
         if (existingRoom === roomId) {
           console.log(`🔄 Reconexão do participante: ${participantName} na sala ${roomId}`);
           room.participantSocketId = socket.id;
+          room.joinedPatientName = participantName; // ✅ NOVO: Persistir nome do paciente
           socketToRoom.set(socket.id, roomId);
           resetRoomExpiration(roomId);
 
@@ -803,21 +805,18 @@ export function setupRoomsWebSocket(io: SocketIOServer): void {
       // Verificar se sala já tem participante
       if (room.participantUserName && room.participantUserName !== participantName) {
         callback({
-          success: false,
           error: 'Esta sala já está cheia'
         });
         return;
       }
 
-      // Adicionar participante à sala
+      console.log(`👤 Participante ${participantName} entrou na sala ${roomId}`);
       room.participantUserName = participantName;
       room.participantSocketId = socket.id;
-      room.status = 'active';
-
+      room.joinedPatientName = participantName; // ✅ NOVO: Persistir nome do paciente
       userToRoom.set(participantName, roomId);
       socketToRoom.set(socket.id, roomId);
       socket.join(roomId); // ✅ NOVO: Entrar na sala do Socket.IO
-
       resetRoomExpiration(roomId);
 
       // ✅ NOVO: Iniciar timer da chamada quando sala ficar ativa
@@ -1825,7 +1824,7 @@ export function setupRoomsWebSocket(io: SocketIOServer): void {
         success: true,
         message: 'Sala finalizada com sucesso',
         saveResult: saveResult,
-        participantUserName: room.participantUserName  // ✅ NOVO: Indicar se paciente entrou
+        participantUserName: room.participantUserName || room.joinedPatientName  // ✅ NOVO: Usar fallback persistente
       });
     });
 

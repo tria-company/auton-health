@@ -27,7 +27,7 @@ interface SidebarProps {
 const menuItems = [
   { icon: Home, label: 'Home', href: '/dashboard' },
   { icon: FileText, label: 'Nova Consulta', href: '/consulta/nova' },
-  { icon: LayoutDashboard, label: 'Gestão de Clínica', href: '/clinica/gestao' },
+
   { icon: MessageCircle, label: 'Consultas', href: '/consultas' },
   { icon: Calendar, label: 'Agenda', href: '/agenda' },
   { icon: User, label: 'Pacientes', href: '/pacientes' },
@@ -43,14 +43,14 @@ export function Sidebar({ expanded, onExpandedChange, isTopMenu = false }: Sideb
   const pathname = usePathname();
   const router = useRouter();
   const { signOut, user } = useAuth();
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [roles, setRoles] = useState({ admin: false, clinica_admin: false });
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Verificar se o usuário é admin
   useEffect(() => {
     const checkAdminStatus = async () => {
       if (!user?.id) {
-        setIsAdmin(false);
+        setRoles({ admin: false, clinica_admin: false });
         return;
       }
 
@@ -61,21 +61,18 @@ export function Sidebar({ expanded, onExpandedChange, isTopMenu = false }: Sideb
           .eq('user_auth', user.id)
           .maybeSingle();
 
-
-
         if (error) {
           console.error('Erro ao verificar status de admin:', error);
-          setIsAdmin(false);
+          setRoles({ admin: false, clinica_admin: false });
         } else {
-          const isSystemAdmin = data?.admin === true;
-          const isClinicAdmin = data?.clinica_admin === true;
-
-          // ✅ Verifica tanto admin do sistema quanto admin de clínica
-          setIsAdmin(isSystemAdmin || isClinicAdmin);
+          setRoles({
+            admin: data?.admin === true,
+            clinica_admin: data?.clinica_admin === true
+          });
         }
       } catch (err) {
         console.error('Erro ao verificar status de admin:', err);
-        setIsAdmin(false);
+        setRoles({ admin: false, clinica_admin: false });
       }
     };
 
@@ -161,20 +158,36 @@ export function Sidebar({ expanded, onExpandedChange, isTopMenu = false }: Sideb
         })}
 
         {/* Menu Admin - visível apenas para administradores */}
-        {isAdmin && adminMenuItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = pathname === item.href;
-          return (
+        {/* Menu Admin - visível apenas para administradores */}
+        {roles.admin && (
+          <>
             <Link
-              key={item.href}
-              href={item.href}
-              className={`nav-btn nav-btn-admin ${isActive ? 'is-active' : ''}`}
+              href="/administracao"
+              className={`nav-btn nav-btn-admin ${pathname === '/administracao' ? 'is-active' : ''}`}
             >
-              <Icon size={24} />
-              <span className="nav-label">{item.label}</span>
+              <Building2 size={24} />
+              <span className="nav-label">Administração</span>
             </Link>
-          );
-        })}
+            <Link
+              href="/consultas-admin"
+              className={`nav-btn nav-btn-admin ${pathname === '/consultas-admin' ? 'is-active' : ''}`}
+            >
+              <ShieldCheck size={24} />
+              <span className="nav-label">Admin Sistema</span>
+            </Link>
+          </>
+        )}
+
+        {/* Menu Gestão de Clínica - visível apenas para admin de clínica */}
+        {roles.clinica_admin && (
+          <Link
+            href="/clinica/gestao"
+            className={`nav-btn nav-btn-admin ${pathname === '/clinica/gestao' ? 'is-active' : ''}`}
+          >
+            <LayoutDashboard size={24} />
+            <span className="nav-label">Gestão de Clínica</span>
+          </Link>
+        )}
       </nav>
 
       <div className="bottom">

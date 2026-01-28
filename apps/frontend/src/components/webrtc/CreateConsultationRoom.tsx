@@ -6,6 +6,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import { getPatients, supabase } from '@/lib/supabase';
+import { gatewayClient } from '@/lib/gatewayClient';
 import io, { Socket } from 'socket.io-client';
 
 interface Patient {
@@ -470,16 +471,29 @@ export function CreateConsultationRoom({
           return;
         }
 
+        // Buscar ID do médico ligado ao usuário
+        const { data: medicoData, error: medicoError } = await supabase
+          .from('medicos')
+          .select('id')
+          .eq('user_auth', user.id)
+          .single();
+
+        if (medicoError || !medicoData) {
+          setIsCreatingRoom(false);
+          showError('Médico não encontrado para este usuário', 'Erro ao Criar');
+          return;
+        }
+
         // Criar consulta no Supabase
         const { data: consultation, error: insertError } = await supabase
-          .from('consultas')
+          .from('consultations')
           .insert({
             patient_id: selectedPatient,
             patient_name: selectedPatientData.name,
             consultation_type: consultationType === 'online' ? 'TELEMEDICINA' : 'PRESENCIAL',
             status: 'AGENDAMENTO',
             consulta_inicio: consultaInicio,
-            user_id: user.id,
+            doctor_id: medicoData.id,
           })
           .select()
           .single();
@@ -490,6 +504,52 @@ export function CreateConsultationRoom({
           showError('Erro ao criar agendamento: ' + (insertError?.message || 'Erro desconhecido'), 'Erro ao Criar');
         } else {
           console.log('✅ Agendamento criado:', consultation);
+
+          // 📅 Sincronizar com Google Calendar (se falhar, não impedir o fluxo principal)
+          try {
+            const endTime = new Date(new Date(consultaInicio).getTime() + 60 * 60 * 1000).toISOString(); // 1 hora de duração padrão
+
+            gatewayClient.post('/api/auth/google-calendar/events', {
+              title: `Consulta MedCall: ${selectedPatientData.name}`,
+              description: `Consulta agendada via MedCall.\nPaciente: ${selectedPatientData.name}\nTipo: ${consultationType === 'online' ? 'Online' : 'Presencial'}\nLink: ${window.location.origin}/consulta/online/doctor?roomId=${consultation.id}`, // Link placeholder, idealmente seria o link real
+              startTime: consultaInicio,
+              endTime: endTime,
+              attendees: selectedPatientData.email ? [selectedPatientData.email] : []
+            }).then(async (res) => {
+              if (res.success && res.eventId) {
+                console.log('✅ Evento criado no Google Calendar:', res.eventId);
+                showSuccess('Evento adicionado ao Google Calendar', 'Agenda');
+
+                // 🔄 CRITICAL FIX: Salvar ID do evento no banco para permitir exclusão futura
+                try {
+                  const { error: updateError } = await supabase
+                    .from('consultations')
+                    .update({
+                      google_event_id: res.eventId,
+                      sync_status: 'synced',
+                      last_synced_at: new Date().toISOString()
+                    })
+                    .eq('id', consultation.id);
+
+                  if (updateError) {
+                    console.error('❌ Erro ao salvar google_event_id no banco:', updateError);
+                  } else {
+                    console.log('✅ google_event_id salvo com sucesso na consulta');
+                  }
+                } catch (dbError) {
+                  console.error('❌ Exceção ao salvar google_event_id:', dbError);
+                }
+
+              } else if (res.error?.includes('não conectado')) {
+                console.warn('Google Calendar não conectado para este médico');
+              } else {
+                console.error('Erro ao sync Google Calendar:', res.error);
+              }
+            });
+
+          } catch (calError) {
+            console.error('Erro ao preparar sync do Calendar:', calError);
+          }
 
           // Redirecionar para página de consultas
           router.push('/consultas');
@@ -509,15 +569,26 @@ export function CreateConsultationRoom({
           throw new Error('Usuário não autenticado');
         }
 
+        // Buscar ID do médico ligado ao usuário
+        const { data: medicoData, error: medicoError } = await supabase
+          .from('medicos')
+          .select('id')
+          .eq('user_auth', userAuth)
+          .single();
+
+        if (medicoError || !medicoData) {
+          throw new Error('Médico não encontrado para este usuário');
+        }
+
         // Criar consulta presencial via Supabase
         const { data: consultation, error: insertError } = await supabase
-          .from('consultas')
+          .from('consultations')
           .insert({
             patient_id: selectedPatient,
             patient_name: selectedPatientData.name,
             consultation_type: 'PRESENCIAL',
             status: 'RECORDING',
-            user_id: userAuth,
+            doctor_id: medicoData.id,
           })
           .select()
           .single();
@@ -618,18 +689,43 @@ export function CreateConsultationRoom({
     }
   };
 
-  const handleShareWhatsApp = (link: string, patientName?: string) => {
-    // Mensagem formatada para WhatsApp
-    const message = `Olá${patientName ? ` ${patientName}` : ''}! 👋\n\n🔗 Link para sua consulta online:\n${link}\n\nPor favor, clique no link acima para entrar na consulta.`;
+  // Estado para controle de loading do envio do WhatsApp
+  const [sendingWhatsapp, setSendingWhatsapp] = useState(false);
 
-    // Codificar a mensagem para URL
-    const encodedMessage = encodeURIComponent(message);
+  const handleSendWhatsApp = async (link: string, patientName?: string, patientPhone?: string | null) => {
+    // Validação: Verificar se telefone existe
+    if (!patientPhone) {
+      showWarning('Telefone do paciente não cadastrado! Por favor, cadastre um telefone para o paciente.', 'Atenção');
+      return;
+    }
 
-    // URL do WhatsApp Web
-    const whatsappUrl = `https://wa.me/?text=${encodedMessage}`;
+    setSendingWhatsapp(true);
 
-    // Abrir WhatsApp em nova aba
-    window.open(whatsappUrl, '_blank');
+    try {
+      const message = `Olá${patientName ? ` ${patientName}` : ''}! 👋\n\n🔗 Link para sua consulta online:\n${link}\n\nPor favor, clique no link acima para entrar na consulta.`;
+
+      const response = await gatewayClient.post('/whatsapp/send', {
+        number: patientPhone,
+        text: message
+      });
+
+      if (response.success) {
+        showSuccess('Mensagem enviada com sucesso para o WhatsApp do paciente!', 'Envio Concluído');
+      } else {
+        throw new Error(response.error || 'Erro desconhecido ao enviar mensagem');
+      }
+
+    } catch (error: any) {
+      console.error('Erro ao enviar WhatsApp:', error);
+      showError(`Erro ao enviar mensagem: ${error.message || 'Falha na comunicação com API'}`, 'Erro no Envio');
+
+      // Fallback: Tentar abrir WhatsApp Web em caso de erro na API automática? 
+      // O usuário pediu especificamente "enviar uma mensagem ... usando a API", então o fallback talvez não seja desejado se o objetivo é automatizar.
+      // Mas podemos deixar uma opção manual se o usuário quiser.
+      // Por enquanto, seguimos estritamente o erro.
+    } finally {
+      setSendingWhatsapp(false);
+    }
   };
 
   const handleEnterRoom = (url: string) => {
@@ -722,7 +818,7 @@ export function CreateConsultationRoom({
                 </div>
               </div>
               <p className="sala-consulta-patient-phone">
-                {selectedPatientData?.phone || '(11)123456789'}
+                {selectedPatientData?.phone || 'Telefone não cadastrado'}
               </p>
             </div>
           </div>
@@ -743,9 +839,11 @@ export function CreateConsultationRoom({
 
               <button
                 className="sala-consulta-btn-whatsapp"
-                onClick={() => handleShareWhatsApp(roomData.participantRoomUrl, roomData.patientName)}
+                onClick={() => handleSendWhatsApp(roomData.participantRoomUrl, roomData.patientName, roomData.patientData?.phone)}
+                disabled={sendingWhatsapp}
+                style={{ opacity: sendingWhatsapp ? 0.7 : 1, cursor: sendingWhatsapp ? 'not-allowed' : 'pointer' }}
               >
-                Enviar para o Whatsapp
+                {sendingWhatsapp ? 'Enviando...' : 'Enviar para o Whatsapp'}
               </button>
 
               <button

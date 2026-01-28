@@ -1,10 +1,11 @@
 import { Router } from 'express';
 import { authenticateToken } from '../middleware/auth';
-import { 
+import {
   getGoogleCalendarStatus,
   authorizeGoogleCalendar,
-  handleGoogleCalendarCallback,
-  disconnectGoogleCalendar
+  disconnectGoogleCalendar,
+  exchangeGoogleCalendarToken,
+  createCalendarEvent
 } from '../controllers/googleCalendarController';
 
 const router = Router();
@@ -22,15 +23,28 @@ router.get('/status', authenticateToken, getGoogleCalendarStatus);
 router.get('/authorize', authenticateToken, authorizeGoogleCalendar);
 
 /**
- * GET /auth/google-calendar/callback
- * Callback do OAuth
+ * POST /auth/google-calendar/exchange
+ * Troca código por token (chamado pelo frontend)
  */
-router.get('/callback', handleGoogleCalendarCallback);
+router.post('/exchange', authenticateToken, exchangeGoogleCalendarToken);
+
+// /**
+//  * GET /auth/google-calendar/callback
+//  * Callback do OAuth (deprecated - frontend handles directly)
+//  */
+// router.get('/callback', handleGoogleCalendarCallback);
 
 /**
  * POST /auth/google-calendar/disconnect
  * Desconecta integração
  */
 router.post('/disconnect', authenticateToken, disconnectGoogleCalendar);
+
+/**
+ * POST /auth/google-calendar/events
+ * Cria um evento no Google Calendar
+ */
+// @ts-ignore - Ignore type error manually
+router.post('/events', authenticateToken, createCalendarEvent);
 
 export default router;

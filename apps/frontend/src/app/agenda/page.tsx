@@ -48,7 +48,7 @@ export default function AgendaPage() {
   const [viewMode, setViewMode] = useState<'month' | 'week' | 'day'>('month');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
-  
+
   // Estados do Google Calendar
   const [googleCalendarStatus, setGoogleCalendarStatus] = useState<GoogleCalendarStatus>({ connected: false });
   const [googleCalendarLoading, setGoogleCalendarLoading] = useState(true);
@@ -74,16 +74,41 @@ export default function AgendaPage() {
   const currentMonth = currentDate.getMonth();
   const currentYear = currentDate.getFullYear();
 
+  // Carregar status do Google Calendar
+  const loadGoogleCalendarStatus = async () => {
+    try {
+      const response = await gatewayClient.get('/api/auth/google-calendar/status');
+      // gatewayClient retorna flat response (properties misturados no objeto root)
+      if (response.success) {
+        setGoogleCalendarStatus({
+          connected: response.connected,
+          googleEmail: response.email // Backend envia 'email', interface espera 'googleEmail'
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao carregar status do Google Calendar:', error);
+    } finally {
+      setGoogleCalendarLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadGoogleCalendarStatus();
+  }, []);
+
   // Verificar query params do OAuth callback
   useEffect(() => {
     const connected = searchParams.get('google_calendar_connected');
     const error = searchParams.get('google_calendar_error');
-    
+
     if (connected === 'true') {
       setNotification({ type: 'success', message: 'Google Calendar conectado com sucesso!' });
+      // ✅ Forçar recarregamento do status
+      loadGoogleCalendarStatus();
       // Limpar URL
       router.replace('/agenda', { scroll: false });
     } else if (error) {
+      // ... error handling ...
       const errorMessages: Record<string, string> = {
         'access_denied': 'Acesso negado. Você cancelou a autorização.',
         'no_code': 'Erro na autorização. Tente novamente.',
@@ -100,23 +125,6 @@ export default function AgendaPage() {
     }
   }, [searchParams, router]);
 
-  // Carregar status do Google Calendar
-  useEffect(() => {
-    const loadGoogleCalendarStatus = async () => {
-      try {
-        const response = await gatewayClient.get('/auth/google-calendar/status');
-        if (response.success && response.data) {
-          setGoogleCalendarStatus(response.data);
-        }
-      } catch (error) {
-        console.error('Erro ao carregar status do Google Calendar:', error);
-      } finally {
-        setGoogleCalendarLoading(false);
-      }
-    };
-    loadGoogleCalendarStatus();
-  }, []);
-
   // Auto-hide notification
   useEffect(() => {
     if (notification) {
@@ -126,16 +134,34 @@ export default function AgendaPage() {
   }, [notification]);
 
   // Função para conectar Google Calendar
-  const handleConnectGoogleCalendar = () => {
-    window.location.href = '/api/auth/google-calendar/authorize';
+  const handleConnectGoogleCalendar = async () => {
+    try {
+      setGoogleCalendarLoading(true);
+      const response = await gatewayClient.get<any>('/api/auth/google-calendar/authorize');
+
+      if (response.success && (response.authUrl || response.data?.authUrl)) {
+        window.location.href = response.authUrl || response.data?.authUrl;
+      } else {
+        console.error('Erro na conexão:', response);
+        setNotification({
+          type: 'error',
+          message: response.error || response.message || 'Erro ao iniciar conexão com Google Calendar.'
+        });
+        setGoogleCalendarLoading(false);
+      }
+    } catch (error) {
+      console.error('Erro ao conectar Google Calendar:', error);
+      setNotification({ type: 'error', message: 'Erro ao conectar Google Calendar.' });
+      setGoogleCalendarLoading(false);
+    }
   };
 
   // Função para desconectar Google Calendar
   const handleDisconnectGoogleCalendar = async () => {
     if (!confirm('Tem certeza que deseja desconectar o Google Calendar?')) return;
-    
+
     try {
-      const response = await gatewayClient.post('/auth/google-calendar/disconnect');
+      const response = await gatewayClient.post('/api/auth/google-calendar/disconnect');
       if (response.success) {
         setGoogleCalendarStatus({ connected: false });
         setNotification({ type: 'success', message: 'Google Calendar desconectado.' });
@@ -238,10 +264,10 @@ export default function AgendaPage() {
     // Dias do mês atual
     for (let day = 1; day <= daysInMonth; day++) {
       const date = new Date(currentYear, currentMonth, day);
-      const dayConsultations = consultations.filter(consultation => 
+      const dayConsultations = consultations.filter(consultation =>
         consultation.date.toDateString() === date.toDateString()
       );
-      
+
       days.push({
         date,
         isCurrentMonth: true,
@@ -268,7 +294,7 @@ export default function AgendaPage() {
   // Obter dias da semana corrente (domingo-sábado)
   const getDaysInWeek = () => {
     const start = new Date(currentDate);
-    start.setHours(0,0,0,0);
+    start.setHours(0, 0, 0, 0);
     const dayOfWeek = start.getDay(); // 0-6
     start.setDate(start.getDate() - dayOfWeek);
     const days: any[] = [];
@@ -289,7 +315,7 @@ export default function AgendaPage() {
   // Obter apenas o dia selecionado/atual
   const getDayView = () => {
     const d = selectedDate ? new Date(selectedDate) : new Date(currentDate);
-    d.setHours(0,0,0,0);
+    d.setHours(0, 0, 0, 0);
     const dayConsultations = consultations.filter(c => c.date.toDateString() === d.toDateString());
     return [{
       date: d,
@@ -302,7 +328,7 @@ export default function AgendaPage() {
   // Obter consultas do dia selecionado
   const getSelectedDayConsultations = () => {
     if (!selectedDate) return [];
-    return consultations.filter(consultation => 
+    return consultations.filter(consultation =>
       consultation.date.toDateString() === selectedDate.toDateString()
     );
   };
@@ -399,16 +425,16 @@ export default function AgendaPage() {
   // Função para abrir modal de edição
   const handleOpenEditModal = (consultation: ConsultationEvent) => {
     setEditingConsultation(consultation);
-    
+
     // Formatar data para o input (YYYY-MM-DD)
     const dateStr = consultation.date.toISOString().split('T')[0];
-    
+
     setEditFormData({
       date: dateStr,
       time: consultation.time,
       type: consultation.type
     });
-    
+
     setEditModalOpen(true);
   };
 
@@ -422,7 +448,7 @@ export default function AgendaPage() {
   // Função para salvar edições
   const handleSaveEdit = async () => {
     if (!editingConsultation) return;
-    
+
     setIsSaving(true);
     try {
       // Criar datetime combinando data e hora
@@ -439,7 +465,9 @@ export default function AgendaPage() {
         })
       });
 
-      if (!response.success) { throw new Error(response.error || "Erro na requisição"); }
+      const data = await response.json();
+
+      if (!data.success) { throw new Error(data.error || "Erro na requisição"); }
 
       // Atualizar lista local
       setConsultations(prev => prev.map(c => {
@@ -483,7 +511,7 @@ export default function AgendaPage() {
     setIsDeleting(true);
     try {
       console.log('Excluindo consulta:', consultationToDelete.id);
-      
+
       const response = await gatewayClient.delete(`/consultations/${consultationToDelete.id}`);
 
       const data = response;
@@ -493,7 +521,7 @@ export default function AgendaPage() {
 
       // Remover da lista local
       setConsultations(prev => prev.filter(c => c.id !== consultationToDelete.id));
-      
+
       setNotification({ type: 'success', message: 'Consulta excluída com sucesso!' });
       handleCloseDeleteModal();
       handleCloseEditModal();
@@ -525,7 +553,7 @@ export default function AgendaPage() {
           <h1 className="agenda-title">Agenda</h1>
           <p className="agenda-subtitle">Gerencie suas consultas e compromissos</p>
         </div>
-        
+
         <div className="agenda-actions">
           {/* Botão Google Calendar */}
           <div className="google-calendar-wrapper">
@@ -536,20 +564,20 @@ export default function AgendaPage() {
               </button>
             ) : googleCalendarStatus.connected ? (
               <>
-                <button 
+                <button
                   className="btn btn-google-calendar connected"
                   onClick={() => setShowGoogleMenu(!showGoogleMenu)}
                 >
                   <svg className="google-icon" viewBox="0 0 24 24" width="18" height="18">
-                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
                   </svg>
                   <Check className="btn-icon check-icon" size={14} />
                   Sincronizado
                 </button>
-                
+
                 {/* Menu dropdown */}
                 {showGoogleMenu && (
                   <div className="google-calendar-menu">
@@ -570,15 +598,15 @@ export default function AgendaPage() {
                 )}
               </>
             ) : (
-              <button 
+              <button
                 className="btn btn-google-calendar"
                 onClick={handleConnectGoogleCalendar}
               >
                 <svg className="google-icon" viewBox="0 0 24 24" width="18" height="18">
-                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
                 </svg>
                 Conectar Google Calendar
               </button>
@@ -597,18 +625,18 @@ export default function AgendaPage() {
         <div className="calendar-section">
           <div className="calendar-header">
             <div className="calendar-navigation">
-              <button 
+              <button
                 className="nav-button"
                 onClick={() => (viewMode === 'month' ? navigateMonth('prev') : viewMode === 'week' ? navigateWeek('prev') : navigateDay('prev'))}
               >
                 <ChevronLeft className="nav-icon" />
               </button>
-              
+
               <h2 className="calendar-title">
                 {monthNames[currentMonth]} {currentYear}
               </h2>
-              
-              <button 
+
+              <button
                 className="nav-button"
                 onClick={() => (viewMode === 'month' ? navigateMonth('next') : viewMode === 'week' ? navigateWeek('next') : navigateDay('next'))}
               >
@@ -617,19 +645,19 @@ export default function AgendaPage() {
             </div>
 
             <div className="view-mode-selector">
-              <button 
+              <button
                 className={`view-mode-btn ${viewMode === 'month' ? 'active' : ''}`}
                 onClick={() => setViewMode('month')}
               >
                 Mês
               </button>
-              <button 
+              <button
                 className={`view-mode-btn ${viewMode === 'week' ? 'active' : ''}`}
                 onClick={() => setViewMode('week')}
               >
                 Semana
               </button>
-              <button 
+              <button
                 className={`view-mode-btn ${viewMode === 'day' ? 'active' : ''}`}
                 onClick={() => setViewMode('day')}
               >
@@ -655,15 +683,13 @@ export default function AgendaPage() {
               {days.map((day, index) => (
                 <div
                   key={index}
-                  className={`calendar-day ${
-                    day.isCurrentMonth ? 'current-month' : 'other-month'
-                  } ${day.isToday ? 'today' : ''} ${
-                    selectedDate?.toDateString() === day.date.toDateString() ? 'selected' : ''
-                  }`}
+                  className={`calendar-day ${day.isCurrentMonth ? 'current-month' : 'other-month'
+                    } ${day.isToday ? 'today' : ''} ${selectedDate?.toDateString() === day.date.toDateString() ? 'selected' : ''
+                    }`}
                   onClick={() => setSelectedDate(day.date)}
                 >
                   <span className="day-number">{day.date.getDate()}</span>
-                  
+
                   {day.consultations.length > 0 && (
                     <div className="day-events">
                       {day.consultations.slice(0, 3).map((consultation: ConsultationEvent) => (
@@ -696,10 +722,10 @@ export default function AgendaPage() {
               {selectedDate ? (
                 <>
                   <Calendar className="sidebar-icon" />
-                  {selectedDate.toLocaleDateString('pt-BR', { 
-                    weekday: 'long', 
-                    day: 'numeric', 
-                    month: 'long' 
+                  {selectedDate.toLocaleDateString('pt-BR', {
+                    weekday: 'long',
+                    day: 'numeric',
+                    month: 'long'
                   })}
                 </>
               ) : (
@@ -724,7 +750,7 @@ export default function AgendaPage() {
                     className="date-input"
                   />
                 </div>
-                
+
                 <div className="date-input-group">
                   <label htmlFor="end-date" className="date-label">
                     Data de Fim
@@ -737,18 +763,18 @@ export default function AgendaPage() {
                     className="date-input"
                   />
                 </div>
-                
+
                 {(startDate || endDate) && (
                   <div className="date-range-info">
                     <p className="range-text">
-                      {startDate && endDate 
+                      {startDate && endDate
                         ? `Período: ${new Date(startDate).toLocaleDateString('pt-BR')} até ${new Date(endDate).toLocaleDateString('pt-BR')}`
-                        : startDate 
-                        ? `A partir de: ${new Date(startDate).toLocaleDateString('pt-BR')}`
-                        : `Até: ${new Date(endDate).toLocaleDateString('pt-BR')}`
+                        : startDate
+                          ? `A partir de: ${new Date(startDate).toLocaleDateString('pt-BR')}`
+                          : `Até: ${new Date(endDate).toLocaleDateString('pt-BR')}`
                       }
                     </p>
-                    <button 
+                    <button
                       className="btn btn-secondary btn-small"
                       onClick={() => {
                         setStartDate('');
@@ -773,8 +799,8 @@ export default function AgendaPage() {
                     {getSelectedDayConsultations()
                       .sort((a, b) => a.time.localeCompare(b.time))
                       .map(consultation => (
-                        <div 
-                          key={consultation.id} 
+                        <div
+                          key={consultation.id}
                           className="consultation-card"
                           onClick={() => handleViewConsultation(consultation)}
                           style={{ cursor: 'pointer' }}
@@ -816,7 +842,7 @@ export default function AgendaPage() {
                               )}
                             </div>
                           </div>
-                          
+
                           <div className="consultation-details">
                             <h4 className="consultation-title">{consultation.title}</h4>
                             <div className="consultation-patient">
@@ -859,7 +885,7 @@ export default function AgendaPage() {
               <Calendar className="sidebar-icon" />
               Resumo do Mês
             </h3>
-            
+
             <div className="month-summary">
               <div className="summary-item">
                 <span className="summary-label">Total de Consultas</span>
@@ -904,7 +930,7 @@ export default function AgendaPage() {
                 <X size={20} />
               </button>
             </div>
-            
+
             <div className="modal-body">
               {/* Informações do Paciente (readonly) */}
               <div className="form-group">
@@ -971,7 +997,7 @@ export default function AgendaPage() {
             </div>
 
             <div className="modal-footer">
-              <button 
+              <button
                 className="btn btn-danger"
                 onClick={() => handleOpenDeleteModal(editingConsultation)}
                 disabled={isDeleting || isSaving}
@@ -980,14 +1006,14 @@ export default function AgendaPage() {
                 Excluir
               </button>
               <div className="modal-footer-right">
-                <button 
+                <button
                   className="btn btn-secondary"
                   onClick={handleCloseEditModal}
                   disabled={isSaving}
                 >
                   Cancelar
                 </button>
-                <button 
+                <button
                   className="btn btn-primary"
                   onClick={handleSaveEdit}
                   disabled={isSaving || !editFormData.date || !editFormData.time}
@@ -1011,7 +1037,7 @@ export default function AgendaPage() {
                 <X size={20} />
               </button>
             </div>
-            
+
             <div className="modal-body">
               <div className="confirm-icon-wrapper">
                 <Trash2 size={48} className="confirm-icon-delete" />
@@ -1025,14 +1051,14 @@ export default function AgendaPage() {
             </div>
 
             <div className="modal-footer modal-footer-center">
-              <button 
+              <button
                 className="btn btn-secondary"
                 onClick={handleCloseDeleteModal}
                 disabled={isDeleting}
               >
                 Cancelar
               </button>
-              <button 
+              <button
                 className="btn btn-danger"
                 onClick={handleConfirmDelete}
                 disabled={isDeleting}

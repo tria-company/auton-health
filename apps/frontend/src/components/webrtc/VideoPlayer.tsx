@@ -17,16 +17,29 @@ interface VideoPlayerProps {
  * - Tela preta após refresh
  * - Autoplay bloqueado pelo navegador
  * - Race conditions ao anexar stream
+ * - Seleção de dispositivo de saída de áudio (setSinkId)
  */
 export function VideoPlayer({
     stream,
     muted = false,
     className = '',
+    audioOutputDeviceId,
     onPlaybackBlocked,
     onPlaybackResumed,
-}: VideoPlayerProps) {
+}: VideoPlayerProps & { audioOutputDeviceId?: string }) {
     const videoRef = useRef<HTMLVideoElement>(null);
     const [isBlocked, setIsBlocked] = useState(false);
+
+    // ✅ Efeito reativo: Alterar saída de áudio (Speakers)
+    useEffect(() => {
+        const video = videoRef.current as any; // Cast to any to access setSinkId (experimental API)
+        if (video && audioOutputDeviceId && typeof video.setSinkId === 'function') {
+            console.log(`🔊 [VideoPlayer] Definindo saída de áudio para: ${audioOutputDeviceId}`);
+            video.setSinkId(audioOutputDeviceId)
+                .then(() => console.log(`✅ [VideoPlayer] Saída de áudio alterada com sucesso para ${audioOutputDeviceId}`))
+                .catch((error: any) => console.error('❌ [VideoPlayer] Erro ao definir saída de áudio:', error));
+        }
+    }, [audioOutputDeviceId]);
 
     // ✅ Efeito reativo: anexa stream quando disponível
     useEffect(() => {

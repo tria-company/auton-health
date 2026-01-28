@@ -356,4 +356,38 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
   });
 }));
 
+// Finalizar sessão por Room ID (para WebRTC)
+router.post('/end', asyncHandler(async (req: Request, res: Response) => {
+  const { roomId } = req.body;
+
+  if (!roomId) {
+    throw new ValidationError('Room ID é obrigatório');
+  }
+
+  console.log(`🔚 Solicitado fim de sessão para room: ${roomId}`);
+
+  // Atualizar sessão para ended
+  const success = await db.updateSessionByRoomId(roomId, {
+    ended_at: new Date().toISOString(),
+    status: 'ended',
+  });
+
+  if (!success) {
+    return res.status(404).json({
+      error: {
+        code: 'SESSION_UPDATE_FAILED',
+        message: 'Falha ao finalizar sessão ou sala não encontrada',
+      },
+    });
+  }
+
+  console.log(`✅ Sessão finalizada com sucesso para room: ${roomId}`);
+
+  res.json({
+    message: 'Sessão finalizada com sucesso',
+    roomId,
+    endedAt: new Date().toISOString(),
+  });
+}));
+
 export default router;

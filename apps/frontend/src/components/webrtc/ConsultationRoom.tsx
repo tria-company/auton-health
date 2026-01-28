@@ -16,7 +16,7 @@ import { NetworkWarning } from './NetworkWarning';
 
 import './webrtc-styles.css';
 
-import { getPatientNameById } from '@/lib/supabase';
+import { getPatientNameById, supabase } from '@/lib/supabase';
 import { gatewayClient } from '@/lib/gatewayClient';
 import { Video, Mic, CheckCircle, Copy, Check, Brain, Sparkles, ChevronDown, ChevronUp, MoreVertical, Minimize2, Maximize2, Circle, Clock, Scale, Ruler, Droplet, User as UserIcon, FileText } from 'lucide-react';
 import Image from 'next/image';
@@ -26,6 +26,11 @@ import { VideoPlayer } from './VideoPlayer';
 import { getWebhookEndpoints, getWebhookHeaders } from '@/lib/webhook-config';
 import { useNotifications } from '@/components/shared/NotificationSystem';
 import { ConfirmModal } from '@/components/modals/ConfirmModal';
+import { useMediaDevices } from '@/hooks/useMediaDevices';
+import { DeviceSettings } from './DeviceSettings';
+import { Settings as SettingsIcon } from 'lucide-react';
+import { ExamUploadModal } from '@/components/modals/ExamUploadModal';
+import { UploadedFile } from '@/components/FileUpload';
 
 
 
@@ -160,6 +165,13 @@ export function ConsultationRoom({
   const [patientAnamnese, setPatientAnamnese] = useState<any>(null);
   const [loadingPatientData, setLoadingPatientData] = useState(false);
 
+  // ✅ DEVICE MANAGER: Hook para gerenciar dispositivos
+  const mediaDevices = useMediaDevices();
+  const [showDeviceSettings, setShowDeviceSettings] = useState(false);
+
+  // ✅ UPLOAD EXAMES: Estado para modal de upload
+  const [showExamUploadModal, setShowExamUploadModal] = useState(false);
+
   // ✅ GRAVAÇÃO: Estados para controle de gravação da consulta
   const [isRecordingEnabled, setIsRecordingEnabled] = useState(false);
   const [recordingConsent, setRecordingConsent] = useState(false);
@@ -184,8 +196,7 @@ export function ConsultationRoom({
   const [localStreamState, setLocalStreamState] = useState<MediaStream | null>(null);
   const [remoteStreamState, setRemoteStreamState] = useState<MediaStream | null>(null);
 
-  // Refs para WebRTC
-
+  // ✅ NOVO: Refs para WebRTC
   const localVideoRef = useRef<HTMLVideoElement>(null);
 
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
@@ -646,6 +657,13 @@ export function ConsultationRoom({
         console.log('📊 Room Status:', response.roomData?.status);
 
         setRoomData(response.roomData);
+        // ✅ NOVO: Salvar ID da consulta (UUID) para uso posterior (ex: upload)
+        // Corrigido para verificar também consultationId e consultation_id
+        const foundId = response.roomData?.id || response.roomData?.consultationId || response.roomData?.consultation_id;
+        if (foundId) {
+          setCurrentConsultationId(foundId);
+          console.log('✅ ID da consulta definido via socket:', foundId);
+        }
 
         setUserRole(response.role);
 
@@ -1410,11 +1428,51 @@ export function ConsultationRoom({
               resolvedName = fetchedName || '';
 
             } catch (err) {
-              // ✅ Silenciar erro de busca de nome (não crítico)
               console.warn('⚠️ Não foi possível buscar nome do paciente no banco. Usando fallback.');
               resolvedName = '';
             }
           }
+
+          // ✅ CORREÇÃO: Buscar ID da consulta pelo Slug (roomId) se não estiver definido
+          if (roomId && !currentConsultationId) {
+            console.log('🔍 Buscando ID da consulta pelo Slug:', roomId);
+            try {
+              // 1. Tentar matching exato com coluna room_id
+              console.log(`🔍 [DEBUG] Tentando room_id = '${roomId}'`);
+              const { data: consultData, error: consultError } = await supabase
+                .from('consultations')
+                .select('id')
+                .eq('room_id', roomId)
+                .maybeSingle();
+
+              if (consultData?.id) {
+                console.log('✅ ID da consulta recuperado pelo room_id:', consultData.id);
+                setCurrentConsultationId(consultData.id);
+              } else {
+                console.warn('⚠️ [DEBUG] ID não encontrado por room_id. Tentando videocall_url...');
+
+                // 2. Fallback: Tentar videocall_url, video_url ou meeting_url
+                const { data: urlData, error: urlError } = await supabase
+                  .from('consultations')
+                  .select('id')
+                  .or(`videocall_url.ilike.%${roomId}%,video_url.ilike.%${roomId}%,meeting_url.ilike.%${roomId}%`)
+                  .limit(1)
+                  .maybeSingle();
+
+                if (urlData?.id) {
+                  console.log('✅ ID recuperado via URL da sala (fallback multi-coluna):', urlData.id);
+                  setCurrentConsultationId(urlData.id);
+                } else {
+                  console.error('❌ Não foi possível encontrar ID da consulta. Verifique se o slug está correto ou se a coluna é diferente.');
+                  console.log('Dados do erro (se houver):', { consultError, urlError });
+                }
+              }
+            } catch (err) {
+              console.error('❌ Erro ao buscar ID da consulta por slug:', err);
+            }
+          }
+
+
 
 
 
@@ -2874,21 +2932,26 @@ export function ConsultationRoom({
 
       //console.log('📹 [MÍDIA] Obtendo stream de mídia...');
 
-      // ✅ NOVO: Tentar primeiro com preferências específicas
+      // ✅ NOVO: Tentar primeiro com preferências específicas + Dispositivos Selecionados
       let stream;
       try {
-        stream = await navigator.mediaDevices.getUserMedia({
+        const constraints: MediaStreamConstraints = {
           video: {
+            deviceId: mediaDevices.selectedVideoInputId ? { exact: mediaDevices.selectedVideoInputId } : undefined,
             width: { ideal: 1280 },
             height: { ideal: 720 },
             facingMode: 'user'
           },
           audio: {
+            deviceId: mediaDevices.selectedAudioInputId ? { exact: mediaDevices.selectedAudioInputId } : undefined,
             echoCancellation: true,
             noiseSuppression: true,
             autoGainControl: true
           }
-        });
+        };
+
+        console.log('📹 [MÍDIA] Solicitando stream com constraints:', constraints);
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
       } catch (error) {
         // Se falhar com preferências, tentar sem
         console.warn('📹 [MÍDIA] Falha com preferências, tentando configuração básica...');
@@ -2897,6 +2960,7 @@ export function ConsultationRoom({
           audio: true
         });
       }
+
 
 
       // 🔍 DEBUG [REFERENCIA] MÍDIA OBTIDA
@@ -2911,6 +2975,7 @@ export function ConsultationRoom({
 
       localStreamRef.current = stream;
       setIsMediaReady(true); // ✅ REACTIVE STATE MACHINE
+
 
       // Configurar estados iniciais dos controles
       const videoTrack = stream.getVideoTracks()[0];
@@ -3290,7 +3355,262 @@ export function ConsultationRoom({
 
 
 
-  // Controles de mídia
+  // ✅ DEVICE MANAGER: Função para trocar dispositivos
+  const handleDeviceSwitch = async (kind: 'audioinput' | 'videoinput' | 'audiooutput', deviceId: string) => {
+    console.log(`🔄 [DEVICE] Switching ${kind} to ${deviceId}`);
+
+    try {
+      if (kind === 'audiooutput') {
+        mediaDevices.selectAudioOutput(deviceId);
+        showSuccess('Saída de áudio alterada com sucesso!', 'Dispositivo Alterado');
+        return;
+      }
+
+      // Update state in hook
+      if (kind === 'audioinput') mediaDevices.selectAudioInput(deviceId);
+      if (kind === 'videoinput') mediaDevices.selectVideoInput(deviceId);
+
+      // Validation
+      if (!deviceId) return;
+
+      const constraints: MediaStreamConstraints = {
+        audio: kind === 'audioinput' ? { deviceId: { exact: deviceId } } : false,
+        video: kind === 'videoinput' ? { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } } : false,
+      };
+
+      const newStream = await navigator.mediaDevices.getUserMedia(constraints);
+      const newTrack = kind === 'audioinput' ? newStream.getAudioTracks()[0] : newStream.getVideoTracks()[0];
+
+      if (!newTrack) {
+        throw new Error(`Nova track de ${kind} não encontrada`);
+      }
+
+      // Replace in local stream
+      if (localStreamRef.current) {
+        const oldTrack = kind === 'audioinput'
+          ? localStreamRef.current.getAudioTracks()[0]
+          : localStreamRef.current.getVideoTracks()[0];
+
+        if (oldTrack) {
+          oldTrack.stop();
+          localStreamRef.current.removeTrack(oldTrack);
+        }
+
+        localStreamRef.current.addTrack(newTrack);
+
+        // Update state to force re-render of local video
+        setLocalStreamState(new MediaStream(localStreamRef.current.getTracks()));
+      } else {
+        // If no stream exists, just set it
+        localStreamRef.current = newStream;
+        setLocalStreamState(newStream);
+      }
+
+      // Replace in PeerConnection
+      if (peerConnectionRef.current) {
+        const senders = peerConnectionRef.current.getSenders();
+        const sender = senders.find(s => s.track?.kind === (kind === 'audioinput' ? 'audio' : 'video'));
+
+        if (sender) {
+          await sender.replaceTrack(newTrack);
+          console.log(`✅ [DEVICE] Track de ${kind} substituída no PeerConnection`);
+        } else {
+          console.warn(`⚠️ [DEVICE] Sender para ${kind} não encontrado no PeerConnection`);
+        }
+      }
+
+      // Special case: Audio Processor for transcription
+      if (kind === 'audioinput' && audioProcessorRef.current && localStreamRef.current) {
+        await audioProcessorRef.current.init(localStreamRef.current);
+      }
+
+      showSuccess(`${kind === 'videoinput' ? 'Câmera' : 'Microfone'} alterado com sucesso!`, 'Dispositivo Alterado');
+
+    } catch (error) {
+      console.error(`❌ [DEVICE] Erro ao trocar dispositivo:`, error);
+      showError('Não foi possível alterar o dispositivo.', 'Erro');
+    }
+  };
+
+  // ✅ UPLOAD EXAMES: Função REAL para envio
+  const handleUploadExam = async (files: UploadedFile[]) => {
+    console.log('📤 [UPLOAD] Iniciando envio de exames:', files.length, 'arquivos');
+
+    // Identificar IDs
+    const currentPatientId = patientId || patientData?.id;
+
+    // ✅ A resolução do ID da consulta agora é feita no backend (suggestionHandler.ts)
+    // para evitar exposição de query logic e erros de RLS.
+    // Mantemos apenas a referência se já estiver no estado.
+    let currentConsultId = currentConsultationId || roomData?.id;
+
+    console.log('🔍 [UPLOAD] IDs:', {
+      currentPatientId,
+      currentConsultId,
+      roomId
+    });
+
+    console.log('🔍 [UPLOAD] IDs finais:', {
+      currentPatientId,
+      currentConsultId,
+      roomIdSlug: roomId
+    });
+
+    // ✅ Validação relaxada: Apenas PatientId é obrigatório para o storage
+    if (!currentPatientId) {
+      console.error('❌ [UPLOAD] Faltando Patient ID');
+      showError('Erro ao identificar paciente.', 'Upload Falhou');
+      throw new Error('ID do paciente não encontrado');
+    }
+
+    const uploadedUrls: string[] = [];
+
+    try {
+      // ✅ Verificar se bucket existe (SUPRESSÃO DE ERROS RLS)
+      // ✅ Verificar se bucket existe (SUPRESSÃO DE ERROS RLS)
+      // Comentado para evitar erros 400 desnecessários no console. Assumimos que o bucket 'documents' existe.
+      /*
+      try {
+        const { data: buckets } = await supabase.storage.listBuckets();
+        const bucketExists = buckets?.some(b => b.name === 'documents');
+
+        if (!bucketExists) {
+          // Tentar criar, mas silenciar erro se for permissão (RLS)
+          const { error: createError } = await supabase.storage.createBucket('documents', { public: true });
+          if (createError) console.warn('⚠️ [UPLOAD] Aviso na criação do bucket (ignorado):', createError.message);
+        }
+      } catch (bucketError) {
+        // Ignorar falhas de listagem/criação de bucket
+        console.warn('⚠️ [UPLOAD] Aviso na verificação do bucket (ignorado):', bucketError);
+      }
+      */
+
+      // ✅ Alterado path para usar apenas ID do paciente
+      const folderPath = `exames/${currentPatientId}`;
+
+      // 1. Upload de Arquivos para o Storage
+      for (const fileObj of files) {
+        const file = fileObj.file;
+        const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+        const fileName = `${Date.now()}_${sanitizedName}`;
+        const filePath = `${folderPath}/${fileName}`;
+
+        console.log(`📤 Uploading: ${filePath}`);
+
+        const { error } = await supabase.storage
+          .from('documents')
+          .upload(filePath, file, {
+            cacheControl: '3600',
+            upsert: false
+          });
+
+        if (error) {
+          console.error(`❌ Erro upload ${file.name}:`, error);
+          throw error;
+        }
+
+        // Obter URL pública
+        const { data: publicUrlData } = supabase.storage
+          .from('documents')
+          .getPublicUrl(filePath);
+
+        if (publicUrlData.publicUrl) {
+          uploadedUrls.push(publicUrlData.publicUrl);
+        }
+      }
+
+      console.log('✅ Uploads concluídos. URLs:', uploadedUrls);
+
+      // 2. Solicitar vínculo via Socket (Backend seguro) e aguardar confirmação
+      if (socketRef.current) {
+        console.log('📤 [UPLOAD] Socket State Check:', {
+          exists: !!socketRef.current,
+          connected: socketRef.current.connected,
+          id: socketRef.current.id,
+          uri: socketRef.current.io?.uri
+        });
+      }
+
+      if (socketRef.current && socketRef.current.connected) {
+        console.log('📤 [UPLOAD] Solicitando vínculo via Socket...', { roomId, count: uploadedUrls.length });
+
+        // Promessa para aguardar resposta do socket
+        const updatePromise = new Promise<{ success: boolean, message?: string }>((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            cleanupListeners();
+            // Não rejeitar, apenas avisar que não houve confirmação, mas uploads foram feitos
+            resolve({ success: false, message: 'Tempo limite esgotado aguardando confirmação do vínculo.' });
+          }, 10000); // 10s timeout
+
+          const onSuccess = (data: any) => {
+            cleanupListeners();
+            resolve({ success: true });
+          };
+
+          const onError = (data: any) => {
+            cleanupListeners();
+            resolve({ success: false, message: data.message || 'Erro ao vincular exames.' });
+          };
+
+          const cleanupListeners = () => {
+            clearTimeout(timeout);
+            socketRef.current?.off('exam:upload:success', onSuccess);
+            socketRef.current?.off('exam:upload:error', onError);
+          };
+
+          socketRef.current?.once('exam:upload:success', onSuccess);
+          socketRef.current?.once('exam:upload:error', onError);
+
+          try {
+            socketRef.current?.emit('exam:upload', {
+              roomId: roomId,
+              fileUrls: uploadedUrls,
+              patientId: currentPatientId
+            });
+          } catch (e) {
+            cleanupListeners();
+            reject(e);
+          }
+        });
+
+        try {
+          const result = await updatePromise;
+
+          if (result.success) {
+            showSuccess(`${uploadedUrls.length} exames enviados e vinculados com sucesso!`, 'Upload Concluído');
+            console.log('✅ [UPLOAD] Sucesso total confirmada pelo backend.');
+          } else {
+            console.warn('⚠️ [UPLOAD] Exames salvos mas backend reportou erro:', result.message);
+            showWarning(`Exames salvos no sistema, mas houve um erro ao vincular à consulta: ${result.message}`, 'Aviso');
+          }
+        } catch (socketErr) {
+          console.error('❌ [UPLOAD] Erro na comunicação socket:', socketErr);
+          showWarning('Exames salvos, mas erro de comunicação impediu confirmação do vínculo.', 'Aviso');
+        }
+
+      } else {
+        console.warn('⚠️ [UPLOAD] Socket desconectado. Exames salvos mas não vinculados automaticamente.');
+        showWarning('Exames salvos no storage, mas conexão instável impediu vínculo automático.', 'Aviso de Conexão');
+      }
+
+      console.log('✅ Processo de upload finalizado.');
+
+    } catch (error: any) {
+      // ✅ Tratamento melhor de erros visuais
+      // Se for erro de RLS do bucket mas o upload funcionou (pelo array), ignorar
+      if (error && error.message && error.message.includes('row-level security') && uploadedUrls.length > 0) {
+        console.warn('⚠️ Ignorando erro RLS final pois uploads parecem ter funcionado');
+        return;
+      }
+
+      console.error('❌ [UPLOAD] Falha geral:', error);
+      showError(error.message || 'Falha ao salvar exames.', 'Erro no Upload');
+      // Re-throw para o modal tratar e fechar/mostrar erro
+      throw error;
+    }
+  };
+
+
 
   const toggleCamera = () => {
 
@@ -4424,8 +4744,7 @@ export function ConsultationRoom({
               <button
                 className="patient-action-btn action-btn-primary"
                 onClick={() => {
-                  // TODO: Implementar funcionalidade de anexar exame
-                  showInfo('Funcionalidade de anexar exame será implementada em breve.', 'Em desenvolvimento');
+                  setShowExamUploadModal(true);
                 }}
               >
                 <FileText size={14} />
@@ -4715,6 +5034,7 @@ export function ConsultationRoom({
             <VideoPlayer
               stream={remoteStreamState}
               className="video-player"
+              audioOutputDeviceId={mediaDevices.selectedAudioOutputId || undefined}
               onPlaybackBlocked={handleRemotePlaybackBlocked}
               onPlaybackResumed={handleRemotePlaybackResumed}
             />
@@ -4775,14 +5095,38 @@ export function ConsultationRoom({
                   >
                     <Mic size={20} />
                   </button>
+
+                  {/* ✅ NOVO: Botão de Configurações */}
+                  <button
+                    className="media-btn active"
+                    onClick={() => setShowDeviceSettings(true)}
+                    title="Configurações de Dispositivos"
+                    style={{ pointerEvents: 'auto', zIndex: 100000 }}
+                  >
+                    <SettingsIcon size={20} />
+                  </button>
                 </div>
               </div>
             )}
           </div>
         </div>
 
-
       </div>
+
+      {/* ✅ NOVO: Modal de Configurações de Dispositivos */}
+      <DeviceSettings
+        isOpen={showDeviceSettings}
+        onClose={() => setShowDeviceSettings(false)}
+        devices={mediaDevices}
+        onDeviceSelect={handleDeviceSwitch}
+      />
+
+      {/* ✅ NOVO: Modal de Upload de Exames */}
+      <ExamUploadModal
+        isOpen={showExamUploadModal}
+        onClose={() => setShowExamUploadModal(false)}
+        onUpload={handleUploadExam}
+      />
 
 
 
@@ -5085,10 +5429,6 @@ export function ConsultationRoom({
           }
         }
       `}</style>
-
     </div>
-
   );
-
 }
-

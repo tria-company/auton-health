@@ -23,6 +23,8 @@ import adminRoutes from './routes/admin';
 import examesRoutes from './routes/exames';
 import googleCalendarRoutes from './routes/google-calendar';
 import consultasAdminRoutes from './routes/consultas-admin';
+import whatsappRoutes from './routes/whatsapp.routes';
+import aiRoutes from './routes/ai';
 
 // Rotas de Proxy
 import proxyRoutes from './routes/proxy';
@@ -113,6 +115,7 @@ app.set('trust proxy', 1);
 app.use('/api/audit', auditRoutes);
 app.use('/api/clinic', clinicRoutes);
 app.use('/api', twilioRoutes);
+app.use('/whatsapp', whatsappRoutes);
 
 // Rotas migradas do Frontend (Monolito legado que ainda vive no Gateway por enquanto)
 app.use('/dashboard', dashboardRoutes);
@@ -127,7 +130,8 @@ app.use('/agenda', agendaRoutes);
 app.use('/admin', adminRoutes);
 app.use('/exames', examesRoutes);
 app.use('/processar-exames', examesRoutes);
-app.use('/auth/google-calendar', googleCalendarRoutes);
+app.use('/api/auth/google-calendar', googleCalendarRoutes);
+app.use('/ai', aiRoutes);
 app.use('/admin/consultations', consultasAdminRoutes);
 
 // Health check do Gateway

@@ -2,6 +2,7 @@ import { Server as SocketIOServer, Socket } from 'socket.io';
 import { isDevelopment } from '../config';
 import { setupPresentialAudioHandlers } from './audioHandler';
 import { setupOnlineConsultationHandlers } from './onlineConsultationHandler';
+import { setupExamHandlers } from './suggestionHandler';
 
 // Interfaces para eventos WebSocket
 interface SessionJoinData {
@@ -31,6 +32,9 @@ export function setupWebSocketHandlers(io: SocketIOServer): void {
 
     // Configurar handlers de consulta online
     setupOnlineConsultationHandlers(socket, notifier);
+
+    // ✅ Configurar handlers de exames (upload/vínculo)
+    setupExamHandlers(socket, io);
 
     // Handler para participar de uma sessão
     socket.on('session:join', async (data: SessionJoinData) => {

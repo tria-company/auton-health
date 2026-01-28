@@ -168,6 +168,21 @@ export const db = {
     return true;
   },
 
+  async updateSessionByRoomId(roomId: string, data: Partial<CallSession>): Promise<boolean> {
+    const { error } = await supabase
+      .from('call_sessions')
+      .update({ ...data, updated_at: new Date().toISOString() })
+      .eq('room_id', roomId);
+
+    if (error) {
+      console.error('Erro ao atualizar sessão por room_id:', error);
+      logError(`Erro ao atualizar sessão por room_id`, 'error', null, { roomId, error: error.message, code: error.code });
+      return false;
+    }
+
+    return true;
+  },
+
   // Utterances
   async createUtterance(data: Partial<Utterance>): Promise<Utterance | null> {
     try {

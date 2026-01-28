@@ -57,6 +57,11 @@ const envSchema = z.object({
   MAX_AUDIO_DURATION_MS: z.coerce.number().default(300000), // 5 minutos
   AUDIO_SAMPLE_RATE: z.coerce.number().default(16000),
 
+  // Evolution API
+  EVO_SERVICE_URL: z.string().default(''),
+  EVO_INSTANCE_NAME: z.string().default(''),
+  EVO_APIKEY: z.string().default(''),
+
   // AI & RAG Settings
 
 

@@ -44,8 +44,8 @@ interface ActiveConsultation {
   room_id: string | null;
   created_at: string;
   consulta_inicio: string | null;
-  patients: { name: string };
-  medicos: { name: string; email: string } | null;
+  pacientes: { name: string }[] | any;
+  medicos: { name: string; email: string }[] | any;
 }
 
 interface ActiveSession {
@@ -122,7 +122,7 @@ export default function CostsMonitorPage() {
 
       // Buscar consultas ativas (RECORDING)
       const { data: activeConsults, error: consultsError } = await supabase
-        .from('consultas')
+        .from('consultations')
         .select(`
           id,
           status,
@@ -254,7 +254,7 @@ export default function CostsMonitorPage() {
     try {
       // Atualizar status da consulta para COMPLETED (forçar encerramento)
       const { error: updateError } = await supabase
-        .from('consultas')
+        .from('consultations')
         .update({
           status: 'COMPLETED',
           consulta_fim: new Date().toISOString(),
@@ -267,7 +267,7 @@ export default function CostsMonitorPage() {
 
       // Buscar room_id para atualizar call_session
       const { data: consulta } = await supabase
-        .from('consultas')
+        .from('consultations')
         .select('room_id')
         .eq('id', consultationId)
         .single();
@@ -306,7 +306,7 @@ export default function CostsMonitorPage() {
     try {
       // Buscar todas as consultas RECORDING
       const { data: recordingConsultations, error: fetchError } = await supabase
-        .from('consultas')
+        .from('consultations')
         .select('id, room_id')
         .eq('status', 'RECORDING');
 
@@ -324,7 +324,7 @@ export default function CostsMonitorPage() {
 
       // Atualizar todas as consultas RECORDING para COMPLETED
       const { error: updateError } = await supabase
-        .from('consultas')
+        .from('consultations')
         .update({
           status: 'COMPLETED',
           consulta_fim: new Date().toISOString(),
@@ -381,7 +381,7 @@ export default function CostsMonitorPage() {
     const diffMs = now.getTime() - start.getTime();
     const diffMins = Math.floor(diffMs / 60000);
     const diffHours = Math.floor(diffMins / 60);
-    
+
     if (diffHours > 0) {
       return `${diffHours}h ${diffMins % 60}min`;
     }
@@ -428,8 +428,8 @@ export default function CostsMonitorPage() {
           </div>
         </div>
         <div className="costs-actions">
-          <select 
-            value={period} 
+          <select
+            value={period}
             onChange={(e) => setPeriod(e.target.value)}
             className="period-select"
           >
@@ -513,8 +513,8 @@ export default function CostsMonitorPage() {
                   </span>
                 </div>
                 <div className="card-body">
-                  <p><strong>Paciente:</strong> {consultation.patients?.name || 'N/A'}</p>
-                  <p><strong>Médico:</strong> {consultation.medicos?.name || consultation.medicos?.email || 'N/A'}</p>
+                  <p><strong>Paciente:</strong> {Array.isArray(consultation.pacientes) ? consultation.pacientes[0]?.name : consultation.pacientes?.name || 'N/A'}</p>
+                  <p><strong>Médico:</strong> {Array.isArray(consultation.medicos) ? (consultation.medicos[0]?.name || consultation.medicos[0]?.email) : (consultation.medicos?.name || consultation.medicos?.email) || 'N/A'}</p>
                   <p><strong>Room:</strong> <code>{consultation.room_id?.slice(0, 15) || 'N/A'}...</code></p>
                   <p><strong>Início:</strong> {formatDate(consultation.consulta_inicio || consultation.created_at)}</p>
                 </div>
@@ -606,8 +606,8 @@ export default function CostsMonitorPage() {
                       {model.includes('realtime') || model.includes('whisper') ? 'Minutos' : 'Tokens'}
                     </span>
                     <span className="stat-value">
-                      {model.includes('realtime') || model.includes('whisper') 
-                        ? data.tokens.toFixed(2) 
+                      {model.includes('realtime') || model.includes('whisper')
+                        ? data.tokens.toFixed(2)
                         : data.tokens.toLocaleString()}
                     </span>
                   </div>

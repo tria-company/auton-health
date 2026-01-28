@@ -1,254 +1,103 @@
-'use client';
+import { useState, useEffect, useCallback } from 'react';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-
-export interface MediaDeviceInfo {
+export interface DeviceInfo {
   deviceId: string;
   label: string;
-  kind: 'videoinput' | 'audioinput';
+  kind: MediaDeviceKind;
 }
 
-export interface DevicePreviewState {
-  videoStream: MediaStream | null;
-  audioLevel: number;
-  isPreviewActive: boolean;
+export interface MediaDevicesState {
+  audioInputs: DeviceInfo[];
+  videoInputs: DeviceInfo[];
+  audioOutputs: DeviceInfo[];
+  selectedAudioInputId: string | null;
+  selectedVideoInputId: string | null;
+  selectedAudioOutputId: string | null;
+  permissionGranted: boolean;
 }
 
-interface UseMediaDevicesReturn {
-  // Dispositivos disponíveis
-  cameras: MediaDeviceInfo[];
-  microphones: MediaDeviceInfo[];
-  
-  // Dispositivos selecionados
-  selectedCamera: string | null;
-  selectedMicrophone: string | null;
-  
-  // Preview
-  previewState: DevicePreviewState;
-  previewVideoRef: React.RefObject<HTMLVideoElement>;
-  
-  // Funções
-  loadDevices: () => Promise<void>;
-  selectCamera: (deviceId: string) => Promise<void>;
-  selectMicrophone: (deviceId: string) => Promise<void>;
-  startPreview: () => Promise<void>;
-  stopPreview: () => void;
-  getSelectedDevices: () => { cameraId: string | null; microphoneId: string | null };
-}
-
-export function useMediaDevices(): UseMediaDevicesReturn {
-  const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
-  const [microphones, setMicrophones] = useState<MediaDeviceInfo[]>([]);
-  const [selectedCamera, setSelectedCamera] = useState<string | null>(null);
-  const [selectedMicrophone, setSelectedMicrophone] = useState<string | null>(null);
-  const [previewState, setPreviewState] = useState<DevicePreviewState>({
-    videoStream: null,
-    audioLevel: 0,
-    isPreviewActive: false
+export function useMediaDevices() {
+  const [devices, setDevices] = useState<MediaDevicesState>({
+    audioInputs: [],
+    videoInputs: [],
+    audioOutputs: [],
+    selectedAudioInputId: null,
+    selectedVideoInputId: null,
+    selectedAudioOutputId: null,
+    permissionGranted: false,
   });
-  
-  const previewVideoRef = useRef<HTMLVideoElement>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const animationFrameRef = useRef<number | null>(null);
 
-  // Carregar dispositivos disponíveis
-  const loadDevices = useCallback(async () => {
+  const getDevices = useCallback(async () => {
     try {
-      // Solicitar permissões primeiro
-      await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      
-      const videoDevices = devices
-        .filter(device => device.kind === 'videoinput')
-        .map(device => ({
-          deviceId: device.deviceId,
-          label: device.label || `Câmera ${device.deviceId.slice(0, 8)}`,
-          kind: 'videoinput' as const
-        }));
-        
-      const audioDevices = devices
-        .filter(device => device.kind === 'audioinput')
-        .map(device => ({
-          deviceId: device.deviceId,
-          label: device.label || `Microfone ${device.deviceId.slice(0, 8)}`,
-          kind: 'audioinput' as const
-        }));
-      
-      setCameras(videoDevices);
-      setMicrophones(audioDevices);
-      
-      // Selecionar primeiro dispositivo por padrão
-      if (videoDevices.length > 0 && !selectedCamera) {
-        setSelectedCamera(videoDevices[0].deviceId);
-      }
-      if (audioDevices.length > 0 && !selectedMicrophone) {
-        setSelectedMicrophone(audioDevices[0].deviceId);
-      }
-      
-      console.log('📱 Dispositivos carregados:', { 
-        cameras: videoDevices.length, 
-        microphones: audioDevices.length 
-      });
-      
+      // Ensure we have permissions first to get labels
+      // Note: We don't call getUserMedia here to avoid interrupting existing streams
+      // We rely on the main component to have requested permissions initially.
+
+      const deviceInfos = await navigator.mediaDevices.enumerateDevices();
+
+      const audioInputs = deviceInfos
+        .filter(d => d.kind === 'audioinput')
+        .map(d => ({ deviceId: d.deviceId, label: d.label || `Microfone ${d.deviceId.slice(0, 5)}...`, kind: d.kind }));
+
+      const videoInputs = deviceInfos
+        .filter(d => d.kind === 'videoinput')
+        .map(d => ({ deviceId: d.deviceId, label: d.label || `Câmera ${d.deviceId.slice(0, 5)}...`, kind: d.kind }));
+
+      const audioOutputs = deviceInfos
+        .filter(d => d.kind === 'audiooutput')
+        .map(d => ({ deviceId: d.deviceId, label: d.label || `Alto-falante ${d.deviceId.slice(0, 5)}...`, kind: d.kind }));
+
+      setDevices(prev => ({
+        ...prev,
+        audioInputs,
+        videoInputs,
+        audioOutputs,
+        // Preserve selection or default to first available
+        selectedAudioInputId: prev.selectedAudioInputId || (audioInputs[0]?.deviceId ?? null),
+        selectedVideoInputId: prev.selectedVideoInputId || (videoInputs[0]?.deviceId ?? null),
+        selectedAudioOutputId: prev.selectedAudioOutputId || (audioOutputs[0]?.deviceId ?? null),
+        permissionGranted: audioInputs.some(d => d.label) // Heuristic: if we have labels, permission is likely granted
+      }));
+
     } catch (error) {
-      console.error('❌ Erro ao carregar dispositivos:', error);
-      throw error;
+      console.error('Error enumerating devices:', error);
     }
-  }, [selectedCamera, selectedMicrophone]);
+  }, []);
 
-  // Selecionar câmera
-  const selectCamera = useCallback(async (deviceId: string) => {
-    setSelectedCamera(deviceId);
-    
-    // Se preview está ativo, atualizar stream
-    if (previewState.isPreviewActive) {
-      await startPreview();
-    }
-  }, [previewState.isPreviewActive]);
-
-  // Selecionar microfone
-  const selectMicrophone = useCallback(async (deviceId: string) => {
-    setSelectedMicrophone(deviceId);
-    
-    // Se preview está ativo, atualizar stream
-    if (previewState.isPreviewActive) {
-      await startPreview();
-    }
-  }, [previewState.isPreviewActive]);
-
-  // Iniciar preview
-  const startPreview = useCallback(async () => {
-    try {
-      // Parar preview anterior
-      stopPreview();
-      
-      if (!selectedCamera || !selectedMicrophone) {
-        throw new Error('Dispositivos não selecionados');
-      }
-
-      // Criar novo stream
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { 
-          deviceId: { exact: selectedCamera },
-          width: { ideal: 640 },
-          height: { ideal: 480 }
-        },
-        audio: { 
-          deviceId: { exact: selectedMicrophone },
-          echoCancellation: false,
-          noiseSuppression: false
-        }
-      });
-
-      // Configurar vídeo
-      if (previewVideoRef.current) {
-        previewVideoRef.current.srcObject = stream;
-      }
-
-      // Configurar análise de áudio
-      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const source = audioContextRef.current.createMediaStreamSource(stream);
-      analyserRef.current = audioContextRef.current.createAnalyser();
-      analyserRef.current.fftSize = 256;
-      source.connect(analyserRef.current);
-
-      // Atualizar estado
-      setPreviewState({
-        videoStream: stream,
-        audioLevel: 0,
-        isPreviewActive: true
-      });
-
-      // Iniciar monitoramento de áudio
-      const updateAudioLevel = () => {
-        if (analyserRef.current) {
-          const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
-          analyserRef.current.getByteFrequencyData(dataArray);
-          
-          const average = dataArray.reduce((sum, value) => sum + value, 0) / dataArray.length;
-          const level = Math.min(100, (average / 128) * 100);
-          
-          setPreviewState(prev => ({ ...prev, audioLevel: level }));
-        }
-        
-        animationFrameRef.current = requestAnimationFrame(updateAudioLevel);
-      };
-      
-      updateAudioLevel();
-      
-      console.log('🎥 Preview iniciado');
-      
-    } catch (error) {
-      console.error('❌ Erro ao iniciar preview:', error);
-      throw error;
-    }
-  }, [selectedCamera, selectedMicrophone]);
-
-  // Parar preview
-  const stopPreview = useCallback(() => {
-    // Parar stream
-    if (previewState.videoStream) {
-      previewState.videoStream.getTracks().forEach(track => track.stop());
-    }
-    
-    // Limpar contexto de áudio
-    if (audioContextRef.current) {
-      audioContextRef.current.close();
-      audioContextRef.current = null;
-    }
-    
-    // Parar animação
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = null;
-    }
-    
-    // Limpar vídeo
-    if (previewVideoRef.current) {
-      previewVideoRef.current.srcObject = null;
-    }
-    
-    setPreviewState({
-      videoStream: null,
-      audioLevel: 0,
-      isPreviewActive: false
-    });
-    
-    console.log('🛑 Preview parado');
-  }, [previewState.videoStream]);
-
-  // Obter dispositivos selecionados
-  const getSelectedDevices = useCallback(() => ({
-    cameraId: selectedCamera,
-    microphoneId: selectedMicrophone
-  }), [selectedCamera, selectedMicrophone]);
-
-  // Carregar dispositivos no mount
   useEffect(() => {
-    loadDevices().catch(console.error);
-  }, [loadDevices]);
+    getDevices();
 
-  // Cleanup no unmount
-  useEffect(() => {
-    return () => {
-      stopPreview();
+    const handleDeviceChange = () => {
+      console.log('🎧 [DeviceManager] Dispositivos alterados! Atualizando lista...');
+      getDevices();
+      // Optional: Add logic here to auto-select a new device if the current one was removed
+      // For now, getDevices() preserves selection if still valid, or defaults to first.
     };
-  }, [stopPreview]);
+
+    navigator.mediaDevices.addEventListener('devicechange', handleDeviceChange);
+
+    return () => {
+      navigator.mediaDevices.removeEventListener('devicechange', handleDeviceChange);
+    };
+  }, [getDevices]);
+
+  const selectAudioInput = (deviceId: string) => {
+    setDevices(prev => ({ ...prev, selectedAudioInputId: deviceId }));
+  };
+
+  const selectVideoInput = (deviceId: string) => {
+    setDevices(prev => ({ ...prev, selectedVideoInputId: deviceId }));
+  };
+
+  const selectAudioOutput = (deviceId: string) => {
+    setDevices(prev => ({ ...prev, selectedAudioOutputId: deviceId }));
+  };
 
   return {
-    cameras,
-    microphones,
-    selectedCamera,
-    selectedMicrophone,
-    previewState,
-    previewVideoRef,
-    loadDevices,
-    selectCamera,
-    selectMicrophone,
-    startPreview,
-    stopPreview,
-    getSelectedDevices
+    ...devices,
+    refreshDevices: getDevices,
+    selectAudioInput,
+    selectVideoInput,
+    selectAudioOutput
   };
 }

@@ -40,11 +40,11 @@ export function waitForSupabaseConfig(): Promise<boolean> {
       resolve(true);
       return;
     }
-    
+
     // Aguardar um pouco para as variáveis carregarem
     setTimeout(() => {
       const newCheck = Boolean(
-        process.env.NEXT_PUBLIC_SUPABASE_URL && 
+        process.env.NEXT_PUBLIC_SUPABASE_URL &&
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
       );
       resolve(newCheck);
@@ -99,8 +99,8 @@ export async function getCurrentUser() {
 export async function getClientSession() {
   try {
     const { data: { session }, error } = await supabase.auth.getSession();
-    
-    
+
+
     return { session, error };
   } catch (error) {
     return { session: null, error };
@@ -111,7 +111,7 @@ export async function getClientSession() {
 export async function getPatients() {
   // Verificar configuração dinamicamente
   const isConfigured = getSupabaseConfigStatus();
-  
+
   // Se o Supabase não estiver configurado, retornar pacientes mock
   if (!isConfigured) {
     console.warn('⚠️ Supabase não configurado, usando dados mock');
@@ -125,7 +125,7 @@ export async function getPatients() {
   try {
     // ✅ CORREÇÃO: Usar a mesma lógica da API /api/patients
     const { data: { session } } = await supabase.auth.getSession();
-    
+
     if (!session?.user) {
       console.error('❌ Usuário não autenticado');
       return [];
@@ -139,7 +139,7 @@ export async function getPatients() {
       .select('id')
       .eq('user_auth', session.user.id)
       .single();
-    
+
     if (medicoError || !medico) {
       console.error('❌ Médico não encontrado:', medicoError);
       return [];
@@ -201,10 +201,10 @@ export async function createConsultation(consultationData: {
 }) {
   try {
     console.log('📝 Criando consulta via Supabase...', consultationData);
-    
+
     // Buscar usuário autenticado
     const { data: { user }, error: userError } = await supabase.auth.getUser();
-    
+
     if (userError || !user) {
       console.error('❌ Usuário não autenticado');
       throw new Error('Usuário não autenticado');
@@ -212,7 +212,7 @@ export async function createConsultation(consultationData: {
 
     // Criar consulta no Supabase
     const { data: consultation, error: insertError } = await supabase
-      .from('consultas')
+      .from('consultations')
       .insert({
         ...consultationData,
         user_id: user.id,
@@ -227,7 +227,7 @@ export async function createConsultation(consultationData: {
 
     console.log('✅ Consulta criada com sucesso:', consultation.id);
     return consultation;
-    
+
   } catch (error) {
     console.error('💥 Erro na criação da consulta:', error);
     throw error;

@@ -60,13 +60,11 @@ interface RequestOptions {
 
 /**
  * Interface para resposta do Gateway
+ * Usamos um Discriminated Union para garantir segurança de tipos entre sucesso e erro.
  */
-interface GatewayResponse<T = any> {
-  data?: T;
-  error?: string;
-  success?: boolean;
-  [key: string]: any;
-}
+export type GatewayResponse<T = any> =
+  | (T & { success: true; error?: never; status: number })
+  | { success: false; error: string; data?: any; status: number };
 
 /**
  * Monta a URL completa com query params
@@ -145,12 +143,14 @@ async function request<T = any>(
       return {
         error: data?.error || data?.message || `Erro ${response.status}: ${response.statusText}`,
         success: false,
+        status: response.status,
         ...data,
       };
     }
 
     return {
       success: true,
+      status: response.status,
       ...data,
     };
   } catch (error) {
@@ -159,6 +159,7 @@ async function request<T = any>(
     return {
       error: error instanceof Error ? error.message : 'Erro desconhecido',
       success: false,
+      status: 500, // Erro de rede ou exceção interna
     };
   }
 }
