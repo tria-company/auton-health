@@ -433,7 +433,7 @@ export default function PatientsPage() {
         .from('a_cadastro_anamnese')
         .select('*')
         .eq('paciente_id', patientId)
-        .single();
+        .maybeSingle();
 
       if (existingAnamnese) {
         const { error } = await supabase
@@ -446,7 +446,6 @@ export default function PatientsPage() {
           .from('a_cadastro_anamnese')
           .insert({
             paciente_id: patientId,
-            user_id: user.id,
             status: 'pendente'
           });
         if (error) throw error;

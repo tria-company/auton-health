@@ -266,7 +266,7 @@ export default function CadastrarPaciente() {
         .from('a_cadastro_anamnese')
         .select('*')
         .eq('paciente_id', patientId)
-        .single();
+        .maybeSingle();
 
       let anamneseResult;
       
@@ -280,7 +280,7 @@ export default function CadastrarPaciente() {
           })
           .eq('paciente_id', patientId)
           .select()
-          .single();
+          .maybeSingle();
         
         if (error) throw error;
         anamneseResult = data;
@@ -290,11 +290,10 @@ export default function CadastrarPaciente() {
           .from('a_cadastro_anamnese')
           .insert({
             paciente_id: patientId,
-            user_id: user.id,
             status: 'pendente'
           })
           .select()
-          .single();
+          .maybeSingle();
         
         if (error) throw error;
         anamneseResult = data;
