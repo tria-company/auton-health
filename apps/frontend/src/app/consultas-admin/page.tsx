@@ -196,10 +196,12 @@ export default function ConsultasAdminPage() {
   // Loading state
   if (authLoading || loading) {
     return (
-      <div className="admin-page">
-        <div className="admin-loading">
+      <div className="consultas-admin-page">
+        <div className="admin-page">
+          <div className="admin-loading">
           <Loader2 className="loading-spinner" />
           <p>Carregando painel administrativo...</p>
+          </div>
         </div>
       </div>
     );
@@ -208,8 +210,9 @@ export default function ConsultasAdminPage() {
   // Não é admin
   if (isAdmin === false) {
     return (
-      <div className="admin-page">
-        <div className="admin-error">
+      <div className="consultas-admin-page">
+        <div className="admin-page">
+          <div className="admin-error">
           <AlertCircle size={48} />
           <h2>Acesso Negado</h2>
           <p>Você não tem permissão para acessar esta página.</p>
@@ -220,13 +223,15 @@ export default function ConsultasAdminPage() {
           >
             Voltar ao Dashboard
           </button>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="admin-page">
+    <div className="consultas-admin-page">
+      <div className="admin-page">
       <div className="admin-header">
         <div className="admin-title">
           <ShieldCheck size={28} />
@@ -375,6 +380,7 @@ export default function ConsultasAdminPage() {
           </table>
         </div>
       )}
+      </div>
     </div>
   );
 }

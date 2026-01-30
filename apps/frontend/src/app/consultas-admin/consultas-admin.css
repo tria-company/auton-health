@@ -1,13 +1,12 @@
-/* Página Admin de Consultas */
-.admin-page {
+/* Página Admin de Consultas - estilos escopados para não afetar o resto do app */
+.consultas-admin-page .admin-page {
   padding: 2rem;
   max-width: 1600px;
   margin: 0 auto;
   min-height: 100vh;
 }
 
-/* Header */
-.admin-header {
+.consultas-admin-page .admin-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -18,36 +17,36 @@
   border-bottom: 1px solid var(--border-color, #e5e7eb);
 }
 
-.admin-title {
+.consultas-admin-page .admin-title {
   display: flex;
   align-items: center;
   gap: 0.75rem;
 }
 
-.admin-title h1 {
+.consultas-admin-page .admin-title h1 {
   font-size: 1.75rem;
   font-weight: 700;
   color: var(--text-primary, #111827);
   margin: 0;
 }
 
-.admin-title svg {
+.consultas-admin-page .admin-title svg {
   color: var(--primary-color, #3b82f6);
 }
 
-.admin-subtitle {
+.consultas-admin-page .admin-subtitle {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
 }
 
-.admin-subtitle p {
+.consultas-admin-page .admin-subtitle p {
   margin: 0;
   color: var(--text-secondary, #6b7280);
   font-size: 0.875rem;
 }
 
-.consultation-count {
+.consultas-admin-page .consultation-count {
   background: var(--primary-light, #dbeafe);
   color: var(--primary-color, #3b82f6);
   padding: 0.25rem 0.75rem;
@@ -56,8 +55,7 @@
   font-weight: 600;
 }
 
-/* Botão Atualizar */
-.btn-refresh {
+.consultas-admin-page .btn-refresh {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -72,31 +70,26 @@
   transition: all 0.2s;
 }
 
-.btn-refresh:hover:not(:disabled) {
+.consultas-admin-page .btn-refresh:hover:not(:disabled) {
   background: var(--primary-dark, #2563eb);
   transform: translateY(-1px);
 }
 
-.btn-refresh:disabled {
+.consultas-admin-page .btn-refresh:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
 
-.btn-refresh .spinning {
-  animation: spin 1s linear infinite;
+.consultas-admin-page .btn-refresh .spinning {
+  animation: ca-spin 1s linear infinite;
 }
 
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+@keyframes ca-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
-/* Loading State */
-.admin-loading {
+.consultas-admin-page .admin-loading {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -105,20 +98,19 @@
   gap: 1rem;
 }
 
-.admin-loading .loading-spinner {
-  animation: spin 1s linear infinite;
+.consultas-admin-page .admin-loading .loading-spinner {
+  animation: ca-spin 1s linear infinite;
   color: var(--primary-color, #3b82f6);
   width: 48px;
   height: 48px;
 }
 
-.admin-loading p {
+.consultas-admin-page .admin-loading p {
   color: var(--text-secondary, #6b7280);
   font-size: 1rem;
 }
 
-/* Error State */
-.admin-error {
+.consultas-admin-page .admin-error {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -128,23 +120,23 @@
   text-align: center;
 }
 
-.admin-error svg {
+.consultas-admin-page .admin-error svg {
   color: #ef4444;
 }
 
-.admin-error h2 {
+.consultas-admin-page .admin-error h2 {
   font-size: 1.5rem;
   font-weight: 700;
   color: var(--text-primary, #111827);
   margin: 0;
 }
 
-.admin-error p {
+.consultas-admin-page .admin-error p {
   color: var(--text-secondary, #6b7280);
   margin: 0;
 }
 
-.btn-back {
+.consultas-admin-page .btn-back {
   margin-top: 1rem;
   padding: 0.625rem 1.5rem;
   background: var(--primary-color, #3b82f6);
@@ -157,12 +149,11 @@
   transition: all 0.2s;
 }
 
-.btn-back:hover {
+.consultas-admin-page .btn-back:hover {
   background: var(--primary-dark, #2563eb);
 }
 
-/* Error Message */
-.admin-error-message {
+.consultas-admin-page .admin-error-message {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -174,8 +165,7 @@
   margin-bottom: 1.5rem;
 }
 
-/* Success Message */
-.admin-success-message {
+.consultas-admin-page .admin-success-message {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -187,8 +177,7 @@
   margin-bottom: 1.5rem;
 }
 
-/* Empty State */
-.admin-empty {
+.consultas-admin-page .admin-empty {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -201,24 +190,23 @@
   padding: 3rem;
 }
 
-.admin-empty svg {
+.consultas-admin-page .admin-empty svg {
   color: var(--text-tertiary, #9ca3af);
 }
 
-.admin-empty h3 {
+.consultas-admin-page .admin-empty h3 {
   font-size: 1.25rem;
   font-weight: 600;
   color: var(--text-primary, #111827);
   margin: 0;
 }
 
-.admin-empty p {
+.consultas-admin-page .admin-empty p {
   color: var(--text-secondary, #6b7280);
   margin: 0;
 }
 
-/* Table Container */
-.admin-table-container {
+.consultas-admin-page .admin-table-container {
   overflow-x: auto;
   background: var(--bg-primary, white);
   border-radius: 0.75rem;
@@ -226,19 +214,18 @@
   border: 1px solid var(--border-color, #e5e7eb);
 }
 
-/* Table */
-.admin-table {
+.consultas-admin-page .admin-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.875rem;
 }
 
-.admin-table thead {
+.consultas-admin-page .admin-table thead {
   background: var(--bg-secondary, #f9fafb);
   border-bottom: 2px solid var(--border-color, #e5e7eb);
 }
 
-.admin-table th {
+.consultas-admin-page .admin-table th {
   padding: 1rem;
   text-align: left;
   font-weight: 600;
@@ -246,29 +233,28 @@
   white-space: nowrap;
 }
 
-.admin-table tbody tr {
+.consultas-admin-page .admin-table tbody tr {
   border-bottom: 1px solid var(--border-color, #e5e7eb);
   transition: background 0.2s;
 }
 
-.admin-table tbody tr:hover {
+.consultas-admin-page .admin-table tbody tr:hover {
   background: var(--bg-hover, #f3f4f6);
 }
 
-.admin-table td {
+.consultas-admin-page .admin-table td {
   padding: 1rem;
   color: var(--text-secondary, #374151);
   vertical-align: middle;
 }
 
-/* ID Column */
-.td-id {
+.consultas-admin-page .td-id {
   display: flex;
   align-items: center;
   gap: 0.5rem;
 }
 
-.td-id code {
+.consultas-admin-page .td-id code {
   font-family: 'Monaco', 'Menlo', monospace;
   font-size: 0.75rem;
   background: var(--bg-secondary, #f3f4f6);
@@ -277,7 +263,7 @@
   color: var(--text-primary, #111827);
 }
 
-.btn-copy {
+.consultas-admin-page .btn-copy {
   background: none;
   border: none;
   cursor: pointer;
@@ -286,60 +272,56 @@
   transition: opacity 0.2s;
 }
 
-.btn-copy:hover {
+.consultas-admin-page .btn-copy:hover {
   opacity: 1;
 }
 
-/* Doctor Column */
-.td-doctor .doctor-info {
+.consultas-admin-page .td-doctor .doctor-info {
   display: flex;
   align-items: center;
   gap: 0.5rem;
 }
 
-.td-doctor code {
+.consultas-admin-page .td-doctor code {
   font-family: 'Monaco', 'Menlo', monospace;
   font-size: 0.75rem;
 }
 
-/* Email Column */
-.td-email {
+.consultas-admin-page .td-email {
   max-width: 250px;
 }
 
-.td-email .medico-name {
+.consultas-admin-page .td-email .medico-name {
   display: block;
   font-size: 0.75rem;
   color: var(--text-tertiary, #9ca3af);
   margin-top: 0.25rem;
 }
 
-/* Patient Column */
-.td-patient .patient-info {
+.consultas-admin-page .td-patient .patient-info {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
 }
 
-.td-patient code {
+.consultas-admin-page .td-patient code {
   font-family: 'Monaco', 'Menlo', monospace;
   font-size: 0.75rem;
 }
 
-.td-patient .patient-name {
+.consultas-admin-page .td-patient .patient-name {
   font-size: 0.75rem;
   color: var(--primary-color, #3b82f6);
   font-weight: 500;
 }
 
-/* Status Column */
-.td-status {
+.consultas-admin-page .td-status {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
 }
 
-.status-badge {
+.consultas-admin-page .status-badge {
   display: inline-flex;
   align-items: center;
   padding: 0.25rem 0.75rem;
@@ -349,73 +331,67 @@
   text-transform: uppercase;
 }
 
-.status-created {
+.consultas-admin-page .status-created {
   background: #dbeafe;
   color: #1d4ed8;
 }
 
-.status-recording {
+.consultas-admin-page .status-recording {
   background: #dcfce7;
   color: #16a34a;
-  animation: pulse 2s infinite;
+  animation: ca-pulse 2s infinite;
 }
 
-.status-processing {
+.consultas-admin-page .status-processing {
   background: #fef3c7;
   color: #d97706;
 }
 
-.status-validation {
+.consultas-admin-page .status-validation {
   background: #f3e8ff;
   color: #7c3aed;
 }
 
-.status-default {
+.consultas-admin-page .status-default {
   background: #f3f4f6;
   color: #6b7280;
 }
 
-.session-status {
+.consultas-admin-page .session-status {
   font-size: 0.7rem;
   color: var(--text-tertiary, #9ca3af);
 }
 
-@keyframes pulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.7;
-  }
+@keyframes ca-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
 }
 
-/* Date Column */
-.td-date .date-info {
+.consultas-admin-page .td-date .date-info {
   display: flex;
   align-items: center;
   gap: 0.5rem;
 }
 
-.td-date .date-info svg {
+.consultas-admin-page .td-date .date-info svg {
   color: var(--text-tertiary, #9ca3af);
 }
 
-.td-date .date-fallback {
+.consultas-admin-page .td-date .date-fallback {
   display: block;
   font-size: 0.7rem;
   color: var(--text-tertiary, #9ca3af);
   margin-top: 0.25rem;
 }
 
-/* Room Column */
-.td-room .room-info {
+.consultas-admin-page .td-room .room-info {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   color: var(--primary-color, #3b82f6);
 }
 
-.td-room code {
+.consultas-admin-page .td-room code {
   font-family: 'Monaco', 'Menlo', monospace;
   font-size: 0.75rem;
   background: var(--bg-secondary, #f3f4f6);
@@ -423,68 +399,64 @@
   border-radius: 0.25rem;
 }
 
-.td-room .no-room {
+.consultas-admin-page .td-room .no-room {
   color: var(--text-tertiary, #9ca3af);
   font-style: italic;
   font-size: 0.8rem;
 }
 
-/* WebRTC Status Column */
-.td-webrtc {
+.consultas-admin-page .td-webrtc {
   min-width: 120px;
 }
 
-.webrtc-active,
-.webrtc-inactive {
+.consultas-admin-page .webrtc-active,
+.consultas-admin-page .webrtc-inactive {
   display: flex;
   align-items: center;
   gap: 0.5rem;
 }
 
-.webrtc-icon.active {
+.consultas-admin-page .webrtc-icon.active {
   color: #16a34a;
-  animation: pulse 2s infinite;
+  animation: ca-pulse 2s infinite;
 }
 
-.webrtc-icon.inactive {
+.consultas-admin-page .webrtc-icon.inactive {
   color: #9ca3af;
 }
 
-.webrtc-label {
+.consultas-admin-page .webrtc-label {
   font-size: 0.75rem;
   font-weight: 500;
 }
 
-.webrtc-label.active {
+.consultas-admin-page .webrtc-label.active {
   color: #16a34a;
 }
 
-.webrtc-label.inactive {
+.consultas-admin-page .webrtc-label.inactive {
   color: #9ca3af;
 }
 
-/* Row with active WebRTC */
-.row-webrtc-active {
-  background: rgba(22, 163, 74, 0.05) !important;
+.consultas-admin-page .row-webrtc-active {
+  background: rgba(22, 163, 74, 0.05);
   border-left: 3px solid #16a34a;
 }
 
-.row-webrtc-active:hover {
-  background: rgba(22, 163, 74, 0.1) !important;
+.consultas-admin-page .row-webrtc-active:hover {
+  background: rgba(22, 163, 74, 0.1);
 }
 
-/* Patient ID */
-.patient-id {
+.consultas-admin-page .patient-id {
   font-size: 0.7rem;
   color: var(--text-tertiary, #9ca3af);
 }
 
-/* Actions Column */
-.td-actions {
+.consultas-admin-page .td-actions {
   min-width: 120px;
 }
 
-.btn-terminate {
+.consultas-admin-page .btn-terminate {
   display: flex;
   align-items: center;
   gap: 0.375rem;
@@ -500,28 +472,30 @@
   white-space: nowrap;
 }
 
-.btn-terminate:hover:not(:disabled) {
+.consultas-admin-page .btn-terminate:hover:not(:disabled) {
   background: #dc2626;
   transform: translateY(-1px);
 }
 
-.btn-terminate:disabled {
+.consultas-admin-page .btn-terminate:disabled {
   opacity: 0.5;
   cursor: not-allowed;
   transform: none;
 }
 
-.btn-terminate.loading {
+.consultas-admin-page .btn-terminate.loading {
   background: #9ca3af;
 }
 
-.btn-terminate .spinning {
-  animation: spin 1s linear infinite;
+.consultas-admin-page .btn-terminate .spinning {
+  animation: ca-spin 1s linear infinite;
 }
 
-/* Dark Mode Support */
-[data-theme="dark"] .admin-page,
-.dark .admin-page {
+/* Dark Mode - escopado */
+.consultas-admin-page[data-theme="dark"] .admin-page,
+.consultas-admin-page.dark .admin-page,
+[data-theme="dark"] .consultas-admin-page .admin-page,
+.dark .consultas-admin-page .admin-page {
   --bg-primary: #1f2937;
   --bg-secondary: #111827;
   --bg-hover: #374151;
@@ -531,87 +505,70 @@
   --border-color: #374151;
 }
 
-[data-theme="dark"] .admin-table-container,
-.dark .admin-table-container {
+[data-theme="dark"] .consultas-admin-page .admin-table-container,
+.dark .consultas-admin-page .admin-table-container {
   background: var(--bg-primary);
 }
 
-[data-theme="dark"] .td-id code,
-.dark .td-id code,
-[data-theme="dark"] .td-room code,
-.dark .td-room code {
+[data-theme="dark"] .consultas-admin-page .td-id code,
+.dark .consultas-admin-page .td-id code,
+[data-theme="dark"] .consultas-admin-page .td-room code,
+.dark .consultas-admin-page .td-room code {
   background: var(--bg-secondary);
   color: var(--text-primary);
 }
 
-[data-theme="dark"] .admin-error-message,
-.dark .admin-error-message {
+[data-theme="dark"] .consultas-admin-page .admin-error-message,
+.dark .consultas-admin-page .admin-error-message {
   background: #450a0a;
   border-color: #7f1d1d;
 }
 
-[data-theme="dark"] .admin-success-message,
-.dark .admin-success-message {
+[data-theme="dark"] .consultas-admin-page .admin-success-message,
+.dark .consultas-admin-page .admin-success-message {
   background: #052e16;
   border-color: #166534;
 }
 
-[data-theme="dark"] .row-webrtc-active,
-.dark .row-webrtc-active {
-  background: rgba(22, 163, 74, 0.15) !important;
+[data-theme="dark"] .consultas-admin-page .row-webrtc-active,
+.dark .consultas-admin-page .row-webrtc-active {
+  background: rgba(22, 163, 74, 0.15);
 }
 
-[data-theme="dark"] .row-webrtc-active:hover,
-.dark .row-webrtc-active:hover {
-  background: rgba(22, 163, 74, 0.2) !important;
+[data-theme="dark"] .consultas-admin-page .row-webrtc-active:hover,
+.dark .consultas-admin-page .row-webrtc-active:hover {
+  background: rgba(22, 163, 74, 0.2);
 }
 
-/* Responsive */
 @media (max-width: 1024px) {
-  .admin-page {
+  .consultas-admin-page .admin-page {
     padding: 1rem;
   }
 
-  .admin-header {
+  .consultas-admin-page .admin-header {
     flex-direction: column;
     align-items: flex-start;
   }
 
-  .admin-table {
+  .consultas-admin-page .admin-table {
     font-size: 0.8rem;
   }
 
-  .admin-table th,
-  .admin-table td {
+  .consultas-admin-page .admin-table th,
+  .consultas-admin-page .admin-table td {
     padding: 0.75rem 0.5rem;
   }
 }
 
 @media (max-width: 640px) {
-  .admin-title h1 {
+  .consultas-admin-page .admin-title h1 {
     font-size: 1.25rem;
   }
 
-  .admin-table-container {
+  .consultas-admin-page .admin-table-container {
     margin: 0 -1rem;
     border-radius: 0;
     border-left: none;
     border-right: none;
   }
-}
-
-/* Nav button admin style (for Sidebar) */
-.nav-btn-admin {
-  border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
-  margin-top: 0.5rem;
-  padding-top: 0.75rem;
-}
-
-.nav-btn-admin svg {
-  color: #f59e0b;
-}
-
-.nav-btn-admin:hover svg,
-.nav-btn-admin.is-active svg {
-  color: #f59e0b;
 }

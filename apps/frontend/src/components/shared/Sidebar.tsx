@@ -1,5 +1,6 @@
 'use client';
 
+import './Sidebar.css';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
