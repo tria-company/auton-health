@@ -1,30 +1,35 @@
-import './landing.css';
-import { LandingHeader } from '@/components/landing/LandingHeader';
-import { HeroSection } from '@/components/landing/HeroSection';
-import { StatsSection } from '@/components/landing/StatsSection';
-import { ProblemSolutionSection } from '@/components/landing/ProblemSolutionSection';
-import { BenefitsSection } from '@/components/landing/BenefitsSection';
-import { FeaturesSection } from '@/components/landing/FeaturesSection';
-import { TestimonialsSection } from '@/components/landing/TestimonialsSection';
-import { PricingSection } from '@/components/landing/PricingSection';
-import { FAQSection } from '@/components/landing/FAQSection';
-import { LandingFooter } from '@/components/landing/LandingFooter';
+import Header from '@/components/landing-lp/layout/Header';
+import HeroSection from '@/components/landing-lp/hero/HeroSection';
+import ProblemSection from '@/components/landing-lp/problem-section/ProblemSection';
+import SolutionSection from '@/components/landing-lp/solution-section/SolutionSection';
+import ApplicationSection from '@/components/landing-lp/application-section/ApplicationSection';
+import FeaturesSection from '@/components/landing-lp/features-section/FeaturesSection';
+import AgentsSection from '@/components/landing-lp/agents-section/AgentsSection';
+import ADSMethodSection from '@/components/landing-lp/ads-method-section/ADSMethodSection';
+import TestimonialsSection from '@/components/landing-lp/testimonials-section/TestimonialsSection';
+import PricingSection from '@/components/landing-lp/pricing-section/PricingSection';
+import FAQSection from '@/components/landing-lp/faq-section/FAQSection';
+import CTASection from '@/components/landing-lp/cta-section/CTASection';
+import Footer from '@/components/landing-lp/footer/Footer';
 
 export default function LandingPage() {
   return (
-    <div className="landing-page">
-      <LandingHeader />
-      <main className="landing-main">
+    <div className="landing-lp-root min-h-screen bg-white">
+      <Header />
+      <main>
         <HeroSection />
-        <StatsSection />
-        <ProblemSolutionSection />
-        <BenefitsSection />
+        <ProblemSection />
+        <SolutionSection />
+        <ApplicationSection />
         <FeaturesSection />
+        <AgentsSection />
+        <ADSMethodSection />
         <TestimonialsSection />
         <PricingSection />
         <FAQSection />
+        <CTASection />
+        <Footer />
       </main>
-      <LandingFooter />
     </div>
   );
 }

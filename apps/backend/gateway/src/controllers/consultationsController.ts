@@ -485,13 +485,13 @@ export async function finalizeConsultationRemote(req: AuthenticatedRequest, res:
       headers: { 'Content-Type': 'application/json' }
     });
 
-    const data = await response.json().catch(() => ({}));
+    const data = (await response.json().catch(() => ({}))) as { error?: string };
 
     if (!response.ok) {
       console.warn(`⚠️ [GATEWAY] Realtime finalize retornou ${response.status}:`, data);
       return res.status(response.status).json({
         success: false,
-        error: data?.error || 'Erro ao finalizar sala no serviço de tempo real'
+        error: data?.error ?? 'Erro ao finalizar sala no serviço de tempo real'
       });
     }
 
