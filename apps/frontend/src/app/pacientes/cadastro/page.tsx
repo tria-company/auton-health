@@ -299,8 +299,8 @@ export default function CadastrarPaciente() {
         anamneseResult = data;
       }
 
-      // Gerar link para anamnese
-      const anamneseLink = `${window.location.origin}/anamnese-inicial?pacienteId=${patientId}`;
+      // Gerar link para anamnese (usar paciente_id para a página reconhecer)
+      const anamneseLink = `${window.location.origin}/anamnese-inicial?paciente_id=${patientId}`;
       setAnamneseLink(anamneseLink);
       
       // Buscar status da anamnese

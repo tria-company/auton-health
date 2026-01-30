@@ -424,3 +424,83 @@ export async function deleteConsultation(req: AuthenticatedRequest, res: Respons
   }
 }
 
+const REALTIME_SERVICE_URL = process.env.REALTIME_SERVICE_URL || 'http://localhost:3002';
+
+/**
+ * POST /consultations/:id/finalize-remote
+ * Finaliza a consulta remotamente (mesmo fluxo do botão "Finalizar" na sala):
+ * busca room_id da call_sessions, chama o realtime para finalizar sala (salvar transcrições, webhook)
+ * Usado pelo popup "Consulta em Andamento" quando o médico clica em Finalizar fora da sala.
+ */
+export async function finalizeConsultationRemote(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autorizado' });
+    }
+
+    const { id: consultationId } = req.params;
+    const doctorAuthId = req.user.id;
+
+    const { data: medico, error: medicoError } = await supabase
+      .from('medicos')
+      .select('id')
+      .eq('user_auth', doctorAuthId)
+      .single();
+
+    if (medicoError || !medico) {
+      return res.status(404).json({ success: false, error: 'Médico não encontrado' });
+    }
+
+    const { data: consultation, error: consultationError } = await supabase
+      .from('consultations')
+      .select('id')
+      .eq('id', consultationId)
+      .eq('doctor_id', medico.id)
+      .single();
+
+    if (consultationError || !consultation) {
+      return res.status(404).json({ success: false, error: 'Consulta não encontrada' });
+    }
+
+    const { data: callSession, error: sessionError } = await supabase
+      .from('call_sessions')
+      .select('room_id')
+      .eq('consultation_id', consultationId)
+      .maybeSingle();
+
+    if (sessionError || !callSession?.room_id) {
+      return res.status(400).json({
+        success: false,
+        error: 'Sala não encontrada para esta consulta. A consulta pode já ter sido finalizada ou a sala não está ativa.'
+      });
+    }
+
+    const roomId = callSession.room_id;
+    const url = `${REALTIME_SERVICE_URL.replace(/\/$/, '')}/api/rooms/finalize/${roomId}`;
+
+    console.log(`📤 [GATEWAY] Chamando realtime para finalizar sala ${roomId} (consulta ${consultationId})`);
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      console.warn(`⚠️ [GATEWAY] Realtime finalize retornou ${response.status}:`, data);
+      return res.status(response.status).json({
+        success: false,
+        error: data?.error || 'Erro ao finalizar sala no serviço de tempo real'
+      });
+    }
+
+    return res.json(data);
+  } catch (error) {
+    console.error('Erro ao finalizar consulta remotamente:', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Erro interno do servidor'
+    });
+  }
+}

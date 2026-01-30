@@ -451,7 +451,7 @@ export default function PatientsPage() {
         if (error) throw error;
       }
 
-      const anamneseLink = `${window.location.origin}/anamnese-inicial?pacienteId=${patientId}`;
+      const anamneseLink = `${window.location.origin}/anamnese-inicial?paciente_id=${patientId}`;
       let emailOk = false;
       let whatsappOk = false;
 

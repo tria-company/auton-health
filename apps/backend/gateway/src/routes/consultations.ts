@@ -4,7 +4,8 @@ import {
   getConsultations,
   getConsultationById,
   updateConsultation,
-  deleteConsultation
+  deleteConsultation,
+  finalizeConsultationRemote
 } from '../controllers/consultationsController';
 
 const router = Router();
@@ -14,6 +15,13 @@ const router = Router();
  * Lista consultas do médico
  */
 router.get('/', authenticateToken, getConsultations);
+
+/**
+ * POST /consultations/:id/finalize-remote
+ * Finaliza a consulta remotamente (salva transcrições, envia webhook de conclusão).
+ * Usado pelo popup "Consulta em Andamento" quando o médico clica em Finalizar.
+ */
+router.post('/:id/finalize-remote', authenticateToken, finalizeConsultationRemote);
 
 /**
  * GET /consultations/:id

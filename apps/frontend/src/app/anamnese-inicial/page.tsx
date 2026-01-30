@@ -51,7 +51,8 @@ function AnamneseInicialContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { showSuccess, showError, showWarning } = useNotifications();
-  const pacienteId = searchParams.get('paciente_id') || searchParams.get('patient_id');
+  // Aceitar paciente_id, patient_id ou pacienteId (links antigos/email usavam pacienteId)
+  const pacienteId = searchParams.get('paciente_id') || searchParams.get('patient_id') || searchParams.get('pacienteId');
   
   const [formData, setFormData] = useState<AnamneseFormData>({});
   const [loading, setLoading] = useState(true);

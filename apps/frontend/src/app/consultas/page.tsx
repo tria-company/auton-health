@@ -238,7 +238,8 @@ function DataField({
   consultaId,
   onSave,
   onAIEdit,
-  readOnly = false
+  readOnly = false,
+  hideActions = false
 }: {
   label: string;
   value: any;
@@ -247,6 +248,8 @@ function DataField({
   onSave?: (fieldPath: string, newValue: string, consultaId: string) => Promise<void>;
   onAIEdit?: (fieldPath: string, label: string) => void;
   readOnly?: boolean;
+  /** Oculta botões Editar com IA e Editar manualmente (ex.: aba Síntese) */
+  hideActions?: boolean;
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
@@ -292,9 +295,9 @@ function DataField({
       return false;
     };
 
-    // Se não houver valor ou for "null" como string, mostrar "Não informado"
+    // Se não houver valor ou for "null" como string: CSS .data-value-empty::before exibe "Não informado"
     if (isEmptyValue(value)) {
-      return <p className="data-value data-value-empty">Não informado</p>;
+      return <p className="data-value data-value-empty"></p>;
     }
 
     // Se for array, renderizar lista
@@ -338,7 +341,7 @@ function DataField({
       <div className="data-field">
         <div className="data-field-header">
           <label className="data-label">{label}:</label>
-          {!readOnly && (
+          {!readOnly && !hideActions && (
             <div className="field-actions">
               {fieldPath && consultaId && onAIEdit && (
                 <button
@@ -764,10 +767,11 @@ function AnamneseSection({
     }
   }, [patientId]);
 
-  // Listener para recarregar dados de anamnese quando a IA processar
+  // Listener para recarregar dados de anamnese e síntese analítica quando a IA processar (edição na Análise)
   useEffect(() => {
     const handleAnamneseRefresh = () => {
       fetchAnamneseData();
+      fetchSinteseAnalitica(); // Atualiza também a Síntese Analítica após edição com IA na tela de Análise
     };
 
     window.addEventListener('force-anamnese-refresh', handleAnamneseRefresh);
@@ -914,6 +918,7 @@ function AnamneseSection({
               onSave={handleSaveField}
               onAIEdit={handleAIEdit}
               readOnly={readOnly}
+              hideActions={true}
             />
 
             <DataField
@@ -924,6 +929,7 @@ function AnamneseSection({
               onSave={handleSaveField}
               onAIEdit={handleAIEdit}
               readOnly={readOnly}
+              hideActions={true}
             />
 
             <DataField
@@ -934,6 +940,7 @@ function AnamneseSection({
               onSave={handleSaveField}
               onAIEdit={handleAIEdit}
               readOnly={readOnly}
+              hideActions={true}
             />
 
             <DataField
@@ -944,6 +951,7 @@ function AnamneseSection({
               onSave={handleSaveField}
               onAIEdit={handleAIEdit}
               readOnly={readOnly}
+              hideActions={true}
             />
 
             <DataField
@@ -954,6 +962,7 @@ function AnamneseSection({
               onSave={handleSaveField}
               onAIEdit={handleAIEdit}
               readOnly={readOnly}
+              hideActions={true}
             />
 
             <DataField
@@ -964,6 +973,7 @@ function AnamneseSection({
               onSave={handleSaveField}
               onAIEdit={handleAIEdit}
               readOnly={readOnly}
+              hideActions={true}
             />
 
             <DataField
@@ -974,6 +984,7 @@ function AnamneseSection({
               onSave={handleSaveField}
               onAIEdit={handleAIEdit}
               readOnly={readOnly}
+              hideActions={true}
             />
 
             <DataField
@@ -984,6 +995,7 @@ function AnamneseSection({
               onSave={handleSaveField}
               onAIEdit={handleAIEdit}
               readOnly={readOnly}
+              hideActions={true}
             />
 
             <DataField
@@ -994,6 +1006,7 @@ function AnamneseSection({
               onSave={handleSaveField}
               onAIEdit={handleAIEdit}
               readOnly={readOnly}
+              hideActions={true}
             />
 
             <DataField
@@ -1004,6 +1017,7 @@ function AnamneseSection({
               onSave={handleSaveField}
               onAIEdit={handleAIEdit}
               readOnly={readOnly}
+              hideActions={true}
             />
 
             <DataField
@@ -1014,6 +1028,7 @@ function AnamneseSection({
               onSave={handleSaveField}
               onAIEdit={handleAIEdit}
               readOnly={readOnly}
+              hideActions={true}
             />
 
             <DataField
@@ -1024,6 +1039,7 @@ function AnamneseSection({
               onSave={handleSaveField}
               onAIEdit={handleAIEdit}
               readOnly={readOnly}
+              hideActions={true}
             />
 
             <DataField
@@ -1034,6 +1050,7 @@ function AnamneseSection({
               onSave={handleSaveField}
               onAIEdit={handleAIEdit}
               readOnly={readOnly}
+              hideActions={true}
             />
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginTop: '16px' }}>
@@ -4966,19 +4983,37 @@ function ConsultasPageContent() {
     setShowAIChat(true); // Abre o chat automaticamente quando um campo é selecionado
   };
 
+  // ID da consulta: URL (?consulta_id=) ou detalhes carregados (consultaDetails.id)
+  const effectiveConsultaId = consultaId || consultaDetails?.id || null;
+
   // Função para enviar mensagem para IA
   const handleSendAIMessage = async () => {
-    if (!chatInput.trim() || !selectedField || !consultaId) return;
+    const trimmed = chatInput.trim();
+    if (!trimmed) return;
+
+    // Validar seleção e consulta; dar feedback e limpar input para o usuário não ficar com a mensagem presa
+    if (!selectedField || !effectiveConsultaId) {
+      setChatInput('');
+      const msg: ChatMessage = {
+        role: 'assistant',
+        content: !effectiveConsultaId
+          ? 'Nenhuma consulta selecionada. Selecione uma consulta na lista para abrir os detalhes e editar com IA.'
+          : 'Selecione um campo (clique em "Editar com IA" no campo desejado) antes de enviar.',
+        timestamp: new Date(),
+      };
+      setChatMessages(prev => [...prev, msg]);
+      return;
+    }
 
     const userMessage: ChatMessage = {
       role: 'user',
-      content: chatInput,
+      content: trimmed,
       timestamp: new Date(),
     };
 
-    // Adiciona mensagem do usuário no chat
+    // Adiciona mensagem do usuário no chat e limpa o campo imediatamente para a mensagem não ficar presa
     setChatMessages(prev => [...prev, userMessage]);
-    const messageText = chatInput;
+    const messageText = trimmed;
     setChatInput('');
     setIsTyping(true);
 
@@ -4997,20 +5032,20 @@ function ConsultasPageContent() {
       const webhookEndpoints = getWebhookEndpoints();
       const webhookHeaders = getWebhookHeaders();
 
-      // Usar webhook específico para Livro da Vida (Mentalidade)
+      // Análise (Síntese Analítica) e anamnese usam: usi-input-edicao-analise-v2
       const webhookUrl = isSolucaoMentalidade
         ? webhookEndpoints.edicaoSolucao
         : isSolucaoSuplemementacao
           ? webhookEndpoints.edicaoSolucao
           : isDiagnostico
             ? webhookEndpoints.edicaoDiagnostico
-            : webhookEndpoints.edicaoAnamnese;
+            : webhookEndpoints.edicaoAnamnese; // Inclui tela de Análise (a_sintese_analitica.*)
 
       const requestBody: any = {
         origem: 'IA',
         fieldPath: selectedField.fieldPath,
         texto: messageText,
-        consultaId,
+        consultaId: effectiveConsultaId,
       };
 
       // Adicionar solucao_etapa se for etapa de solução

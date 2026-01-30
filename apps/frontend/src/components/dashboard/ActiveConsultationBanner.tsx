@@ -224,22 +224,37 @@ export function ActiveConsultationBanner() {
 
     try {
       setIsFinishing(true);
-      
-      // Atualizar status para PROCESSING (inicia o processamento da consulta)
-      const response = await gatewayClient.patch(`/consultations/${activeConsultation.id}`, {
-        status: 'PROCESSING',
-      });
 
-      if (!response.success) {
-        throw new Error(response.error || "Erro na requisição");
+      // Tentar finalizar remotamente (mesmo fluxo de concluir na sala: salva transcrições e dispara webhook)
+      const finalizeResponse = await gatewayClient.post(
+        `/consultations/${activeConsultation.id}/finalize-remote`
+      );
+
+      if (finalizeResponse.success) {
+        // Remover o banner
+        activeConsultationRef.current = null;
+        setActiveConsultation(null);
+        // Recarregar a página para atualizar o dashboard
+        window.location.reload();
+        return;
       }
 
-      // Remover o banner
-      activeConsultationRef.current = null;
-      setActiveConsultation(null);
-      
-      // Recarregar a página para atualizar o dashboard
-      window.location.reload();
+      // Se sala não encontrada (ex.: já finalizada), apenas atualizar status para PROCESSING
+      const statusCode = (finalizeResponse as any).status;
+      if (statusCode === 400 || statusCode === 404) {
+        const response = await gatewayClient.patch(`/consultations/${activeConsultation.id}`, {
+          status: 'PROCESSING',
+        });
+        if (!response.success) {
+          throw new Error(response.error || 'Erro na requisição');
+        }
+        activeConsultationRef.current = null;
+        setActiveConsultation(null);
+        window.location.reload();
+        return;
+      }
+
+      throw new Error((finalizeResponse as any).error || 'Erro ao finalizar consulta');
     } catch (error) {
       console.error('Erro ao finalizar consulta:', error);
       showError('Erro ao finalizar consulta. Tente novamente.', 'Erro');
