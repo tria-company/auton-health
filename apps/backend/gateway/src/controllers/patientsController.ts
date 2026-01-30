@@ -118,6 +118,69 @@ export async function getPatients(req: AuthenticatedRequest, res: Response) {
 }
 
 /**
+ * POST /patients
+ * Cria um novo paciente para o médico autenticado
+ */
+export async function createPatient(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        error: 'Não autorizado'
+      });
+    }
+
+    const patientData = req.body;
+
+    // Buscar o ID do médico a partir do user_auth
+    const { data: medico, error: medicoError } = await supabase
+      .from('medicos')
+      .select('id')
+      .eq('user_auth', req.user.id)
+      .single();
+
+    if (medicoError || !medico) {
+      return res.status(404).json({
+        success: false,
+        error: 'Médico não encontrado'
+      });
+    }
+
+    // Não permitir que o cliente envie doctor_id
+    const { doctor_id: _discard, user_id: _discardUser, ...body } = patientData;
+    const payload = {
+      ...body,
+      doctor_id: medico.id
+    };
+
+    const { data: patient, error: insertError } = await supabase
+      .from('patients')
+      .insert(payload)
+      .select()
+      .single();
+
+    if (insertError) {
+      console.error('Erro ao criar paciente:', insertError);
+      return res.status(500).json({
+        success: false,
+        error: insertError.message || 'Erro ao cadastrar paciente'
+      });
+    }
+
+    return res.status(201).json({
+      success: true,
+      patient
+    });
+  } catch (error) {
+    console.error('Erro ao criar paciente:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Erro interno do servidor'
+    });
+  }
+}
+
+/**
  * GET /patients/:id
  * Busca um paciente específico
  */

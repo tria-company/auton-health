@@ -288,42 +288,18 @@ export default function PatientsPage() {
     setIsCreatingPatient(true);
     try {
       console.log('📤 Enviando dados do paciente:', patientData);
-      
-      // Buscar usuário autenticado
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      
-      if (userError || !user) {
-        throw new Error('Usuário não autenticado');
+
+      // Criar paciente via Gateway (tabela patients no Supabase)
+      const response = await gatewayClient.post<{ patient: { id: string; email?: string } }>('/patients', patientData);
+
+      if (!response.success || !response.patient) {
+        throw new Error((response as { error?: string }).error || 'Erro ao criar paciente');
       }
 
-      // Criar paciente no Supabase
-      const { data: result, error: insertError } = await supabase
-        .from('pacientes')
-        .insert({
-          ...patientData,
-          user_id: user.id,
-        })
-        .select()
-        .single();
-
-      console.log('📥 Resposta recebida:', { result, insertError });
-
-      if (insertError || !result) {
-        console.error('❌ Erro na resposta:', insertError);
-        throw new Error(insertError?.message || 'Erro ao criar paciente');
-      }
-
+      const result = response.patient;
       console.log('✅ Paciente criado com sucesso:', result);
 
-      // Criar usuário automaticamente se email estiver presente
-      if (result.email && patientData.email) {
-        try {
-          await handleSyncUser(result.id, 'create');
-        } catch (error) {
-          console.warn('Paciente criado, mas não foi possível criar usuário:', error);
-          // Não mostrar erro, apenas logar - o usuário pode criar depois manualmente
-        }
-      }
+      // Criação de usuário e envio de credenciais ficam manuais (botão na lista/detalhes do paciente)
 
       setShowForm(false);
       setIsCreatingPatient(false); // Reabilitar o botão após sucesso

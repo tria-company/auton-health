@@ -446,26 +446,14 @@ export default function CadastrarPaciente() {
 
       console.log('Dados do paciente para envio:', patientData);
 
-      // Buscar usuário autenticado
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      
-      if (userError || !user) {
-        throw new Error('Usuário não autenticado');
+      // Criar paciente via Gateway (tabela patients no Supabase)
+      const response = await gatewayClient.post<{ patient: { id: string } }>('/patients', patientData);
+
+      if (!response.success || !response.patient) {
+        throw new Error((response as { error?: string }).error || 'Erro ao cadastrar paciente');
       }
 
-      // Criar paciente no Supabase
-      const { data: patient, error: insertError } = await supabase
-        .from('pacientes')
-        .insert({
-          ...patientData,
-          user_id: user.id,
-        })
-        .select()
-        .single();
-
-      if (insertError || !patient) {
-        throw new Error(insertError?.message || 'Erro ao cadastrar paciente');
-      }
+      const patient = response.patient;
 
       console.log('Paciente cadastrado com sucesso:', patient);
       

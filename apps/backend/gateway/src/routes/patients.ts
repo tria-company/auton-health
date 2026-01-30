@@ -4,6 +4,7 @@ import {
   getPatients, 
   getPatientById, 
   getPatientMetrics,
+  createPatient,
   updatePatient, 
   deletePatient,
   syncPatientUser,
@@ -18,6 +19,12 @@ const router = Router();
  * Lista todos os pacientes do médico autenticado
  */
 router.get('/', authenticateToken, getPatients);
+
+/**
+ * POST /patients
+ * Cria um novo paciente
+ */
+router.post('/', authenticateToken, createPatient);
 
 /**
  * GET /patients/:id/metrics
