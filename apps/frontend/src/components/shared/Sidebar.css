@@ -1,15 +1,1 @@
-/* Sidebar - estilo do link Admin Sistema (não depende da página consultas-admin) */
-.sidebar .nav-btn-admin {
-  border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
-  margin-top: 0.5rem;
-  padding-top: 0.75rem;
-}
-
-.sidebar .nav-btn-admin svg {
-  color: #f59e0b;
-}
-
-.sidebar .nav-btn-admin:hover svg,
-.sidebar .nav-btn-admin.is-active svg {
-  color: #f59e0b;
-}
+/* Sidebar - itens Admin (Administração, Admin Sistema) usam o mesmo estilo dos demais .nav-btn */

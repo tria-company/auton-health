@@ -20,6 +20,7 @@ import {
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { gatewayClient } from '@/lib/gatewayClient';
+import { LoadingScreen } from '@/components/shared/LoadingScreen';
 import './consultas-admin.css';
 
 interface ConsultaAdmin {
@@ -193,18 +194,9 @@ export default function ConsultasAdminPage() {
     }
   };
 
-  // Loading state
+  // Loading state - usa o loading dinâmico do app
   if (authLoading || loading) {
-    return (
-      <div className="consultas-admin-page">
-        <div className="admin-page">
-          <div className="admin-loading">
-          <Loader2 className="loading-spinner" />
-          <p>Carregando painel administrativo...</p>
-          </div>
-        </div>
-      </div>
-    );
+    return <LoadingScreen message="Carregando painel administrativo..." />;
   }
 
   // Não é admin

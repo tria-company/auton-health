@@ -1,9 +1,56 @@
-/* Página Admin de Consultas - estilos escopados para não afetar o resto do app */
-.consultas-admin-page .admin-page {
+/* Página Admin de Consultas - mesmo container e tema do dashboard principal */
+.consultas-admin-page {
+  background: #EBF3F6;
+  height: auto !important;
+  margin: -2rem;
   padding: 2rem;
+  position: relative;
+  font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: visible !important;
+  box-sizing: border-box;
+  /* Variáveis do tema (igual ao dashboard) */
+  --dashboard-bg: #EBF3F6;
+  --dashboard-title-color: #1a1a1a;
+  --card-bg: #ffffff;
+  --card-text: #1a1a1a;
+  --card-border: rgba(0, 0, 0, 0.1);
+  --section-border: rgba(0, 0, 0, 0.15);
+  --table-row-bg: #f8f9fa;
+  --table-text: #1a1a1a;
+  --table-header: #666666;
+  --primary-color: #A6CE39;
+  --primary-hover: #95B832;
+}
+.consultas-admin-page * {
+  box-sizing: border-box;
+}
+/* Dark mode - mesmo tema do dashboard */
+.dark .consultas-admin-page {
+  background: #0A0A0A;
+  --dashboard-bg: #0A0A0A;
+  --dashboard-title-color: #FFFFFF;
+  --card-bg: #1A1A1A;
+  --card-text: #FFFFFF;
+  --card-border: rgba(255, 255, 255, 0.1);
+  --section-border: rgba(255, 255, 255, 0.15);
+  --table-row-bg: #252525;
+  --table-text: #FFFFFF;
+  --table-header: #CCCCCC;
+  --primary-color: #A6CE39;
+  --primary-hover: #95B832;
+}
+
+.consultas-admin-page .admin-page {
+  padding: 0;
   max-width: 1600px;
+  width: 100%;
   margin: 0 auto;
-  min-height: 100vh;
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .consultas-admin-page .admin-header {
@@ -14,7 +61,7 @@
   gap: 1rem;
   margin-bottom: 2rem;
   padding-bottom: 1.5rem;
-  border-bottom: 1px solid var(--border-color, #e5e7eb);
+  border-bottom: 1px solid var(--section-border, var(--border-color));
 }
 
 .consultas-admin-page .admin-title {
@@ -26,12 +73,13 @@
 .consultas-admin-page .admin-title h1 {
   font-size: 1.75rem;
   font-weight: 700;
-  color: var(--text-primary, #111827);
+  color: var(--dashboard-title-color, var(--text-primary));
   margin: 0;
 }
 
 .consultas-admin-page .admin-title svg {
-  color: var(--primary-color, #3b82f6);
+  color: #1e3a5f;
+  stroke: currentColor;
 }
 
 .consultas-admin-page .admin-subtitle {
@@ -42,13 +90,13 @@
 
 .consultas-admin-page .admin-subtitle p {
   margin: 0;
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
   font-size: 0.875rem;
 }
 
 .consultas-admin-page .consultation-count {
-  background: var(--primary-light, #dbeafe);
-  color: var(--primary-color, #3b82f6);
+  background: var(--hover-bg);
+  color: var(--primary-color);
   padding: 0.25rem 0.75rem;
   border-radius: 9999px;
   font-size: 0.75rem;
@@ -60,10 +108,10 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.625rem 1.25rem;
-  background: var(--primary-color, #3b82f6);
+  background: var(--primary-color);
   color: white;
   border: none;
-  border-radius: 0.5rem;
+  border-radius: var(--radius-sm, 0.5rem);
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
@@ -71,7 +119,7 @@
 }
 
 .consultas-admin-page .btn-refresh:hover:not(:disabled) {
-  background: var(--primary-dark, #2563eb);
+  background: var(--primary-hover);
   transform: translateY(-1px);
 }
 
@@ -100,13 +148,13 @@
 
 .consultas-admin-page .admin-loading .loading-spinner {
   animation: ca-spin 1s linear infinite;
-  color: var(--primary-color, #3b82f6);
+  color: var(--primary-color);
   width: 48px;
   height: 48px;
 }
 
 .consultas-admin-page .admin-loading p {
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
   font-size: 1rem;
 }
 
@@ -127,22 +175,22 @@
 .consultas-admin-page .admin-error h2 {
   font-size: 1.5rem;
   font-weight: 700;
-  color: var(--text-primary, #111827);
+  color: var(--text-primary);
   margin: 0;
 }
 
 .consultas-admin-page .admin-error p {
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
   margin: 0;
 }
 
 .consultas-admin-page .btn-back {
   margin-top: 1rem;
   padding: 0.625rem 1.5rem;
-  background: var(--primary-color, #3b82f6);
+  background: var(--primary-color);
   color: white;
   border: none;
-  border-radius: 0.5rem;
+  border-radius: var(--radius-sm, 0.5rem);
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
@@ -150,7 +198,7 @@
 }
 
 .consultas-admin-page .btn-back:hover {
-  background: var(--primary-dark, #2563eb);
+  background: var(--primary-hover);
 }
 
 .consultas-admin-page .admin-error-message {
@@ -185,33 +233,34 @@
   min-height: 300px;
   gap: 1rem;
   text-align: center;
-  background: var(--bg-secondary, #f9fafb);
-  border-radius: 0.75rem;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md, 0.75rem);
   padding: 3rem;
 }
 
 .consultas-admin-page .admin-empty svg {
-  color: var(--text-tertiary, #9ca3af);
+  color: var(--text-tertiary);
 }
 
 .consultas-admin-page .admin-empty h3 {
   font-size: 1.25rem;
   font-weight: 600;
-  color: var(--text-primary, #111827);
+  color: var(--text-primary);
   margin: 0;
 }
 
 .consultas-admin-page .admin-empty p {
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
   margin: 0;
 }
 
 .consultas-admin-page .admin-table-container {
   overflow-x: auto;
-  background: var(--bg-primary, white);
-  border-radius: 0.75rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  border: 1px solid var(--border-color, #e5e7eb);
+  -webkit-overflow-scrolling: touch;
+  background: var(--card-bg, var(--surface));
+  border-radius: var(--radius-md, 0.75rem);
+  box-shadow: var(--shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.1));
+  border: 1px solid var(--card-border, var(--border-color));
 }
 
 .consultas-admin-page .admin-table {
@@ -221,30 +270,30 @@
 }
 
 .consultas-admin-page .admin-table thead {
-  background: var(--bg-secondary, #f9fafb);
-  border-bottom: 2px solid var(--border-color, #e5e7eb);
+  background: var(--table-row-bg, var(--bg-secondary));
+  border-bottom: 2px solid var(--section-border, var(--border-color));
 }
 
 .consultas-admin-page .admin-table th {
   padding: 1rem;
   text-align: left;
   font-weight: 600;
-  color: var(--text-primary, #111827);
+  color: var(--table-header, var(--text-primary));
   white-space: nowrap;
 }
 
 .consultas-admin-page .admin-table tbody tr {
-  border-bottom: 1px solid var(--border-color, #e5e7eb);
+  border-bottom: 1px solid var(--border-color);
   transition: background 0.2s;
 }
 
 .consultas-admin-page .admin-table tbody tr:hover {
-  background: var(--bg-hover, #f3f4f6);
+  background: var(--hover-bg);
 }
 
 .consultas-admin-page .admin-table td {
   padding: 1rem;
-  color: var(--text-secondary, #374151);
+  color: var(--table-text, var(--text-secondary));
   vertical-align: middle;
 }
 
@@ -257,10 +306,10 @@
 .consultas-admin-page .td-id code {
   font-family: 'Monaco', 'Menlo', monospace;
   font-size: 0.75rem;
-  background: var(--bg-secondary, #f3f4f6);
+  background: var(--bg-secondary);
   padding: 0.25rem 0.5rem;
   border-radius: 0.25rem;
-  color: var(--text-primary, #111827);
+  color: var(--text-primary);
 }
 
 .consultas-admin-page .btn-copy {
@@ -294,7 +343,7 @@
 .consultas-admin-page .td-email .medico-name {
   display: block;
   font-size: 0.75rem;
-  color: var(--text-tertiary, #9ca3af);
+  color: var(--text-tertiary);
   margin-top: 0.25rem;
 }
 
@@ -311,7 +360,7 @@
 
 .consultas-admin-page .td-patient .patient-name {
   font-size: 0.75rem;
-  color: var(--primary-color, #3b82f6);
+  color: var(--primary-color);
   font-weight: 500;
 }
 
@@ -332,8 +381,8 @@
 }
 
 .consultas-admin-page .status-created {
-  background: #dbeafe;
-  color: #1d4ed8;
+  background: rgba(166, 206, 57, 0.25);
+  color: var(--primary-hover);
 }
 
 .consultas-admin-page .status-recording {
@@ -353,13 +402,13 @@
 }
 
 .consultas-admin-page .status-default {
-  background: #f3f4f6;
-  color: #6b7280;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
 }
 
 .consultas-admin-page .session-status {
   font-size: 0.7rem;
-  color: var(--text-tertiary, #9ca3af);
+  color: var(--text-tertiary);
 }
 
 @keyframes ca-pulse {
@@ -374,13 +423,13 @@
 }
 
 .consultas-admin-page .td-date .date-info svg {
-  color: var(--text-tertiary, #9ca3af);
+  color: var(--text-tertiary);
 }
 
 .consultas-admin-page .td-date .date-fallback {
   display: block;
   font-size: 0.7rem;
-  color: var(--text-tertiary, #9ca3af);
+  color: var(--text-tertiary);
   margin-top: 0.25rem;
 }
 
@@ -388,19 +437,19 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  color: var(--primary-color, #3b82f6);
+  color: var(--primary-color);
 }
 
 .consultas-admin-page .td-room code {
   font-family: 'Monaco', 'Menlo', monospace;
   font-size: 0.75rem;
-  background: var(--bg-secondary, #f3f4f6);
+  background: var(--bg-secondary);
   padding: 0.25rem 0.5rem;
   border-radius: 0.25rem;
 }
 
 .consultas-admin-page .td-room .no-room {
-  color: var(--text-tertiary, #9ca3af);
+  color: var(--text-tertiary);
   font-style: italic;
   font-size: 0.8rem;
 }
@@ -449,7 +498,7 @@
 
 .consultas-admin-page .patient-id {
   font-size: 0.7rem;
-  color: var(--text-tertiary, #9ca3af);
+  color: var(--text-tertiary);
 }
 
 .consultas-admin-page .td-actions {
@@ -540,29 +589,90 @@
   background: rgba(22, 163, 74, 0.2);
 }
 
+/* Tablet e telas médias */
 @media (max-width: 1024px) {
   .consultas-admin-page .admin-page {
-    padding: 1rem;
+    padding: 1.25rem;
   }
 
   .consultas-admin-page .admin-header {
     flex-direction: column;
     align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .consultas-admin-page .admin-title h1 {
+    font-size: 1.5rem;
+  }
+
+  .consultas-admin-page .btn-refresh {
+    width: 100%;
+    justify-content: center;
   }
 
   .consultas-admin-page .admin-table {
-    font-size: 0.8rem;
+    font-size: 0.8125rem;
+    min-width: 720px;
   }
 
   .consultas-admin-page .admin-table th,
   .consultas-admin-page .admin-table td {
     padding: 0.75rem 0.5rem;
   }
+
+  .consultas-admin-page .td-email {
+    max-width: 180px;
+  }
+
+  .consultas-admin-page .td-webrtc {
+    min-width: 100px;
+  }
+
+  .consultas-admin-page .td-actions {
+    min-width: 100px;
+  }
 }
 
-@media (max-width: 640px) {
+/* Celular e telas pequenas */
+@media (max-width: 768px) {
+  .consultas-admin-page .admin-page {
+    padding: 1rem;
+  }
+
+  .consultas-admin-page .admin-header {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+  }
+
   .consultas-admin-page .admin-title h1 {
     font-size: 1.25rem;
+  }
+
+  .consultas-admin-page .admin-title svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  .consultas-admin-page .admin-subtitle {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .consultas-admin-page .admin-empty {
+    min-height: 240px;
+    padding: 2rem 1.5rem;
+  }
+
+  .consultas-admin-page .admin-empty h3 {
+    font-size: 1.125rem;
+  }
+
+  .consultas-admin-page .admin-error-message,
+  .consultas-admin-page .admin-success-message {
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
   }
 
   .consultas-admin-page .admin-table-container {
@@ -570,5 +680,64 @@
     border-radius: 0;
     border-left: none;
     border-right: none;
+    overflow-x: auto;
+  }
+
+  .consultas-admin-page .admin-table {
+    font-size: 0.75rem;
+    min-width: 680px;
+  }
+
+  .consultas-admin-page .admin-table th,
+  .consultas-admin-page .admin-table td {
+    padding: 0.5rem 0.375rem;
+  }
+
+  .consultas-admin-page .status-badge {
+    font-size: 0.65rem;
+    padding: 0.2rem 0.5rem;
+  }
+
+  .consultas-admin-page .btn-terminate {
+    padding: 0.375rem 0.5rem;
+    font-size: 0.7rem;
+  }
+
+  .consultas-admin-page .btn-terminate span {
+    display: none;
+  }
+
+  .consultas-admin-page .webrtc-label {
+    display: none;
+  }
+
+  .consultas-admin-page .session-status {
+    display: block;
+    font-size: 0.65rem;
+  }
+}
+
+/* Telas muito pequenas */
+@media (max-width: 480px) {
+  .consultas-admin-page .admin-page {
+    padding: 0.75rem;
+  }
+
+  .consultas-admin-page .admin-title h1 {
+    font-size: 1.125rem;
+  }
+
+  .consultas-admin-page .consultation-count {
+    font-size: 0.7rem;
+    padding: 0.2rem 0.5rem;
+  }
+
+  .consultas-admin-page .admin-loading,
+  .consultas-admin-page .admin-error {
+    min-height: 280px;
+  }
+
+  .consultas-admin-page .admin-empty {
+    padding: 1.5rem 1rem;
   }
 }
