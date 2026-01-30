@@ -65,3 +65,4 @@ steps:
       - "--timeout=300"
       - "--cpu-boost"
       - "--cpu-throttling"
+      - "--startup-cpu-boost"

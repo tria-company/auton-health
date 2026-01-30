@@ -5026,20 +5026,32 @@ function ConsultasPageContent() {
         selectedField.fieldPath.startsWith('integracao_diagnostica') ||
         selectedField.fieldPath.startsWith('habitos_vida');
 
-      const isSolucaoMentalidade = selectedField.fieldPath.startsWith('mentalidade_data');
-      const isSolucaoSuplemementacao = selectedField.fieldPath.startsWith('suplementacao_data');
+      // ✅ FIX: Verificar TODAS as etapas de solução para usar o webhook correto
+      const isSolucaoMentalidade = selectedField.fieldPath.startsWith('mentalidade_data') ||
+        selectedField.fieldPath.startsWith('livro_vida');
+      const isSolucaoSuplemementacao = selectedField.fieldPath.startsWith('suplementacao_data') ||
+        selectedField.fieldPath.startsWith('suplementacao');
+      const isSolucaoAlimentacao = selectedField.fieldPath.startsWith('alimentacao_data') ||
+        selectedField.fieldPath.startsWith('alimentacao');
+      const isSolucaoAtividadeFisica = selectedField.fieldPath.startsWith('atividade_fisica') ||
+        selectedField.fieldPath.startsWith('exercicio');
+
+      // Qualquer campo de solução usa o webhook de edição de solução
+      const isSolucao = isSolucaoMentalidade || isSolucaoSuplemementacao ||
+        isSolucaoAlimentacao || isSolucaoAtividadeFisica;
 
       const webhookEndpoints = getWebhookEndpoints();
       const webhookHeaders = getWebhookHeaders();
 
-      // Análise (Síntese Analítica) e anamnese usam: usi-input-edicao-analise-v2
-      const webhookUrl = isSolucaoMentalidade
+      // Cada tipo de edição vai para seu webhook específico:
+      // - Soluções (todas as etapas): edicaoSolucao
+      // - Diagnóstico: edicaoDiagnostico
+      // - Análise/Anamnese: edicaoAnamnese
+      const webhookUrl = isSolucao
         ? webhookEndpoints.edicaoSolucao
-        : isSolucaoSuplemementacao
-          ? webhookEndpoints.edicaoSolucao
-          : isDiagnostico
-            ? webhookEndpoints.edicaoDiagnostico
-            : webhookEndpoints.edicaoAnamnese; // Inclui tela de Análise (a_sintese_analitica.*)
+        : isDiagnostico
+          ? webhookEndpoints.edicaoDiagnostico
+          : webhookEndpoints.edicaoAnamnese; // Inclui tela de Análise (a_sintese_analitica.*)
 
       const requestBody: any = {
         origem: 'IA',
@@ -5053,6 +5065,10 @@ function ConsultasPageContent() {
         requestBody.solucao_etapa = 'MENTALIDADE';
       } else if (isSolucaoSuplemementacao) {
         requestBody.solucao_etapa = 'SUPLEMENTACAO';
+      } else if (isSolucaoAlimentacao) {
+        requestBody.solucao_etapa = 'ALIMENTACAO';
+      } else if (isSolucaoAtividadeFisica) {
+        requestBody.solucao_etapa = 'ATIVIDADE_FISICA';
       }
 
       console.log('✅ [FIXED] Enviando para webhook:', requestBody);
