@@ -2,12 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { 
-  ShieldCheck, 
-  RefreshCw, 
-  AlertCircle, 
-  Video, 
-  User, 
+import {
+  ShieldCheck,
+  RefreshCw,
+  AlertCircle,
+  Video,
+  User,
   Clock,
   ExternalLink,
   Loader2,
@@ -57,7 +57,7 @@ export default function ConsultasAdminPage() {
   const [error, setError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [terminatingRoom, setTerminatingRoom] = useState<string | null>(null);
+  const [terminatingId, setTerminatingId] = useState<string | null>(null);
   const [terminateSuccess, setTerminateSuccess] = useState<string | null>(null);
 
   // Verificar se o usuário é admin
@@ -127,30 +127,30 @@ export default function ConsultasAdminPage() {
   // Função para encerrar chamada
   const handleTerminateCall = async (consulta: ConsultaAdmin) => {
     if (!consulta.room_id) {
-      setError('Esta consulta não possui uma sala ativa');
+      setError('Esta consulta não possui uma sala ativa (room_id ausente)');
       return;
     }
 
     const confirmMessage = `Tem certeza que deseja encerrar a chamada?\n\nPaciente: ${consulta.patient_name}\nMédico: ${consulta.medico_name || consulta.medico_email || 'Não identificado'}\nRoom ID: ${consulta.room_id}`;
-    
+
     if (!confirm(confirmMessage)) {
       return;
     }
 
-    setTerminatingRoom(consulta.room_id);
+    setTerminatingId(consulta.id);
     setError(null);
     setTerminateSuccess(null);
 
     try {
-      // Encerrar consulta via gateway
-      const response = await gatewayClient.post(`/admin/consultations/${consulta.id}/terminate`);
+      // Encerrar sessão diretamente pelo room_id
+      const response = await gatewayClient.post(`/admin/consultations/terminate-room/${consulta.room_id}`);
 
       if (!response.success) {
         throw new Error(response.error || 'Erro ao encerrar chamada');
       }
 
-      setTerminateSuccess(`Chamada encerrada com sucesso: ${consulta.room_id}`);
-      
+      setTerminateSuccess(`Sessão encerrada com sucesso: ${consulta.room_id}`);
+
       // Atualizar lista de consultas
       await fetchConsultas();
 
@@ -161,7 +161,7 @@ export default function ConsultasAdminPage() {
       console.error('Erro ao encerrar chamada:', err);
       setError(err instanceof Error ? err.message : 'Erro ao encerrar chamada');
     } finally {
-      setTerminatingRoom(null);
+      setTerminatingId(null);
     }
   };
 
@@ -209,7 +209,7 @@ export default function ConsultasAdminPage() {
           <h2>Acesso Negado</h2>
           <p>Você não tem permissão para acessar esta página.</p>
           <p>Apenas administradores podem visualizar este painel.</p>
-          <button 
+          <button
             className="btn-back"
             onClick={() => router.push('/dashboard')}
           >
@@ -233,7 +233,7 @@ export default function ConsultasAdminPage() {
           <p>Consultas abertas no sistema</p>
           <span className="consultation-count">{consultas.length} consulta(s) em aberto</span>
         </div>
-        <button 
+        <button
           className="btn-refresh"
           onClick={fetchConsultas}
           disabled={refreshing}
@@ -283,7 +283,7 @@ export default function ConsultasAdminPage() {
                 <tr key={consulta.id} className={consulta.webrtc_active ? 'row-webrtc-active' : ''}>
                   <td className="td-id">
                     <code>{consulta.id.substring(0, 8)}...</code>
-                    <button 
+                    <button
                       className="btn-copy"
                       onClick={() => navigator.clipboard.writeText(consulta.id)}
                       title="Copiar ID completo"
@@ -350,20 +350,22 @@ export default function ConsultasAdminPage() {
                     )}
                   </td>
                   <td className="td-actions">
-                    {consulta.room_id && (
+                    {consulta.room_id ? (
                       <button
-                        className={`btn-terminate ${terminatingRoom === consulta.room_id ? 'loading' : ''}`}
+                        className={`btn-terminate ${terminatingId === consulta.id ? 'loading' : ''}`}
                         onClick={() => handleTerminateCall(consulta)}
-                        disabled={terminatingRoom !== null}
+                        disabled={terminatingId !== null}
                         title="Encerrar chamada"
                       >
-                        {terminatingRoom === consulta.room_id ? (
+                        {terminatingId === consulta.id ? (
                           <Loader2 size={16} className="spinning" />
                         ) : (
                           <PhoneOff size={16} />
                         )}
                         <span>Encerrar</span>
                       </button>
+                    ) : (
+                      <span className="no-room">Sem sala</span>
                     )}
                   </td>
                 </tr>

@@ -1,8 +1,9 @@
 import { Router } from 'express';
 import { authenticateToken } from '../middleware/auth';
-import { 
-  getActiveConsultations, 
-  terminateConsultation 
+import {
+  getActiveConsultations,
+  terminateConsultation,
+  terminateSessionByRoom
 } from '../controllers/consultasAdminController';
 
 const router = Router();
@@ -20,5 +21,12 @@ router.get('/', authenticateToken, getActiveConsultations);
  * Apenas para administradores
  */
 router.post('/:id/terminate', authenticateToken, terminateConsultation);
+
+/**
+ * POST /admin/consultations/terminate-room/:roomId
+ * Encerra uma sessão pelo room_id diretamente
+ * Apenas para administradores
+ */
+router.post('/terminate-room/:roomId', authenticateToken, terminateSessionByRoom);
 
 export default router;

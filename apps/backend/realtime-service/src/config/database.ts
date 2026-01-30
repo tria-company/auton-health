@@ -525,6 +525,26 @@ export const db = {
       return null;
     }
 
+    // ✅ REQ 1: Criar registro na tabela transcriptions assim que criar a consulta
+    if (consultation && consultation.id) {
+      const { error: transcriptionError } = await supabase
+        .from('transcriptions')
+        .insert({
+          consultation_id: consultation.id,
+          raw_text: '', // Começa vazio
+          language: 'pt-BR',
+          model_used: 'whisper-1',
+          created_at: now
+        });
+
+      if (transcriptionError) {
+        console.error('❌ Erro ao criar registro inicial em transcriptions:', transcriptionError);
+        // Não falhar a criação da consulta, apenas logar o erro
+      } else {
+        console.log(`✅ Registro inicial em transcriptions criado para consulta ${consultation.id}`);
+      }
+    }
+
     return consultation;
   },
 
@@ -995,6 +1015,68 @@ export const db = {
     }
 
     return transcription;
+  },
+
+  /**
+   * Appends text to an existing transcription or creates a new one if it doesn't exist.
+   * This allows continuous saving during the consultation.
+   */
+  async appendConsultationTranscription(consultationId: string, textToAppend: string, speaker: string, timestamp: string): Promise<boolean> {
+    try {
+      // 1. Check if a transcription record exists for this consultation
+      const { data: existing, error: fetchError } = await supabase
+        .from('transcriptions')
+        .select('id, raw_text')
+        .eq('consultation_id', consultationId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (fetchError) {
+        console.error('❌ [DB] Error fetching transcription for append:', fetchError);
+        return false;
+      }
+
+      const formattedLine = `[${speaker}] (${timestamp}): ${textToAppend}`;
+
+      if (existing) {
+        // Append to existing
+        const newText = existing.raw_text ? `${existing.raw_text}\n${formattedLine}` : formattedLine;
+
+        const { error: updateError } = await supabase
+          .from('transcriptions')
+          .update({
+            raw_text: newText,
+            updated_at: new Date().toISOString() // Assuming there's an updated_at, if not it's fine
+          } as any)
+          .eq('id', existing.id);
+
+        if (updateError) {
+          console.error('❌ [DB] Error appending transcription:', updateError);
+          return false;
+        }
+      } else {
+        // Create new
+        const { error: insertError } = await supabase
+          .from('transcriptions')
+          .insert({
+            consultation_id: consultationId,
+            raw_text: formattedLine,
+            language: 'pt-BR',
+            model_used: 'whisper-1-vad',
+            created_at: new Date().toISOString()
+          });
+
+        if (insertError) {
+          console.error('❌ [DB] Error creating transcription (append):', insertError);
+          return false;
+        }
+      }
+      return true;
+    } catch (e) {
+      console.error('❌ [DB] Exception in appendConsultationTranscription:', e);
+      return false;
+    }
   },
 
   // ==================== GRAVAÇÕES ====================

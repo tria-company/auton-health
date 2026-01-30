@@ -8,7 +8,7 @@ import { randomUUID } from 'crypto';
 import { logError, logWarning } from '../config/database';
 import { aiPricingService } from './aiPricingService';
 import { aiConfig } from '../config';
-
+import { VoiceActivityDetector } from '../utils/vad';
 import { TranscriptionSegment, Speaker } from '@medcall/shared-types';
 
 interface AudioChunk {
@@ -28,8 +28,11 @@ interface TranscriptionOptions {
 export class TranscriptionService extends EventEmitter {
   private supabase: any;
   private activeRooms: Map<string, Set<string>> = new Map();
-  private audioBuffers: Map<string, Buffer[]> = new Map();
-  private processingQueue: Map<string, NodeJS.Timeout> = new Map();
+  // ✅ Armazenar metadados junto com o buffer
+  private audioBuffers: Map<string, { data: Buffer; sampleRate: number }[]> = new Map();
+  // private processingQueue: Map<string, NodeJS.Timeout> = new Map(); // Removed: timer-based queue
+  private vadInstances: Map<string, VoiceActivityDetector> = new Map(); // Added: VAD instances
+  private roomConsultations: Map<string, string> = new Map(); // ✅ Mapeamento roomName -> consultationId
 
   // Azure OpenAI config
   private azureEndpoint: string;
@@ -64,7 +67,14 @@ export class TranscriptionService extends EventEmitter {
       console.log(`✅ Transcrição ativada para sala: ${roomName}`);
 
       // Captura de áudio via WebSocket
+      // Captura de áudio via WebSocket
       this.setupAudioCapture(roomName, consultationId);
+
+      // ✅ Salvar consultationId para uso posterior (salvamento no banco)
+      if (consultationId) {
+        this.roomConsultations.set(roomName, consultationId);
+        console.log(`✅ [TRANSCRIPTION] ConsultationId vinculado à sala ${roomName}: ${consultationId}`);
+      }
 
     } catch (error) {
       console.error('Erro ao iniciar transcrição:', error);
@@ -97,13 +107,17 @@ export class TranscriptionService extends EventEmitter {
 
       this.audioBuffers.delete(roomName);
 
-      const timeout = this.processingQueue.get(roomName);
-      if (timeout) {
-        clearTimeout(timeout);
-        this.processingQueue.delete(roomName);
+      // Limpar instâncias VAD associadas à sala
+      for (const [key, vad] of this.vadInstances.entries()) {
+        if (key.startsWith(`${roomName}-`)) {
+          console.log(`🧹 [VAD] Limpando VAD para ${key}`);
+          vad.removeAllListeners();
+          this.vadInstances.delete(key);
+        }
       }
 
       this.activeRooms.delete(roomName);
+      this.roomConsultations.delete(roomName); // ✅ Limpar mapeamento
 
     } catch (error) {
       console.error('Erro ao parar transcrição:', error);
@@ -117,17 +131,83 @@ export class TranscriptionService extends EventEmitter {
     }
   }
 
+  // ✅ Armazenar metadados junto com o buffer
+  private prerollBuffers: Map<string, { data: Buffer; sampleRate: number }[]> = new Map();
+  private isSpeakingMap: Map<string, boolean> = new Map();
+
   async processAudioChunk(audioChunk: AudioChunk, roomName: string): Promise<void> {
     try {
-      const { data, participantId } = audioChunk;
-
+      const { data, participantId, sampleRate } = audioChunk;
       const bufferKey = `${roomName}-${participantId}`;
-      if (!this.audioBuffers.has(bufferKey)) {
+      const chunkData = { data, sampleRate: sampleRate || 16000 };
+
+      // DEBUG: Log para verificar se audio do médico está chegando
+      // console.log(`🎤 [AUDIO-CHUNK] Recebido de ${participantId} (${data.length} bytes) - Key: ${bufferKey}`);
+
+      // Inicializar VAD se não existir
+      if (!this.vadInstances.has(bufferKey)) {
+        console.log(`🎙️ [VAD] Inicializando para ${participantId} na sala ${roomName}`);
+
+        const vad = new VoiceActivityDetector({
+          sampleRate: chunkData.sampleRate, // Use chunk sample rate
+          energyThreshold: 0.02, // 0.02 para evitar respiracão/ruído
+          silenceDuration: 1000,  // 1s silêncio = fim
+          minSpeechDuration: 500  // Min 0.5s fala
+        });
+
+        // Inicializar estados
+        this.prerollBuffers.set(bufferKey, []);
+        this.isSpeakingMap.set(bufferKey, false);
         this.audioBuffers.set(bufferKey, []);
+
+        // Evento: Início de fala detectado
+        vad.on('speechStart', () => {
+          console.log(`🗣️ [VAD] Fala detectada: ${participantId} (Room: ${roomName})`);
+          this.isSpeakingMap.set(bufferKey, true);
+
+          // Mover preroll para o buffer principal (para não perder o início da frase)
+          const preroll = this.prerollBuffers.get(bufferKey) || [];
+          const mainBuffer = this.audioBuffers.get(bufferKey) || [];
+          this.audioBuffers.set(bufferKey, [...preroll, ...mainBuffer]); // Type safety ensured by map definition
+          this.prerollBuffers.set(bufferKey, []); // Limpar preroll
+        });
+
+        // Evento: Fim de fala detectado (Silêncio) -> Enviar para Whisper
+        vad.on('speechEnd', async ({ duration }) => {
+          console.log(`🤐 [VAD] Silêncio detectado para ${participantId} (Fala: ${duration}ms). Processando transcrição...`);
+          this.isSpeakingMap.set(bufferKey, false);
+          await this.processBufferedAudio(bufferKey, roomName, participantId);
+        });
+
+        this.vadInstances.set(bufferKey, vad);
       }
 
-      this.audioBuffers.get(bufferKey)!.push(data);
-      this.scheduleProcessing(bufferKey, roomName, participantId);
+      // Processar no VAD (dispara eventos acima)
+      const vad = this.vadInstances.get(bufferKey);
+      if (vad) {
+        vad.processAudio(data);
+      }
+
+      // LÓGICA DE BUFFERIZACAO INTELIGENTE (GATED)
+      const isSpeaking = this.isSpeakingMap.get(bufferKey) || false;
+
+      if (isSpeaking) {
+        // Se está falando, grava no buffer principal
+        if (!this.audioBuffers.has(bufferKey)) this.audioBuffers.set(bufferKey, []);
+        this.audioBuffers.get(bufferKey)!.push(chunkData);
+      } else {
+        // Se NÃO está falando, grava apenas no Ring Buffer (Preroll)
+        if (!this.prerollBuffers.has(bufferKey)) this.prerollBuffers.set(bufferKey, []);
+
+        const preroll = this.prerollBuffers.get(bufferKey)!;
+        preroll.push(chunkData);
+
+        // Manter apenas ~600ms de áudio no preroll (aprox 20 chunks de 30ms se assumirmos chunks pequenos, ou baseado em bytes)
+        // Se data.length for 2000 bytes (aprox 60ms a 16khz), manter 10 chunks = 600ms
+        if (preroll.length > 20) {
+          preroll.shift(); // Remove o mais antigo
+        }
+      }
 
     } catch (error) {
       console.error('Erro ao processar chunk de áudio:', error);
@@ -140,40 +220,84 @@ export class TranscriptionService extends EventEmitter {
     }
   }
 
-  private scheduleProcessing(bufferKey: string, roomName: string, participantId: string): void {
-    const existingTimeout = this.processingQueue.get(bufferKey);
-    if (existingTimeout) {
-      clearTimeout(existingTimeout);
-    }
+  // Método scheduleProcessing removido em favor do VAD logic
 
-    const timeout = setTimeout(async () => {
-      await this.processBufferedAudio(bufferKey, roomName, participantId);
-    }, 1000);
-
-    this.processingQueue.set(bufferKey, timeout);
-  }
 
   private async processBufferedAudio(bufferKey: string, roomName: string, participantId: string): Promise<void> {
     try {
-      const audioBuffers = this.audioBuffers.get(bufferKey);
-      if (!audioBuffers || audioBuffers.length === 0) {
+      const audioChunks = this.audioBuffers.get(bufferKey);
+      if (!audioChunks || audioChunks.length === 0) {
         return;
       }
 
-      const combinedBuffer = Buffer.concat(audioBuffers);
+      // Extrair buffers e determinar sampleRate (assumindo constante no segmento)
+      const dataBuffers = audioChunks.map(c => c.data);
+      const sampleRate = audioChunks[0]?.sampleRate || 16000;
+
+      const combinedBuffer = Buffer.concat(dataBuffers);
+
+      // Limpar buffer após consumo
       this.audioBuffers.set(bufferKey, []);
 
-      if (combinedBuffer.length < 8000) {
-        return;
+      // Resetar estado do VAD para evitar falsos positivos imediatos
+      const vad = this.vadInstances.get(bufferKey);
+      if (vad) vad.reset();
+
+      // Mínimo de áudio para enviar (aprox 0.5s)
+      if (combinedBuffer.length < (sampleRate * 0.5 * 2)) { // 0.5s de audio (sampleRate * duration * bytesPerSample)
+        // Aprox check
+        if (combinedBuffer.length < 8000) { // Fallback check
+          console.log(`⚠️ [TRANSCRIPTION] Áudio muito curto descartado`);
+          return;
+        }
       }
 
+      // ✅ Obter consultationId do mapa para registrar uso de IA
+      const consultaId = this.roomConsultations.get(roomName) || undefined;
+
+      // ✅ PASSAR SAMPLE RATE CORRETA E CONSULTA ID
       const transcription = await this.transcribeAudio(combinedBuffer, {
         language: 'pt',
         model: 'whisper-1',
         response_format: 'verbose_json'
-      });
+      }, consultaId, sampleRate); // ✅ Agora passa o consultaId corretamente
 
       if (transcription && transcription.text.trim()) {
+        const text = transcription.text.trim();
+
+        // 🛡️ FILTRO ANTI-ALUCINAÇÃO
+        // Whisper tende a gerar essas frases em silêncio absoluto
+        const HALLUCINATIONS = [
+          'Sous-titres', 'Amara.org', 'Obrigado.', 'Súbricas',
+          'Subtitles by', 'Translated by', 'Unara.org',
+          'Aguarde um momento.'
+        ];
+
+        // 1. Verificar frases bloqueadas
+        if (HALLUCINATIONS.some(h => text.includes(h)) || text === '.') {
+          console.log(`🛡️ [ANTI-HALLUCINATION] Texto descartado (frase proibida): "${text}"`);
+          return;
+        }
+
+        // 2. Verificar caracteres repetidos ou símbolos isolados
+        if (text.length < 3 && !['Oi', 'Sim', 'Não', 'Ok'].includes(text)) {
+          console.log(`🛡️ [ANTI-HALLUCINATION] Texto descartado (muito curto): "${text}"`);
+          return;
+        }
+
+        // 3. Verificar repetição de caracteres especiais (ex: "???")
+        if (/^[?.!,\s]+$/.test(text)) {
+          console.log(`🛡️ [ANTI-HALLUCINATION] Texto descartado (apenas pontuação): "${text}"`);
+          return;
+        }
+
+        const role = this.getParticipantRole(participantId);
+        // console.log(`====> Role: ${role}`); // Remove debug logs
+        let speaker: Speaker = 'UNKNOWN';
+        if (role === 'doctor') speaker = 'MEDICO';
+        else if (role === 'patient') speaker = 'PACIENTE';
+        else if (role === 'system') speaker = 'SISTEMA';
+
         await this.sendTranscriptionToRoom(roomName, {
           id: randomUUID(),
           text: transcription.text,
@@ -183,7 +307,7 @@ export class TranscriptionService extends EventEmitter {
           final: true,
           confidence: transcription.confidence,
           language: transcription.language,
-          speaker: 'UNKNOWN' as Speaker // Default, will be refined in saveTranscriptionToDatabase
+          speaker: speaker
         });
       }
 
@@ -198,9 +322,9 @@ export class TranscriptionService extends EventEmitter {
     }
   }
 
-  private async transcribeAudio(audioBuffer: Buffer, options: TranscriptionOptions = {}, consultaId?: string): Promise<any> {
+  private async transcribeAudio(audioBuffer: Buffer, options: TranscriptionOptions = {}, consultaId?: string, sampleRate: number = 16000): Promise<any> {
     try {
-      const wavBuffer = this.convertToWav(audioBuffer);
+      const wavBuffer = this.convertToWav(audioBuffer, sampleRate);
 
       // Azure OpenAI Whisper endpoint
       const azureUrl = `${this.azureEndpoint}/openai/deployments/${this.azureDeployment}/audio/transcriptions?api-version=${this.azureApiVersion}`;
@@ -220,7 +344,10 @@ export class TranscriptionService extends EventEmitter {
       });
       formData.append('language', options.language || 'pt');
       formData.append('response_format', options.response_format || 'verbose_json');
-      formData.append('temperature', (options.temperature || 0).toString());
+      formData.append('temperature', '0'); // Temperatura 0 para determinismo
+
+      // ✅ Prompt para contexto médico e redução de alucinações
+      formData.append('prompt', 'Transcrição de uma consulta médica entre doutor e paciente. Evite alucinações em silêncio.');
 
       console.log(`🌐 [TRANSCRIPTION-SERVICE] Enviando para Azure: ${azureUrl}`);
 
@@ -327,11 +454,23 @@ export class TranscriptionService extends EventEmitter {
 
       // Mapear speaker baseado no participantId ou participantName
       let speaker: 'doctor' | 'patient' | 'system' = 'system';
-      const participantLower = ((segment.participantId || '') + (segment.participantName || '')).toLowerCase();
-      if (participantLower.includes('doctor') || participantLower.includes('médico') || participantLower.includes('Medico')) {
-        speaker = 'doctor';
-      } else if (participantLower.includes('patient') || participantLower.includes('Paciente')) {
-        speaker = 'patient';
+
+      // 1. Tentar usar o papel já identificado no segmento se confiável
+      if (segment.speaker === 'MEDICO') speaker = 'doctor';
+      else if (segment.speaker === 'PACIENTE') speaker = 'patient';
+
+      // 2. Fallback: Analisar nome/ID (Se ainda for system ou UNKNOWN)
+      if (speaker === 'system') {
+        const participantLower = ((segment.participantId || '') + (segment.participantName || '')).toLowerCase();
+
+        // Identificação de Médico (Case insensitive e variações)
+        if (participantLower.includes('doctor') || participantLower.includes('médico') || participantLower.includes('medico')) {
+          speaker = 'doctor';
+        } else {
+          // Para transcrições de áudio, se não é médico, assumimos que é o paciente
+          // Isso resolve o problema de IDs temporários (ex: Temp-123) sendo marcados como system
+          speaker = 'patient';
+        }
       }
 
       // ✅ Usar addTranscriptionToSession em vez de insert direto
@@ -359,22 +498,61 @@ export class TranscriptionService extends EventEmitter {
       });
 
       if (!success) {
-        console.error('❌ [TRANSCRIPTION-SERVICE] Erro ao salvar transcrição no banco');
-        console.error('❌ [TRANSCRIPTION-SERVICE] Dados tentados:', {
-          session_id: sessionId,
-          speaker,
-          speaker_id: speakerId,
-          text: segment.text.substring(0, 50) + '...',
-          roomName
-        });
-        logError(
-          `Erro ao salvar transcrição no banco via TranscriptionService`,
-          'error',
-          null,
-          { sessionId, speaker, speakerId, roomName, textLength: segment.text.length }
-        );
+        console.error('❌ [TRANSCRIPTION-SERVICE] Erro ao salvar transcrição no banco (array)');
+        // ... (logging error)
       } else {
-        console.log(`✅ [TRANSCRIPTION-SERVICE] Transcrição salva no banco (${speaker}):`, segment.text.substring(0, 50) + '...');
+        console.log(`✅ [TRANSCRIPTION-SERVICE] Transcrição salva no banco (array - ${speaker}):`, segment.text.substring(0, 50) + '...');
+      }
+
+      // ✅ NOVO: Salvar na tabela 'transcriptions' (append) para cumprir requisito "salvar toda vez"
+      // Tentar pegar consultationId do mapa ou buscar do banco se necessário
+      let consultationId = this.roomConsultations.get(roomName) || null;
+
+      if (!consultationId && sessionId) {
+        // Tentar recuperar da call_sessions se tivermos sessionId mas não consultationId
+        // (Otimização: idealmente já teríamos no map)
+        const { data: sessionData } = await this.supabase
+          .from('call_sessions')
+          .select('consultation_id')
+          .eq('id', sessionId)
+          .maybeSingle();
+
+        if (sessionData?.consultation_id) {
+          consultationId = sessionData.consultation_id;
+          this.roomConsultations.set(roomName, consultationId as string); // Cache
+        }
+      }
+
+      if (consultationId) {
+        console.log(`===> SPEAKER: ${speaker}`)
+        // Formatar speaker para o padrão solicitado: [MEDICO] ou [PACIENTE - NOME]
+        let formattedSpeaker = '';
+        if (speaker === 'doctor') {
+          formattedSpeaker = 'MEDICO';
+        } else {
+          console.log(`===> PARTICIPANT NAME: ${segment.participantName}`)
+          // Tentar pegar nome do paciente
+          const patientName = segment.participantName || 'Paciente';
+          formattedSpeaker = `PACIENTE - ${patientName}`;
+        }
+
+        // Formatar timestamp para visualização (HH:mm:ss)
+        const date = new Date(segment.timestamp);
+        const hours = date.getHours().toString().padStart(2, '0');
+        const minutes = date.getMinutes().toString().padStart(2, '0');
+        const seconds = date.getSeconds().toString().padStart(2, '0');
+        const formattedTime = `${hours}:${minutes}:${seconds}`;
+
+        // Salvar raw_text appendado (Req 2)
+        await db.appendConsultationTranscription(
+          consultationId as string,
+          segment.text,
+          formattedSpeaker,
+          formattedTime
+        );
+        console.log(`✅ [TRANSCRIPTION-SERVICE] Transcrição anexada à tabela 'transcriptions' para consulta ${consultationId}`);
+      } else {
+        console.warn(`⚠️ [TRANSCRIPTION-SERVICE] Não foi possível anexar à tabela 'transcriptions': consultationId não encontrado para sala ${roomName}`);
       }
 
     } catch (error) {
@@ -388,8 +566,20 @@ export class TranscriptionService extends EventEmitter {
     }
   }
 
+  // ✅ Cache de nomes e roles de participantes
+  private participantRegistry: Map<string, { name: string; role: 'doctor' | 'patient' }> = new Map();
+
+  public registerParticipant(participantId: string, name: string, role: 'doctor' | 'patient') {
+    this.participantRegistry.set(participantId, { name, role });
+    console.log(`👤 [TRANSCRIPTION-SERVICE] Participante registrado: ${name} (${role}) - ID: ${participantId}`);
+  }
+
   private async getParticipantName(participantId: string): Promise<string> {
     try {
+      if (this.participantRegistry.has(participantId)) {
+        return this.participantRegistry.get(participantId)!.name;
+      }
+
       const { data } = await this.supabase
         .from('participants')
         .select('name')
@@ -397,10 +587,16 @@ export class TranscriptionService extends EventEmitter {
         .single();
 
       return data?.name || participantId;
-
     } catch (error) {
       return participantId;
     }
+  }
+
+  private getParticipantRole(participantId: string): 'doctor' | 'patient' | 'system' {
+    if (this.participantRegistry.has(participantId)) {
+      return this.participantRegistry.get(participantId)!.role;
+    }
+    return 'system';
   }
 
   async getTranscriptionStats(roomName: string): Promise<any> {

@@ -3,6 +3,8 @@ import crypto from 'crypto';
 import WebSocket from 'ws';
 import { db, logError, logWarning } from '../config/database';
 import { aiPricingService } from '../services/aiPricingService';
+import { transcriptionService } from '../services/transcriptionService'; // ✅ Importado
+
 
 // ==================== ESTRUTURAS DE DADOS ====================
 
@@ -15,28 +17,8 @@ const userToRoom = new Map();
 // Mapa de socket para sala: socketId -> roomId
 const socketToRoom = new Map();
 
-// Mapa de conexões OpenAI: userName -> WebSocket
-const openAIConnections = new Map();
+// ❌ REMOVIDO: Mapas da Realtime API (openAIConnections, trackers) - Migrado para Whisper
 
-// Mapa de keepalive timers para conexões OpenAI: userName -> Interval
-const openAIKeepaliveTimers = new Map();
-
-// 📊 Mapa para rastrear tempo de uso da Realtime API: userName -> { startTime, roomId }
-// 📊 Mapa para rastrear tempo de uso da Realtime API: userName -> { startTime, roomId, tokens... }
-const openAIUsageTracker = new Map<string, {
-  startTime: number;
-  roomId: string;
-  textInputTokens: number;
-  textOutputTokens: number;
-  audioInputTokens: number;
-  audioOutputTokens: number;
-}>();
-
-// ⏱️ Mapa para timeout máximo de conexões OpenAI: userName -> Timeout
-const openAIMaxTimeoutTimers = new Map();
-
-// 🔧 Constante: Timeout máximo para conexões OpenAI (2 horas)
-const OPENAI_MAX_CONNECTION_TIME = 2 * 60 * 60 * 1000; // 2 horas em ms
 
 // Mapa separado para timers (não serializar com room data)
 const roomTimers = new Map(); // roomId -> Timeout
@@ -150,73 +132,14 @@ function cleanExpiredRoom(roomId: string): void {
 /**
  * 🔧 Fecha conexão OpenAI de forma segura e registra uso
  */
+/**
+ * 🔧 Fecha conexão OpenAI de forma segura e registra uso
+ * (Stub mantido para compatibilidade, mas lógica removida)
+ */
 async function closeOpenAIConnection(userName: string, reason: string = 'desconexão'): Promise<void> {
-  const openAIWs = openAIConnections.get(userName);
-
-  if (openAIWs) {
-    console.log(`🔌 [OpenAI] Fechando conexão de ${userName} (motivo: ${reason})`);
-
-    // 📊 Registrar uso antes de fechar
-    const usageData = openAIUsageTracker.get(userName);
-    if (usageData) {
-      const durationMs = Date.now() - usageData.startTime;
-      const durationMinutes = durationMs / 60000;
-
-      console.log(`📊 [AI_PRICING] Registrando uso Realtime API: ${userName} - ${durationMinutes.toFixed(2)} minutos`);
-
-      try {
-        // Buscar consulta_id a partir do roomId
-        const room = rooms.get(usageData.roomId);
-        let consultaId = room?.consultationId || null;
-
-        // Se não encontrou na room, buscar do banco de dados
-        if (!consultaId && usageData.roomId) {
-          console.log(`🔍 [AI_PRICING] Buscando consultaId do banco para room ${usageData.roomId}...`);
-          consultaId = await db.getConsultationIdByRoomId(usageData.roomId);
-          if (consultaId) {
-            console.log(`✅ [AI_PRICING] consultaId recuperado do banco: ${consultaId}`);
-          }
-        }
-
-        if (!consultaId) {
-          console.warn(`⚠️ [AI_PRICING] Não foi possível obter consultaId para room ${usageData.roomId}`);
-        }
-
-        // 📊 Atualizado: Não logar acumulado no final, pois já estamos logando por interação.
-        console.log(`📊 [AI_PRICING] Conexão encerrada (log individual já realizado a cada interação)`);
-        console.log(`   - Duração Sessão: ${durationMinutes.toFixed(2)} minutos`);
-      } catch (error) {
-        console.error(`❌ [AI_PRICING] Erro ao registrar uso:`, error);
-      }
-
-      openAIUsageTracker.delete(userName);
-    }
-
-    // Fechar conexão WebSocket
-    try {
-      if (openAIWs.readyState === WebSocket.OPEN || openAIWs.readyState === WebSocket.CONNECTING) {
-        openAIWs.close(1000, reason);
-      }
-    } catch (error) {
-      console.error(`❌ [OpenAI] Erro ao fechar conexão de ${userName}:`, error);
-    }
-
-    openAIConnections.delete(userName);
-  }
-
-  // Limpar keepalive timer
-  const keepaliveInterval = openAIKeepaliveTimers.get(userName);
-  if (keepaliveInterval) {
-    clearInterval(keepaliveInterval);
-    openAIKeepaliveTimers.delete(userName);
-  }
-
-  // Limpar timeout máximo timer
-  const maxTimeoutTimer = openAIMaxTimeoutTimers.get(userName);
-  if (maxTimeoutTimer) {
-    clearTimeout(maxTimeoutTimer);
-    openAIMaxTimeoutTimers.delete(userName);
-  }
+  // Lógica da Realtime API removida.
+  // Clean up any remaining legacy state if needed.
+  console.log(`🔌 [WHISPER-MIGRATION] closeOpenAIConnection chamado para ${userName} (${reason}) - Ignorado (Realtime API desativada)`);
 }
 
 /**
@@ -297,6 +220,40 @@ function calculateDuration(startTime: string): number {
 // ==================== SOCKET.IO HANDLERS ====================
 
 export function setupRoomsWebSocket(io: SocketIOServer): void {
+  // ✅ LISTENER GLOBAL PARA TRANSCRIPTION SERVICE
+  // Escuta eventos do serviço Whisper e retransmite para o socket como se fosse evento da OpenAI
+  if (transcriptionService.listenerCount('transcription') === 0) {
+    transcriptionService.on('transcription', ({ roomName, segment }) => {
+      // console.log(`📝 [WHISPER->SOCKET] Retransmitindo transcrição para sala ${roomName}: "${segment.text}"`);
+
+      // ✅ FIX: Adicionar ao array room.transcriptions para ser salvo em consultations.transcricao
+      const room = rooms.get(roomName);
+      if (room) {
+        const transcriptionEntry = {
+          speaker: segment.speaker || segment.participantName || 'UNKNOWN',
+          text: segment.text,
+          timestamp: segment.timestamp || new Date().toISOString()
+        };
+        room.transcriptions.push(transcriptionEntry);
+        console.log(`📝 [WHISPER] Transcrição adicionada ao array (total: ${room.transcriptions.length}): "${segment.text.substring(0, 50)}..."`);
+      }
+
+      // Mock do evento 'conversation.item.input_audio_transcription.completed' da OpenAI
+      const fakeOpenAIEvent = {
+        type: 'conversation.item.input_audio_transcription.completed',
+        event_id: `evt_${segment.id}`,
+        item_id: `item_${segment.id}`,
+        content_index: 0,
+        transcript: segment.text, // O texto transcrito!
+        timestamp: new Date().toISOString()
+      };
+
+      // Emitir para a sala inteira (Socket.IO)
+      io.to(roomName).emit('transcription:message', JSON.stringify(fakeOpenAIEvent));
+    });
+    console.log('✅ [WHISPER] Listener global configurado em rooms.ts');
+  }
+
   io.on('connection', (socket) => {
 
     const userName = socket.handshake.auth.userName;
@@ -523,6 +480,8 @@ export function setupRoomsWebSocket(io: SocketIOServer): void {
                   }
                 }
               }
+              // ✅ Registrar nome do médico no serviço de transcrição
+              transcriptionService.registerParticipant(userName || socket.id, doctorName, 'doctor');
             }
           } catch (consultationError) {
             console.error('❌ Erro ao criar/atualizar consulta:', consultationError);
@@ -586,6 +545,15 @@ export function setupRoomsWebSocket(io: SocketIOServer): void {
         // ✅ NOVO: Atualizar webrtc_active = true quando o médico entrar na consulta
         console.log(`🔗 [WebRTC] Médico entrou na sala ${roomId} - atualizando webrtc_active = true`);
         db.setWebRTCActive(roomId, true);
+
+        // ✅ Garantir que o serviço de transcrição conheça o ID da consulta
+        if (room.consultationId) {
+          transcriptionService.startTranscription(roomId, room.consultationId).catch(err => {
+            console.error(`❌ Erro ao registrar transcrição para sala ${roomId} (Host):`, err);
+          });
+          // ✅ Registrar nome do médico no serviço de transcrição
+          transcriptionService.registerParticipant(userName || socket.id, room.doctorName || room.hostUserName, 'doctor');
+        }
 
         // ✅ NOVO: Buscar transcrições do banco de dados
         let transcriptionHistory: any[] = room.transcriptions || [];
@@ -825,6 +793,15 @@ export function setupRoomsWebSocket(io: SocketIOServer): void {
       console.log(`✅ ${participantName} entrou na sala ${roomId}`);
 
       // ✅ NOVO: Buscar transcrições do banco de dados
+      // ✅ Garantir que o serviço de transcrição conheça o ID da consulta
+      if (room.consultationId) {
+        transcriptionService.startTranscription(roomId, room.consultationId).catch(err => {
+          console.error(`❌ Erro ao registrar transcrição para sala ${roomId}:`, err);
+        });
+        // ✅ Registrar nome do paciente no serviço de transcrição
+        transcriptionService.registerParticipant(userName || socket.id, participantName, 'patient');
+      }
+
       let transcriptionHistory = room.transcriptions || [];
       if (room.callSessionId) {
         try {
@@ -1059,273 +1036,49 @@ export function setupRoomsWebSocket(io: SocketIOServer): void {
     // ==================== TRANSCRIÇÕES COM ROOMS ====================
 
     socket.on('transcription:connect', (data, callback) => {
-      console.log(`🔍 [TRANSCRIPTION] Solicitação de conexão recebida de socket ${socket.id}`);
-
+      console.log(`🔍 [TRANSCRIPTION] Conexão solicitada por ${socket.id} (MIGRADO PARA WHISPER)`);
       const roomId = socketToRoom.get(socket.id);
-      const userName = socket.handshake.auth.userName;
-
-      console.log(`🔍 [TRANSCRIPTION] Room ID: ${roomId}, User: ${userName}`);
 
       if (!roomId) {
-        console.error(`❌ [TRANSCRIPTION] Socket ${socket.id} não está em uma sala`);
-        // Logar warning no banco (não é um erro crítico)
-        logWarning(
-          `Tentativa de conexão de transcrição sem estar em sala`,
-          null,
-          { socketId: socket.id, userName }
-        );
         if (typeof callback === 'function') {
-          callback({ success: false, error: 'Você não está em uma sala. Entre em uma sala primeiro.' });
+          callback({ success: false, error: 'Você não está em uma sala.' });
         }
         return;
       }
 
-      console.log(`[${userName}] Solicitando conexão OpenAI na sala ${roomId}`);
-
-      // ==================== FUNÇÃO AUXILIAR DE PROCESSAMENTO DE MENSAGENS ====================
-      const handleOpenAIMessage = async (message: string, currentUserName: string, currentRoomId: string) => {
-        try {
-          const parsed = JSON.parse(message);
-
-          // ✅ Capturar evento de transcrição: Log apenas para debug (não salvar no banco duplicado zerado)
-          if (parsed.type === 'conversation.item.input_audio_transcription.completed') {
-            console.log(`[${currentUserName}] 📝 TRANSCRIÇÃO:`, parsed.transcript);
-          }
-
-          // ✅ CÁLCULO DE TOKENS: Capturar evento response.done
-          if (parsed.type === 'response.done' && parsed.response?.usage) {
-            const usage = parsed.response.usage;
-
-            // 1. Atualizar tracking para estatísticas em tempo real (dashboard)
-            const currentUsage = openAIUsageTracker.get(currentUserName);
-            if (currentUsage) {
-              currentUsage.textInputTokens += (usage.input_token_details?.text_tokens || 0);
-              currentUsage.textOutputTokens += (usage.output_token_details?.text_tokens || 0);
-              currentUsage.audioInputTokens += (usage.input_token_details?.audio_tokens || 0);
-              currentUsage.audioOutputTokens += (usage.output_token_details?.audio_tokens || 0);
-            }
-
-            // 2. Registrar no banco IMEDIATAMENTE
-            const startRoom = rooms.get(currentRoomId);
-            let consultaId = startRoom?.consultationId || null;
-
-            try {
-              // Se não tem consultaId na memória, tenta buscar rápido antes de logar
-              if (!consultaId && currentRoomId) {
-                const { db } = await import('../config/database');
-                consultaId = await db.getConsultationIdByRoomId(currentRoomId);
-                if (consultaId && startRoom) startRoom.consultationId = consultaId;
-              }
-              const { aiPricingService } = await import('../services/aiPricingService');
-              await aiPricingService.logRealtimeUsage({
-                durationMs: 0,
-                textInputTokens: usage.input_token_details?.text_tokens || 0,
-                textOutputTokens: usage.output_token_details?.text_tokens || 0,
-                audioInputTokens: usage.input_token_details?.audio_tokens || 0,
-                audioOutputTokens: usage.output_token_details?.audio_tokens || 0,
-                cachedTokens: usage.input_token_details?.cached_tokens || 0,
-                responseDoneJson: parsed // ✅ NOVO: JSON completo do response.done
-              }, consultaId);
-            } catch (err) {
-              console.error('Erro ao logar uso realtime por interação:', err);
-            }
-          }
-        } catch (e) {
-          // Ignorar erros de parsing
-        }
-      };
-
-      // ✅ CORREÇÃO: Se já existe uma conexão OpenAI ativa, reutilizar
-      if (openAIConnections.has(userName)) {
-        const existingWs = openAIConnections.get(userName);
-
-        // Verificar se a conexão ainda está aberta
-        if (existingWs && existingWs.readyState === WebSocket.OPEN) {
-          console.log(`[${userName}] ✅ Reutilizando conexão OpenAI existente (reconexão)`);
-
-          // Reconfigurar listeners para o novo socket
-          existingWs.removeAllListeners('message');
-          existingWs.removeAllListeners('error');
-          existingWs.removeAllListeners('close');
-
-          // Adicionar listeners para o socket atual
-          existingWs.on('message', (data: any) => {
-            const message = data.toString();
-            // Processar uso e transcrição (Agora usa a mesma função!)
-            handleOpenAIMessage(message, userName, roomId);
-            // Re-emitir para o frontend
-            socket.emit('transcription:message', message);
-          });
-
-          existingWs.on('error', (error: Error) => {
-            console.error(`[${userName}] ❌ Erro OpenAI:`, error.message);
-            socket.emit('transcription:error', { error: error.message });
-          });
-
-          existingWs.on('close', async () => {
-            console.log(`[${userName}] OpenAI WebSocket fechado (Reused)`);
-            openAIConnections.delete(userName);
-            openAIUsageTracker.delete(userName);
-
-            const keepaliveInterval = openAIKeepaliveTimers.get(userName);
-            if (keepaliveInterval) {
-              clearInterval(keepaliveInterval);
-              openAIKeepaliveTimers.delete(userName);
-            }
-
-            socket.emit('transcription:disconnected');
-          });
-
-          callback({ success: true, message: 'Conexão existente reutilizada' });
-          return;
-        } else {
-          // Conexão antiga está fechada, remover e criar nova
-          console.log(`[${userName}] ⚠️ Conexão OpenAI antiga fechada, criando nova...`);
-          openAIConnections.delete(userName);
-          const keepaliveInterval = openAIKeepaliveTimers.get(userName);
-          if (keepaliveInterval) {
-            clearInterval(keepaliveInterval);
-            openAIKeepaliveTimers.delete(userName);
-          }
-        }
+      // Simplesmente retornar sucesso. O backend agora "só ouve".
+      // Não abrimos conexão real com OpenAI.
+      if (typeof callback === 'function') {
+        callback({ success: true, message: 'Conectado (Whisper VAD Active)' });
       }
-
-      // ... (Configuração Azure permanece igual) ...
-      const AZURE_ENDPOINT = process.env.AZURE_OPENAI_ENDPOINT;
-      const AZURE_API_KEY = process.env.AZURE_OPENAI_API_KEY;
-      const AZURE_DEPLOYMENT = process.env.AZURE_OPENAI_REALTIME_DEPLOYMENT || 'gpt-realtime-mini';
-      const AZURE_API_VERSION = process.env.AZURE_OPENAI_REALTIME_API_VERSION || '2024-10-01-preview';
-
-      if (!AZURE_ENDPOINT || !AZURE_API_KEY) {
-        // ... (Erro config permanece igual) ...
-        console.error('❌ [TRANSCRIPTION] Azure OpenAI não configurado!');
-        callback({ success: false, error: 'Azure OpenAI não configurado' });
-        return;
-      }
-
-      // Extrair hostname do endpoint (remover https://)
-      const azureHost = AZURE_ENDPOINT.replace('https://', '').replace('http://', '');
-      const azureWsUrl = `wss://${azureHost}/openai/realtime?api-version=${AZURE_API_VERSION}&deployment=${AZURE_DEPLOYMENT}&api-key=${AZURE_API_KEY}`;
-      const openAIWs = new WebSocket(azureWsUrl);
-
-      openAIWs.on('open', () => {
-        console.log(`[${userName}] ✅ Conectado à Azure OpenAI Realtime na sala ${roomId}`);
-        openAIConnections.set(userName, openAIWs);
-        openAIUsageTracker.set(userName, {
-          startTime: Date.now(),
-          roomId: roomId,
-          textInputTokens: 0,
-          textOutputTokens: 0,
-          audioInputTokens: 0,
-          audioOutputTokens: 0
-        });
-
-        // ... (Keepalive e Timeout mudam um pouco a posição mas lógica é mesma)
-        // Recriar keepalive e timeout aqui...
-
-        callback({ success: true, message: 'Conectado com sucesso' });
-      });
-
-      openAIWs.on('message', (data) => {
-        const message = data.toString();
-        // ✅ USANDO A NOVA FUNÇÃO CENTRALIZADA
-        handleOpenAIMessage(message, userName, roomId);
-        socket.emit('transcription:message', data.toString());
-      });
-
-      openAIWs.on('error', (error: any) => {
-        console.error(`❌ [TRANSCRIPTION] Erro OpenAI para ${userName}:`, error);
-        console.error(`❌ [TRANSCRIPTION] Mensagem:`, error?.message || 'Erro desconhecido');
-        console.error(`❌ [TRANSCRIPTION] Stack:`, error?.stack);
-        // Logar erro de conexão OpenAI
-        const room = rooms.get(roomId);
-        logError(
-          `Erro na conexão WebSocket com OpenAI Realtime API`,
-          'error',
-          room?.consultationId || null,
-          { roomId, userName, errorMessage: error?.message || 'Erro desconhecido', errorStack: error?.stack }
-        );
-        socket.emit('transcription:error', { error: error?.message || 'Erro desconhecido ao conectar à OpenAI' });
-        if (typeof callback === 'function') {
-          callback({ success: false, error: error?.message || 'Erro desconhecido ao conectar à OpenAI' });
-        }
-      });
-
-      openAIWs.on('close', async () => {
-        console.log(`[${userName}] OpenAI WebSocket fechado`);
-        openAIConnections.delete(userName);
-
-        // 📊 Registrar uso da Realtime API
-        const usageData = openAIUsageTracker.get(userName);
-        if (usageData) {
-          const durationMs = Date.now() - usageData.startTime;
-          const room = rooms.get(usageData.roomId);
-
-          // Prioridade: consultationId da room > buscar do banco pelo roomId
-          let consultaId = room?.consultationId || null;
-
-          // Se não encontrou na room, buscar do banco de dados
-          if (!consultaId && usageData.roomId) {
-            console.log(`🔍 [AI_PRICING] Buscando consultaId do banco para room ${usageData.roomId}...`);
-            const { db } = await import('../config/database');
-            consultaId = await db.getConsultationIdByRoomId(usageData.roomId);
-
-            // Atualizar a room em memória se encontrou
-            if (consultaId && room) {
-              room.consultationId = consultaId;
-              console.log(`✅ [AI_PRICING] consultaId recuperado do banco: ${consultaId}`);
-            }
-          }
-
-          if (!consultaId) {
-            console.warn(`⚠️ [AI_PRICING] Não foi possível obter consultaId para room ${usageData.roomId}`);
-          }
-
-          // 📊 Atualizado: Não logar acumulado no final, pois já estamos logando por interação.
-          // Apenas logar informativo no console de encerramento
-          const totalTextIn = usageData.textInputTokens || 0;
-          const totalTextOut = usageData.textOutputTokens || 0;
-          const totalAudioIn = usageData.audioInputTokens || 0;
-          const totalAudioOut = usageData.audioOutputTokens || 0;
-
-          console.log(`📊 [AI_PRICING] Realtime API encerrada para ${userName}`);
-          console.log(`   - Duração Sessão: ${(durationMs / 60000).toFixed(2)} minutos`);
-          console.log(`   - Total Tokens Acumulados (para conferência):`);
-          console.log(`     - Text In/Out: ${totalTextIn} / ${totalTextOut}`);
-          console.log(`     - Audio In/Out: ${totalAudioIn} / ${totalAudioOut}`);
-
-          openAIUsageTracker.delete(userName);
-        }
-
-        // Limpar keepalive timer
-        const keepaliveInterval = openAIKeepaliveTimers.get(userName);
-        if (keepaliveInterval) {
-          clearInterval(keepaliveInterval);
-          openAIKeepaliveTimers.delete(userName);
-        }
-
-        socket.emit('transcription:disconnected');
-      });
     });
 
 
 
     socket.on('transcription:send', (data) => {
-      const openAIWs = openAIConnections.get(userName);
+      // ✅ INTERCEPTOR para o serviço Whisper VAD
+      try {
+        const payload = JSON.parse(data);
 
-      if (!openAIWs || openAIWs.readyState !== WebSocket.OPEN) {
-        // Logar warning de conexão não disponível
-        const roomId = socketToRoom.get(socket.id);
-        const room = roomId ? rooms.get(roomId) : null;
-        logWarning(
-          `Tentativa de enviar transcrição sem conexão OpenAI ativa`,
-          room?.consultationId || null,
-          { userName, roomId, wsReadyState: openAIWs?.readyState }
-        );
-        socket.emit('transcription:error', { error: 'Não conectado à OpenAI' });
-        return;
+        // Extrair áudio do evento 'input_audio_buffer.append'
+        if (payload.type === 'input_audio_buffer.append' && payload.audio) {
+          const roomId = socketToRoom.get(socket.id);
+          const userName = socket.handshake.auth.userName;
+
+          if (roomId) {
+            const audioBuffer = Buffer.from(payload.audio, 'base64');
+            // Envia para o processador VAD + Whisper
+            transcriptionService.processAudioChunk({
+              data: audioBuffer,
+              participantId: userName || socket.id,
+              sampleRate: 24000, // Realtime API default é 24kHz
+              channels: 1
+            }, roomId);
+          }
+        }
+      } catch (e) {
+        // Se não for JSON ou erro de parse, ignora
       }
-      openAIWs.send(data);
     });
 
     socket.on('transcription:disconnect', async () => {
@@ -1710,6 +1463,12 @@ export function setupRoomsWebSocket(io: SocketIOServer): void {
             model_used: 'gpt-4o-mini-realtime-preview'
           });
 
+          // ✅ CORREÇÃO: Salvar também na coluna 'transcricao' da tabela 'consultations' (requisito do usuário)
+          await db.updateConsultation(consultationId, {
+            transcricao: rawText
+          });
+          console.log(`📝 Transcrição salva na consulta ${consultationId} (coluna transcricao)`);
+
           if (transcription) {
             console.log(`📝 Transcrição salva: ${transcription.id}`);
             saveResult.transcriptionId = transcription.id;
@@ -1838,62 +1597,26 @@ export function setupRoomsWebSocket(io: SocketIOServer): void {
 export {
   rooms,
   userToRoom,
-  socketToRoom,
-  openAIConnections
+  socketToRoom
 };
 
 /**
  * 📊 Obtém estatísticas das conexões OpenAI ativas em tempo real
  * Útil para monitoramento de custos
  */
+/**
+ * 📊 Obtém estatísticas (STUB - Realtime API desativada)
+ */
 export function getOpenAIConnectionsStats() {
-  const now = Date.now();
-  const connections: Array<{
-    userName: string;
-    roomId: string;
-    startTime: string;
-    durationMinutes: number;
-    estimatedCost: number;
-    status: string;
-  }> = [];
-
-  // Iterar sobre conexões ativas
-  for (const [userName, ws] of openAIConnections.entries()) {
-    const usageData = openAIUsageTracker.get(userName);
-
-    if (usageData) {
-      const durationMs = now - usageData.startTime;
-      const durationMinutes = durationMs / 60000;
-      // Custo estimado: $0.06/min input + $0.24/min output ≈ $0.30/min total
-      const estimatedCost = durationMinutes * 0.30;
-
-      connections.push({
-        userName,
-        roomId: usageData.roomId,
-        startTime: new Date(usageData.startTime).toISOString(),
-        durationMinutes: Math.round(durationMinutes * 100) / 100,
-        estimatedCost: Math.round(estimatedCost * 100) / 100,
-        status: ws.readyState === 1 ? 'OPEN' : ws.readyState === 0 ? 'CONNECTING' : 'CLOSING/CLOSED'
-      });
-    }
-  }
-
-  // Calcular totais
-  const totalConnections = connections.length;
-  const totalMinutes = connections.reduce((sum, c) => sum + c.durationMinutes, 0);
-  const totalEstimatedCost = connections.reduce((sum, c) => sum + c.estimatedCost, 0);
-
   return {
     timestamp: new Date().toISOString(),
     summary: {
-      totalConnections,
-      totalMinutes: Math.round(totalMinutes * 100) / 100,
-      totalEstimatedCost: Math.round(totalEstimatedCost * 100) / 100,
-      maxConnectionTime: OPENAI_MAX_CONNECTION_TIME / 60000, // em minutos
+      totalConnections: 0,
+      totalMinutes: 0,
+      totalEstimatedCost: 0,
+      maxConnectionTime: 0,
     },
-    connections,
-    warning: totalConnections > 0 ?
-      `⚠️ ${totalConnections} conexão(ões) OpenAI ativa(s) consumindo aproximadamente $${totalEstimatedCost.toFixed(2)} até agora` :
-      null
+    connections: [],
+    warning: null
   };
 }

@@ -281,6 +281,30 @@ export async function updateConsultation(req: AuthenticatedRequest, res: Respons
       });
     }
 
+    // ✅ REQ 4: Se o status estiver sendo atualizado para COMPLETED, salvar transcrição
+    if (updateData.status === 'COMPLETED') {
+      try {
+        const { data: transcriptionData, error: transError } = await supabase
+          .from('transcriptions')
+          .select('raw_text')
+          .eq('consultation_id', id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (transcriptionData && transcriptionData.raw_text) {
+          updateData.transcricao = transcriptionData.raw_text;
+          // Garantir que consulta_fim seja setado se não estiver no payload
+          if (!updateData.consulta_fim) {
+            updateData.consulta_fim = new Date().toISOString();
+          }
+          console.log(`📝 [UPDATE-CONSULTATION] Transcrição final anexada para consulta ${id}`);
+        }
+      } catch (e) {
+        console.warn(`⚠️ [UPDATE-CONSULTATION] Erro ao buscar transcrição final: ${e}`);
+      }
+    }
+
     // Atualizar consulta
     const { data: consultation, error } = await supabase
       .from('consultations')

@@ -510,6 +510,26 @@ export const db = {
       return null;
     }
 
+    // ✅ REQ 1: Criar registro na tabela transcriptions assim que criar a consulta
+    if (consultation && consultation.id) {
+      const { error: transcriptionError } = await supabase
+        .from('transcriptions')
+        .insert({
+          consultation_id: consultation.id,
+          raw_text: '', // Começa vazio
+          language: 'pt-BR',
+          model_used: 'whisper-1',
+          created_at: now
+        });
+
+      if (transcriptionError) {
+        console.error('❌ Erro ao criar registro inicial em transcriptions:', transcriptionError);
+        // Não falhar a criação da consulta, apenas logar o erro
+      } else {
+        console.log(`✅ Registro inicial em transcriptions criado para consulta ${consultation.id}`);
+      }
+    }
+
     return consultation;
   },
 
