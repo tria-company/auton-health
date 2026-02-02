@@ -33,7 +33,7 @@ export async function getAnamnese(req: AuthenticatedRequest, res: Response) {
       supabase.from('a_cadastro_prontuario').select('*').eq('consulta_id', consultaId).maybeSingle(),
       supabase.from('a_objetivos_queixas').select('*').eq('consulta_id', consultaId).maybeSingle(),
       supabase.from('a_historico_risco').select('*').eq('consulta_id', consultaId).maybeSingle(),
-      supabase.from('a_observacao_clinica_lab').select('*').eq('consulta_id', consultaId).maybeSingle(),
+      supabase.from('a_observacao_clinica_lab_2').select('*').eq('consulta_id', consultaId).maybeSingle(),
       supabase.from('a_historia_vida').select('*').eq('consulta_id', consultaId).maybeSingle(),
       supabase.from('a_setenios_eventos').select('*').eq('consulta_id', consultaId).maybeSingle(),
       supabase.from('a_ambiente_contexto').select('*').eq('consulta_id', consultaId).maybeSingle(),

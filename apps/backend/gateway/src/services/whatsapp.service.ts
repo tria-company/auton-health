@@ -1,8 +1,8 @@
 
 import fetch from 'node-fetch';
-import { AppError } from '@/utils/AppError';
+import { AppError } from '../utils/AppError';
 
-import { config } from '@/config';
+import { config } from '../config';
 
 interface SendTextOptions {
     number: string;
