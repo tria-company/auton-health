@@ -79,6 +79,70 @@ export class WhatsappService {
     }
 
     /**
+     * Verifica se um número possui WhatsApp
+     * Endpoint: POST /chat/whatsappNumbers/{instance}
+     * @param number Número para verificar (será formatado internamente)
+     * @returns { exists: boolean, jid?: string, number: string }
+     */
+    async checkWhatsappNumber(number: string): Promise<{ exists: boolean; jid?: string; number: string }> {
+        if (!this.serviceUrl || !this.instanceName || !this.apiKey) {
+            throw new AppError('Serviço de WhatsApp não configurado corretamente', 503);
+        }
+
+        const formattedNumber = this.formatNumber(number);
+
+        if (!formattedNumber) {
+            throw new AppError('Número de telefone inválido', 400);
+        }
+
+        const baseUrl = this.serviceUrl.replace(/\/$/, '');
+        const url = `${baseUrl}/chat/whatsappNumbers/${this.instanceName}`;
+
+        try {
+            console.log(`🔍 [WhatsappService] Verificando se ${formattedNumber} possui WhatsApp...`);
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'apikey': this.apiKey
+                },
+                body: JSON.stringify({
+                    numbers: [formattedNumber]
+                })
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('❌ [WhatsappService] Erro ao verificar número:', response.status, errorText);
+                throw new AppError(`Erro na Evolution API: ${response.statusText}`, response.status);
+            }
+
+            const data = await response.json() as any[];
+
+            // A API retorna array com objetos contendo: exists, jid, number
+            if (data && data.length > 0) {
+                const result = data[0];
+                console.log(`✅ [WhatsappService] Verificação: ${formattedNumber} ${result.exists ? 'TEM' : 'NÃO TEM'} WhatsApp`);
+                return {
+                    exists: result.exists === true,
+                    jid: result.jid,
+                    number: formattedNumber
+                };
+            }
+
+            return { exists: false, number: formattedNumber };
+
+        } catch (error) {
+            console.error('❌ [WhatsappService] Erro ao verificar número:', error);
+            if (error instanceof AppError) {
+                throw error;
+            }
+            throw new AppError('Falha ao verificar número no WhatsApp', 502);
+        }
+    }
+
+    /**
      * Formata o número para o padrão 55dddnumero
      * Remove caracteres não numéricos
      * Garante que tenha o código do país (55 para Brasil se não tiver)

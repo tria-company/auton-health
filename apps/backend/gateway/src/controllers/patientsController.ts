@@ -88,7 +88,7 @@ export async function getPatients(req: AuthenticatedRequest, res: Response) {
       }
     }
 
-    const patientsWithAnamnese = (patients || []).map((p: { id: string; [key: string]: unknown }) => ({
+    const patientsWithAnamnese = (patients || []).map((p: { id: string;[key: string]: unknown }) => ({
       ...p,
       anamnese: anamneseByPaciente[p.id] || undefined
     }));
@@ -624,7 +624,7 @@ export async function getCadastroAnamnese(req: AuthenticatedRequest, res: Respon
     console.log('[getCadastroAnamnese] ========== INICIANDO ==========');
     console.log('[getCadastroAnamnese] patientId:', req.params.patientId);
     console.log('[getCadastroAnamnese] user:', req.user ? 'autenticado' : 'NÃO AUTENTICADO');
-    
+
     const { patientId } = req.params;
 
     // Buscar cadastro de anamnese
@@ -645,7 +645,7 @@ export async function getCadastroAnamnese(req: AuthenticatedRequest, res: Respon
     }
 
     console.log('[getCadastroAnamnese] ✅ Query OK - cadastro:', cadastro ? 'encontrado' : 'não encontrado (null)');
-    
+
     // Se não encontrou, retorna dados vazios (não é erro)
     return res.json({
       success: true,
@@ -669,6 +669,11 @@ export async function getCadastroAnamnese(req: AuthenticatedRequest, res: Respon
  */
 export async function updateCadastroAnamnese(req: AuthenticatedRequest, res: Response) {
   try {
+    console.log('[updateCadastroAnamnese] ========== INICIANDO ==========');
+    console.log('[updateCadastroAnamnese] patientId:', req.params.patientId);
+    console.log('[updateCadastroAnamnese] body:', JSON.stringify(req.body, null, 2));
+    console.log('[updateCadastroAnamnese] user:', req.user ? req.user.id : 'NÃO AUTENTICADO');
+
     if (!req.user) {
       return res.status(401).json({
         success: false,
@@ -680,39 +685,55 @@ export async function updateCadastroAnamnese(req: AuthenticatedRequest, res: Res
     const cadastroData = req.body;
 
     // Verificar se já existe
-    const { data: existing } = await supabase
+    console.log('[updateCadastroAnamnese] Buscando cadastro existente...');
+    const { data: existing, error: existingError } = await supabase
       .from('a_cadastro_anamnese')
-      .select('id')
-      .eq('paciente_id', patientId)  // ← CORRIGIDO
+      .select('paciente_id')
+      .eq('paciente_id', patientId)
       .maybeSingle();
+
+    if (existingError) {
+      console.error('[updateCadastroAnamnese] ❌ Erro ao buscar existente:', existingError);
+    }
+    console.log('[updateCadastroAnamnese] Cadastro existente:', existing ? 'SIM' : 'NÃO');
 
     let result;
     if (existing) {
       // Atualizar
+      console.log('[updateCadastroAnamnese] Atualizando cadastro...');
       const { data, error } = await supabase
         .from('a_cadastro_anamnese')
         .update({
           ...cadastroData,
           updated_at: new Date().toISOString()
         })
-        .eq('paciente_id', patientId)  // ← CORRIGIDO
+        .eq('paciente_id', patientId)
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('[updateCadastroAnamnese] ❌ Erro Supabase UPDATE:', JSON.stringify(error, null, 2));
+        throw error;
+      }
+      console.log('[updateCadastroAnamnese] ✅ Atualizado com sucesso');
       result = data;
     } else {
       // Criar
+      console.log('[updateCadastroAnamnese] Criando novo cadastro...');
       const { data, error } = await supabase
         .from('a_cadastro_anamnese')
         .insert({
-          paciente_id: patientId,  // ← CORRIGIDO
+          paciente_id: patientId,
           ...cadastroData
         })
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('[updateCadastroAnamnese] ❌ Erro Supabase INSERT:', JSON.stringify(error, null, 2));
+        throw error;
+      }
+      console.log('[updateCadastroAnamnese] ✅ Criado com sucesso');
       result = data;
     }
 
@@ -721,11 +742,16 @@ export async function updateCadastroAnamnese(req: AuthenticatedRequest, res: Res
       cadastro: result
     });
 
-  } catch (error) {
-    console.error('Erro ao atualizar cadastro de anamnese:', error);
+  } catch (error: any) {
+    console.error('[updateCadastroAnamnese] ❌❌ ERRO CATCH:', error);
+    console.error('[updateCadastroAnamnese] Stack:', error?.stack);
+    console.error('[updateCadastroAnamnese] Message:', error?.message);
+    console.error('[updateCadastroAnamnese] Code:', error?.code);
+    console.error('[updateCadastroAnamnese] Details:', error?.details);
     return res.status(500).json({
       success: false,
-      error: 'Erro ao atualizar cadastro'
+      error: 'Erro ao atualizar cadastro',
+      details: error?.message || 'Erro desconhecido'
     });
   }
 }
@@ -784,29 +810,29 @@ export async function syncPatientUser(req: AuthenticatedRequest, res: Response) 
       const numbers = '0123456789';
       const special = '!@#$%&*';
       const allChars = uppercase + lowercase + numbers + special;
-      
+
       let password = '';
       // Garantir pelo menos um de cada tipo
       password += uppercase[Math.floor(Math.random() * uppercase.length)];
       password += lowercase[Math.floor(Math.random() * lowercase.length)];
       password += numbers[Math.floor(Math.random() * numbers.length)];
       password += special[Math.floor(Math.random() * special.length)];
-      
+
       // Preencher o resto
       for (let i = password.length; i < length; i++) {
         password += allChars[Math.floor(Math.random() * allChars.length)];
       }
-      
+
       // Embaralhar
       return password.split('').sort(() => Math.random() - 0.5).join('');
     };
 
     // Criar ou atualizar usuário no banco de dados (Supabase Auth)
-    
+
     if (!userAuthId || action === 'create') {
       // Gerar senha temporária segura
       generatedPassword = generateTemporaryPassword();
-      
+
       // Criar novo usuário no Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.admin.createUser({
         email: patient.email!,
@@ -900,11 +926,11 @@ export async function syncPatientUser(req: AuthenticatedRequest, res: Response) 
     return res.json({
       success: true,
       patient: updatedPatient,
-      message: action === 'deactivate' 
-        ? 'Usuário desativado com sucesso' 
+      message: action === 'deactivate'
+        ? 'Usuário desativado com sucesso'
         : action === 'activate'
-        ? 'Usuário ativado com sucesso'
-        : 'Usuário criado com sucesso',
+          ? 'Usuário ativado com sucesso'
+          : 'Usuário criado com sucesso',
       emailSent: emailSent || false,
       emailError: emailError ? emailError.message : null,
       password: generatedPassword || undefined // Retornar senha para debug (remover em produção se necessário)
@@ -1074,17 +1100,17 @@ export async function resendPatientCredentials(req: AuthenticatedRequest, res: R
       const numbers = '0123456789';
       const special = '!@#$%&*';
       const allChars = uppercase + lowercase + numbers + special;
-      
+
       let password = '';
       password += uppercase[Math.floor(Math.random() * uppercase.length)];
       password += lowercase[Math.floor(Math.random() * lowercase.length)];
       password += numbers[Math.floor(Math.random() * numbers.length)];
       password += special[Math.floor(Math.random() * special.length)];
-      
+
       for (let i = password.length; i < length; i++) {
         password += allChars[Math.floor(Math.random() * allChars.length)];
       }
-      
+
       return password.split('').sort(() => Math.random() - 0.5).join('');
     };
 
@@ -1152,7 +1178,7 @@ async function sendCredentialsEmail(
   console.log('  - Para:', to);
   console.log('  - Nome:', patientName);
   console.log('  - RESEND_API_KEY configurado:', !!process.env.RESEND_API_KEY);
-  
+
   if (!process.env.RESEND_API_KEY) {
     const error = 'RESEND_API_KEY não configurado no servidor';
     console.error('❌ [EMAIL]', error);
@@ -1172,7 +1198,7 @@ async function sendCredentialsEmail(
   // Verificar se está em modo de teste
   const isTestMode = fromEmail.includes('@resend.dev');
   console.log('📧 [EMAIL] Modo de teste:', isTestMode);
-  
+
   if (isTestMode) {
     const verifiedEmail = process.env.RESEND_VERIFIED_EMAIL || 'ferramentas@triacompany.com.br';
     console.log('📧 [EMAIL] Email verificado para modo de teste:', verifiedEmail);
@@ -1184,11 +1210,11 @@ async function sendCredentialsEmail(
   }
 
   console.log('📧 [EMAIL] Enviando email via Resend...');
-  
+
   const { data, error } = await resend.emails.send({
     from: `${appName} <${fromEmail}>`,
     to: [to],
-    subject: temporaryPassword 
+    subject: temporaryPassword
       ? `Suas Credenciais de Acesso - ${appName} (Senha Temporária)`
       : `Suas Credenciais de Acesso - ${appName}`,
     html: `

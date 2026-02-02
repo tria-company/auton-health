@@ -827,8 +827,8 @@ function AnamneseSection({
       console.log('✅ Campo do cadastro atualizado:', result);
 
       // Atualizar estado local
-      if (result.success && result.data) {
-        setCadastroAnamnese(result.data);
+      if (result.success && result.cadastro) {
+        setCadastroAnamnese(result.cadastro);
       }
     } catch (error) {
       console.error('Erro ao salvar campo do cadastro:', error);

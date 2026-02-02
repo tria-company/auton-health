@@ -86,6 +86,10 @@ export async function getAnamnese(req: AuthenticatedRequest, res: Response) {
  */
 export async function updateAnamneseField(req: AuthenticatedRequest, res: Response) {
   try {
+    console.log('[updateAnamneseField] ========== INICIANDO ==========');
+    console.log('[updateAnamneseField] consultaId:', req.params.consultaId);
+    console.log('[updateAnamneseField] body:', JSON.stringify(req.body, null, 2));
+
     if (!req.user) {
       return res.status(401).json({
         success: false,
@@ -96,40 +100,97 @@ export async function updateAnamneseField(req: AuthenticatedRequest, res: Respon
     const { consultaId } = req.params;
     const updateData = req.body;
 
-    // Verificar se já existe registro
-    const { data: existing } = await supabase
-      .from('a_anamnese')
-      .select('id')
-      .eq('consultation_id', consultaId)
+    // Lista de tabelas válidas de anamnese
+    const validTables = [
+      'a_cadastro_prontuario',
+      'a_objetivos_queixas',
+      'a_historico_risco',
+      'a_observacao_clinica_lab_2',
+      'a_historia_vida',
+      'a_setenios_eventos',
+      'a_ambiente_contexto',
+      'a_sensacao_emocoes',
+      'a_preocupacoes_crencas',
+      'a_reino_miasma'
+    ];
+
+    // Parsear o body para extrair tabela e campo
+    // Formato esperado: { "tabela.campo": "valor" }
+    const keys = Object.keys(updateData);
+    if (keys.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Nenhum campo para atualizar'
+      });
+    }
+
+    const firstKey = keys[0];
+    const [tableName, ...fieldParts] = firstKey.split('.');
+    const fieldName = fieldParts.join('.');
+    const fieldValue = updateData[firstKey];
+
+    console.log('[updateAnamneseField] Tabela:', tableName);
+    console.log('[updateAnamneseField] Campo:', fieldName);
+    console.log('[updateAnamneseField] Valor:', typeof fieldValue === 'string' ? fieldValue.substring(0, 50) + '...' : fieldValue);
+
+    // Validar tabela
+    if (!validTables.includes(tableName)) {
+      console.error('[updateAnamneseField] ❌ Tabela inválida:', tableName);
+      return res.status(400).json({
+        success: false,
+        error: `Tabela inválida: ${tableName}`
+      });
+    }
+
+    // Verificar se já existe registro para essa consulta
+    console.log('[updateAnamneseField] Buscando registro existente...');
+    const { data: existing, error: existingError } = await supabase
+      .from(tableName)
+      .select('consulta_id')
+      .eq('consulta_id', consultaId)
       .maybeSingle();
+
+    if (existingError) {
+      console.error('[updateAnamneseField] ❌ Erro ao buscar:', JSON.stringify(existingError, null, 2));
+    }
+    console.log('[updateAnamneseField] Registro existente:', existing ? 'SIM' : 'NÃO');
 
     let result;
     if (existing) {
       // Atualizar
+      console.log('[updateAnamneseField] Atualizando...');
       const { data, error } = await supabase
-        .from('a_anamnese')
+        .from(tableName)
         .update({
-          ...updateData,
-          updated_at: new Date().toISOString()
+          [fieldName]: fieldValue
         })
-        .eq('consultation_id', consultaId)
+        .eq('consulta_id', consultaId)
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('[updateAnamneseField] ❌ Erro UPDATE:', JSON.stringify(error, null, 2));
+        throw error;
+      }
+      console.log('[updateAnamneseField] ✅ Atualizado com sucesso');
       result = data;
     } else {
-      // Criar
+      // Criar novo registro
+      console.log('[updateAnamneseField] Criando novo...');
       const { data, error } = await supabase
-        .from('a_anamnese')
+        .from(tableName)
         .insert({
-          consultation_id: consultaId,
-          ...updateData
+          consulta_id: consultaId,
+          [fieldName]: fieldValue
         })
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('[updateAnamneseField] ❌ Erro INSERT:', JSON.stringify(error, null, 2));
+        throw error;
+      }
+      console.log('[updateAnamneseField] ✅ Criado com sucesso');
       result = data;
     }
 
@@ -138,11 +199,12 @@ export async function updateAnamneseField(req: AuthenticatedRequest, res: Respon
       anamnese: result
     });
 
-  } catch (error) {
-    console.error('Erro ao atualizar anamnese:', error);
+  } catch (error: any) {
+    console.error('[updateAnamneseField] ❌❌ ERRO:', error?.message);
     return res.status(500).json({
       success: false,
-      error: 'Erro ao atualizar anamnese'
+      error: 'Erro ao atualizar anamnese',
+      details: error?.message || 'Erro desconhecido'
     });
   }
 }

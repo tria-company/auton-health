@@ -27,6 +27,7 @@ interface Patient {
   allergies?: string;
   current_medications?: string;
   profile_pic?: string | null;
+  documents?: string[] | null;
   status: 'active' | 'inactive' | 'archived';
   created_at: string;
   updated_at: string;
@@ -83,7 +84,7 @@ export function PatientForm({ patient, onSubmit, onCancel, title }: PatientFormP
   const [medicalFiles, setMedicalFiles] = useState<Array<{ id: string; name: string; url: string; file?: File }>>([]);
   const [uploadingFiles, setUploadingFiles] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   // Estado para URL da foto do perfil
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(patient?.profile_pic || null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -113,6 +114,16 @@ export function PatientForm({ patient, onSubmit, onCancel, title }: PatientFormP
       });
       setProfilePicUrl(patient.profile_pic || null);
       setImagePreview(patient.profile_pic || null);
+      // Carregar documentos existentes
+      if (patient.documents && patient.documents.length > 0) {
+        const existingDocs = patient.documents.map((url, index) => {
+          const fileName = url.split('/').pop() || `documento_${index + 1}`;
+          return { id: `existing_${index}`, name: fileName, url };
+        });
+        setMedicalFiles(existingDocs);
+      } else {
+        setMedicalFiles([]);
+      }
     } else {
       // Resetar formulário e estado quando for novo paciente
       setFormData({
@@ -134,6 +145,7 @@ export function PatientForm({ patient, onSubmit, onCancel, title }: PatientFormP
       });
       setProfilePicUrl(null);
       setImagePreview(null);
+      setMedicalFiles([]);
     }
     // Resetar estado de submissão quando o formulário é aberto
     setIsSubmitting(false);
@@ -176,7 +188,7 @@ export function PatientForm({ patient, onSubmit, onCancel, title }: PatientFormP
   // Manipular mudanças nos campos
   const handleChange = (field: keyof CreatePatientData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    
+
     // Limpar erro do campo quando usuário começar a digitar
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: undefined }));
@@ -186,18 +198,18 @@ export function PatientForm({ patient, onSubmit, onCancel, title }: PatientFormP
   // Manipular envio do formulário
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Prevenir múltiplos envios
     if (isSubmitting) {
       return;
     }
-    
+
     if (!validateForm()) {
       return;
     }
 
     setIsSubmitting(true);
-    
+
     try {
       // Limpar campos vazios antes de enviar (mas manter email e phone que são obrigatórios)
       const cleanedData: CreatePatientData = {
@@ -205,23 +217,30 @@ export function PatientForm({ patient, onSubmit, onCancel, title }: PatientFormP
         email: formData.email.trim(),
         phone: formData.phone.trim(),
         ...Object.fromEntries(
-          Object.entries(formData).filter(([key, value]) => 
+          Object.entries(formData).filter(([key, value]) =>
             !['name', 'email', 'phone'].includes(key) && value !== '' && value !== undefined && value !== null
           )
         ),
         profile_pic: profilePicUrl || undefined
       } as CreatePatientData;
-      
+
       console.log('📋 Dados do formulário antes do envio:', formData);
       console.log('🧹 Dados limpos para envio:', cleanedData);
-      
+
       // Aguardar a Promise retornada por onSubmit antes de reabilitar o botão
       const result = onSubmit(cleanedData);
       if (result instanceof Promise) {
         await result;
       }
+      // Notificação de sucesso
+      const isEditing = !!patient?.id;
+      showSuccess(
+        isEditing ? 'Paciente atualizado com sucesso!' : 'Paciente cadastrado com sucesso!',
+        isEditing ? 'Atualização Concluída' : 'Cadastro Concluído'
+      );
     } catch (error) {
       console.error('Erro ao submeter formulário:', error);
+      showError('Erro ao salvar paciente. Tente novamente.', 'Erro');
       // Reabilitar o botão em caso de erro
       setIsSubmitting(false);
     }
@@ -272,11 +291,13 @@ export function PatientForm({ patient, onSubmit, onCancel, title }: PatientFormP
         // Se estiver editando um paciente, fazer upload para o Supabase
         if (patient?.id) {
           const fileExt = file.name.split('.').pop();
-          const fileName = `paciente_${patient.id}_historico_${Date.now()}.${fileExt}`;
-          const filePath = `pacientes/historicos/${fileName}`;
+          const timestamp = Date.now();
+          const safeFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+          const fileName = `${timestamp}_${safeFileName}`;
+          const filePath = `${patient.id}/${fileName}`;
 
           const { error: uploadError } = await supabase.storage
-            .from('medical_files')
+            .from('documents')
             .upload(filePath, file, {
               cacheControl: '3600',
               upsert: false
@@ -287,10 +308,28 @@ export function PatientForm({ patient, onSubmit, onCancel, title }: PatientFormP
           }
 
           const { data: { publicUrl } } = supabase.storage
-            .from('medical_files')
+            .from('documents')
             .getPublicUrl(filePath);
 
-          setMedicalFiles(prev => [...prev, { id: fileId, name: file.name, url: publicUrl }]);
+          // Atualizar estado local
+          setMedicalFiles(prev => {
+            const newFiles = [...prev, { id: fileId, name: file.name, url: publicUrl }];
+            // Persistir no banco de dados
+            const allUrls = newFiles.filter(f => f.url).map(f => f.url);
+            supabase
+              .from('patients')
+              .update({ documents: allUrls, updated_at: new Date().toISOString() })
+              .eq('id', patient.id)
+              .then(({ error }) => {
+                if (error) {
+                  console.error('Erro ao salvar documentos no banco:', error);
+                } else {
+                  console.log('✅ Documentos salvos no banco:', allUrls);
+                }
+              });
+            return newFiles;
+          });
+          showSuccess(`Arquivo ${file.name} enviado com sucesso!`, 'Upload Concluído');
         } else {
           // Se estiver criando, apenas adicionar à lista (será enviado depois)
           setMedicalFiles(prev => [...prev, { id: fileId, name: file.name, url: '', file }]);
@@ -386,18 +425,42 @@ export function PatientForm({ patient, onSubmit, onCancel, title }: PatientFormP
   // Remover arquivo
   const handleRemoveFile = async (fileId: string, fileUrl: string) => {
     try {
-      // Se tiver URL, tentar deletar do Supabase
+      // Se tiver URL, tentar deletar do Supabase Storage
       if (fileUrl && patient?.id) {
-        const filePath = fileUrl.split('/').slice(-2).join('/');
+        // Extrair path do arquivo a partir da URL
+        // URL formato: https://xxx.supabase.co/storage/v1/object/public/documents/{patient_id}/{filename}
+        const urlParts = fileUrl.split('/documents/');
+        const filePath = urlParts.length > 1 ? urlParts[1] : fileUrl.split('/').slice(-2).join('/');
         await supabase.storage
-          .from('medical_files')
+          .from('documents')
           .remove([filePath]);
       }
 
-      setMedicalFiles(prev => prev.filter(f => f.id !== fileId));
+      // Atualizar estado local e persistir no banco
+      setMedicalFiles(prev => {
+        const newFiles = prev.filter(f => f.id !== fileId);
+        // Persistir no banco de dados se estiver editando paciente
+        if (patient?.id) {
+          const allUrls = newFiles.filter(f => f.url).map(f => f.url);
+          supabase
+            .from('patients')
+            .update({ documents: allUrls, updated_at: new Date().toISOString() })
+            .eq('id', patient.id)
+            .then(({ error }) => {
+              if (error) {
+                console.error('Erro ao atualizar documentos no banco:', error);
+              } else {
+                console.log('✅ Documentos atualizados no banco:', allUrls);
+                showSuccess('Arquivo removido com sucesso!', 'Remoção Concluída');
+              }
+            });
+        }
+        return newFiles;
+      });
     } catch (error) {
       console.error('Erro ao remover arquivo:', error);
-      // Remover da lista mesmo se der erro no Supabase
+      showError('Erro ao remover arquivo. Tente novamente.', 'Erro');
+      // Remover da lista mesmo se der erro no Supabase Storage
       setMedicalFiles(prev => prev.filter(f => f.id !== fileId));
     }
   };
@@ -440,7 +503,7 @@ export function PatientForm({ patient, onSubmit, onCancel, title }: PatientFormP
             <User className="section-icon" />
             <h3 className="section-title">Informações Básicas</h3>
           </div>
-          
+
           <div className="form-grid">
             <div className="form-field">
               <label htmlFor="name" className="field-label">
@@ -560,7 +623,7 @@ export function PatientForm({ patient, onSubmit, onCancel, title }: PatientFormP
             <MapPin className="section-icon" />
             <h3 className="section-title">Endereço</h3>
           </div>
-          
+
           <div className="form-grid">
             <div className="form-field" style={{ gridColumn: 'span 2' }}>
               <label htmlFor="address" className="field-label">
@@ -613,7 +676,7 @@ export function PatientForm({ patient, onSubmit, onCancel, title }: PatientFormP
             <AlertTriangle className="section-icon" />
             <h3 className="section-title">Contato de Emergência</h3>
           </div>
-          
+
           <div className="form-grid">
             <div className="form-field">
               <label htmlFor="emergency_contact" className="field-label">
@@ -651,7 +714,7 @@ export function PatientForm({ patient, onSubmit, onCancel, title }: PatientFormP
             <FileText className="section-icon" />
             <h3 className="section-title">Informações Médicas</h3>
           </div>
-          
+
           <div className="medical-info-grid">
             <div className="medical-info-card">
               <div className="medical-info-header">
@@ -680,7 +743,7 @@ export function PatientForm({ patient, onSubmit, onCancel, title }: PatientFormP
               <div className="field-hint">
                 <span className="hint-text">Dica: Liste doenças, cirurgias, condições crônicas e histórico familiar</span>
               </div>
-              
+
               {/* Upload de Arquivos de Histórico */}
               <div className="medical-files-upload">
                 <div className="medical-files-header">
@@ -710,7 +773,7 @@ export function PatientForm({ patient, onSubmit, onCancel, title }: PatientFormP
                 <p className="medical-files-hint">
                   Formatos aceitos: PDF, DOC, DOCX, JPG, PNG (máximo 10MB por arquivo)
                 </p>
-                
+
                 {medicalFiles.length > 0 && (
                   <div className="medical-files-list">
                     {medicalFiles.map((file) => (
@@ -808,7 +871,7 @@ export function PatientForm({ patient, onSubmit, onCancel, title }: PatientFormP
           >
             Cancelar
           </button>
-          
+
           <button
             type="submit"
             disabled={isSubmitting}

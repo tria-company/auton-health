@@ -20,7 +20,19 @@ export class WhatsappController {
             // Validar input
             const { number, text } = sendTextSchema.parse(req.body);
 
-            // Chamar serviço
+            // Verificar se o número possui WhatsApp
+            const whatsappCheck = await whatsappService.checkWhatsappNumber(number);
+
+            if (!whatsappCheck.exists) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'O número informado não possui WhatsApp',
+                    code: 'WHATSAPP_NOT_FOUND',
+                    number: whatsappCheck.number
+                });
+            }
+
+            // Chamar serviço de envio
             const result = await whatsappService.sendText({ number, text });
 
             // Retornar resposta

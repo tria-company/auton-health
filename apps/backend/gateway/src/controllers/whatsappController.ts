@@ -49,6 +49,36 @@ export async function sendAnamneseWhatsApp(req: AuthenticatedRequest, res: Respo
       return;
     }
 
+    // Verificar se o número possui WhatsApp
+    const checkUrl = `${EVOLUTION_API_URL}/chat/whatsappNumbers/${EVOLUTION_INSTANCE}`;
+    try {
+      const checkResponse = await fetch(checkUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': EVOLUTION_API_KEY
+        },
+        body: JSON.stringify({ numbers: [number] })
+      });
+
+      if (checkResponse.ok) {
+        const checkData = await checkResponse.json() as any[];
+        if (checkData && checkData.length > 0 && !checkData[0].exists) {
+          console.log('❌ [WHATSAPP] Número não possui WhatsApp:', number.slice(-4) + '****');
+          res.status(400).json({
+            success: false,
+            error: 'O número informado não possui WhatsApp',
+            code: 'WHATSAPP_NOT_FOUND'
+          });
+          return;
+        }
+        console.log('✅ [WHATSAPP] Número verificado - possui WhatsApp');
+      }
+    } catch (checkError) {
+      console.warn('⚠️ [WHATSAPP] Erro ao verificar número, continuando envio:', checkError);
+      // Se falhar a verificação, continua com o envio (melhor tentar enviar do que bloquear)
+    }
+
     const appName = process.env.APP_NAME || 'Auton Health';
     const text = `Olá *${patientName}*! 👋
 

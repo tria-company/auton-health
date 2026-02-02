@@ -110,8 +110,14 @@ export default function PatientsPage() {
       console.log('🔍 Buscando pacientes...', `/patients?${params}`);
 
       const data = await gatewayClient.get<PatientsResponse>(`/patients?${params}`);
-      
+
       console.log('📋 Dados recebidos:', data);
+
+      // Verifica se a resposta foi bem-sucedida antes de acessar os dados
+      if (!data.success) {
+        throw new Error(data.error || 'Erro ao buscar pacientes');
+      }
+
       console.log('👤 Primeiro paciente (exemplo):', data.patients[0]);
       setPatients(data.patients);
       setPagination(data.pagination);
@@ -208,12 +214,12 @@ export default function PatientsPage() {
       } else {
         showSuccess(response.message || 'Usuário sincronizado com sucesso!', 'Sucesso');
       }
-      
+
       // Atualizar paciente no modal se estiver aberto
       if (showUserManagementModal && showUserManagementModal.id === patientId && response.patient) {
         setShowUserManagementModal(response.patient);
       }
-      
+
       fetchPatients(pagination.page, searchTerm, statusFilter, false);
     } catch (error) {
       console.error('Erro ao sincronizar usuário:', error);
@@ -236,12 +242,12 @@ export default function PatientsPage() {
       }
 
       showSuccess(response.message || `Usuário ${newStatus === 'active' ? 'ativado' : 'desativado'} com sucesso!`, 'Sucesso');
-      
+
       // Atualizar paciente no modal se estiver aberto
       if (showUserManagementModal && showUserManagementModal.id === patientId && response.patient) {
         setShowUserManagementModal(response.patient);
       }
-      
+
       fetchPatients(pagination.page, searchTerm, statusFilter, false);
     } catch (error) {
       console.error('Erro ao alterar status do usuário:', error);
@@ -446,13 +452,22 @@ export default function PatientsPage() {
           patientName: patient.name,
           anamneseLink
         });
-        whatsappOk = !!whatsappResponse.success;
+
+        // Verificar se houve erro de número sem WhatsApp
+        if (!whatsappResponse.success && (whatsappResponse as any).code === 'WHATSAPP_NOT_FOUND') {
+          showWarning('O número informado não possui WhatsApp.', 'WhatsApp não encontrado');
+          whatsappOk = false;
+        } else {
+          whatsappOk = !!whatsappResponse.success;
+        }
       }
 
       if (emailOk && whatsappOk) {
         showSuccess('Anamnese enviada por email e WhatsApp com sucesso!', 'Enviado');
-      } else if (emailOk) {
-        showSuccess('Anamnese enviada por email. WhatsApp não enviado (verifique o telefone).', 'Enviado');
+      } else if (emailOk && !patient.phone) {
+        showSuccess('Anamnese enviada por email com sucesso!', 'Enviado');
+      } else if (emailOk && !whatsappOk) {
+        showSuccess('Anamnese enviada por email. WhatsApp não enviado.', 'Enviado Parcialmente');
       } else if (whatsappOk) {
         showSuccess('Anamnese enviada por WhatsApp. Email não enviado (verifique o email).', 'Enviado');
       } else {
@@ -463,9 +478,15 @@ export default function PatientsPage() {
       }
 
       fetchPatients(pagination.page, searchTerm, statusFilter, false);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao enviar anamnese:', error);
-      showError(`Erro ao enviar anamnese: ${error instanceof Error ? error.message : 'Erro desconhecido'}`, 'Erro');
+
+      // Verificar se o erro é específico de WhatsApp não encontrado
+      if (error?.code === 'WHATSAPP_NOT_FOUND' || error?.message?.includes('não possui WhatsApp')) {
+        showWarning('O número informado não possui WhatsApp.', 'WhatsApp não encontrado');
+      } else {
+        showError(`Erro ao enviar anamnese: ${error instanceof Error ? error.message : 'Erro desconhecido'}`, 'Erro');
+      }
     } finally {
       setSendingAnamnese(null);
     }
@@ -494,7 +515,7 @@ export default function PatientsPage() {
         <div className="patients-header">
           <div className="patients-header-content">
             <h1 className="patients-title">Lista de Pacientes</h1>
-            <button 
+            <button
               onClick={() => setShowForm(true)}
               className="btn btn-primary btn-novo-paciente"
             >
@@ -506,7 +527,7 @@ export default function PatientsPage() {
             {pagination.total} {pagination.total === 1 ? 'paciente cadastrado' : 'pacientes cadastrados'}
           </div>
         </div>
-        
+
         {loading ? (
           <div className="loading-state">
             <div className="loading-spinner"></div>
@@ -518,7 +539,7 @@ export default function PatientsPage() {
               <p className="error-title">Erro ao buscar pacientes</p>
               <p className="error-message">{error}</p>
             </div>
-            <button 
+            <button
               onClick={() => fetchPatients(pagination.page, searchTerm, statusFilter, true)}
               className="btn btn-secondary"
             >
@@ -529,7 +550,7 @@ export default function PatientsPage() {
           <div className="empty-state">
             <h3>Nenhum paciente encontrado</h3>
             <p>Comece cadastrando seu primeiro paciente para gerenciar suas consultas.</p>
-            <button 
+            <button
               onClick={() => setShowForm(true)}
               className="btn btn-primary"
             >
@@ -579,15 +600,15 @@ export default function PatientsPage() {
                   .join('')
                   .toUpperCase()
                   .slice(0, 2);
-                
+
                 return (
                   <div key={patient.id} className="patients-table-row">
                     <div className="table-cell table-cell-paciente">
                       <div className="patient-info-cell">
                         <div className="patient-avatar-table">
                           {patient.profile_pic ? (
-                            <img 
-                              src={patient.profile_pic} 
+                            <img
+                              src={patient.profile_pic}
                               alt={patient.name}
                               className="avatar-image-table"
                               onError={(e) => {
@@ -609,8 +630,8 @@ export default function PatientsPage() {
                               <span className="patient-status-badge active">ATIVO</span>
                             )}
                             {patient.anamnese?.status ? (
-                              <span 
-                                className="patient-status-badge" 
+                              <span
+                                className="patient-status-badge"
                                 style={{
                                   backgroundColor: patient.anamnese.status === 'preenchida' ? '#d1fae5' : '#fef3c7',
                                   color: patient.anamnese.status === 'preenchida' ? '#065f46' : '#92400e',
@@ -632,8 +653,8 @@ export default function PatientsPage() {
                                 )}
                               </span>
                             ) : (
-                              <span 
-                                className="patient-status-badge" 
+                              <span
+                                className="patient-status-badge"
                                 style={{
                                   backgroundColor: '#f3f4f6',
                                   color: '#6b7280',
@@ -647,8 +668,8 @@ export default function PatientsPage() {
                               </span>
                             )}
                             {patient.user_auth && (
-                              <span 
-                                className="patient-status-badge" 
+                              <span
+                                className="patient-status-badge"
                                 style={{
                                   backgroundColor: patient.user_status === 'active' ? '#dbeafe' : '#fee2e2',
                                   color: patient.user_status === 'active' ? '#1e40af' : '#991b1b',
@@ -694,7 +715,7 @@ export default function PatientsPage() {
                     <div className="table-cell-divider"></div>
                     <div className="table-cell table-cell-acoes">
                       <div className="patient-actions-table">
-                        <button 
+                        <button
                           className="action-btn-table email"
                           onClick={(e) => {
                             e.stopPropagation();
@@ -715,7 +736,7 @@ export default function PatientsPage() {
                             </>
                           )}
                         </button>
-                        <button 
+                        <button
                           className={`action-btn-table copy ${copySuccess === patient.id ? 'success' : ''}`}
                           onClick={(e) => {
                             e.stopPropagation();
@@ -735,7 +756,7 @@ export default function PatientsPage() {
                           <span>Ver detalhes</span>
                         </Link>
                         {/* Botão para gerenciar acesso do paciente */}
-                        <button 
+                        <button
                           className="action-btn-table user-manage"
                           onClick={(e) => {
                             e.stopPropagation();
@@ -746,7 +767,7 @@ export default function PatientsPage() {
                           <User size={16} />
                           <span>Gerenciar Acesso</span>
                         </button>
-                        <button 
+                        <button
                           className="action-btn-table edit"
                           onClick={() => setEditingPatient(patient)}
                           title="Editar informações do paciente"
@@ -754,7 +775,7 @@ export default function PatientsPage() {
                           <Edit size={16} />
                           <span>Editar</span>
                         </button>
-                        <button 
+                        <button
                           className="action-btn-table delete"
                           onClick={(e) => {
                             e.stopPropagation();
@@ -771,22 +792,22 @@ export default function PatientsPage() {
                 );
               })}
             </div>
-            
+
             {/* Paginação */}
             {pagination.totalPages > 1 && (
               <div className="pagination-design">
-                <button 
-                  className="pagination-btn" 
+                <button
+                  className="pagination-btn"
                   disabled={pagination.page === 1}
                   onClick={() => fetchPatients(pagination.page - 1, searchTerm, statusFilter, false)}
                 >
                   <span>‹</span>
                 </button>
-                
+
                 {/* Primeira página */}
                 {pagination.page > 3 && (
                   <>
-                    <button 
+                    <button
                       className="pagination-number"
                       onClick={() => fetchPatients(1, searchTerm, statusFilter, false)}
                     >
@@ -795,14 +816,14 @@ export default function PatientsPage() {
                     {pagination.page > 4 && <span className="pagination-dots">...</span>}
                   </>
                 )}
-                
+
                 {/* Páginas ao redor da atual */}
                 {Array.from({ length: Math.min(3, pagination.totalPages) }, (_, i) => {
                   const pageNum = Math.max(1, Math.min(pagination.totalPages - 2, pagination.page - 1)) + i;
                   if (pageNum > pagination.totalPages) return null;
-                  
+
                   return (
-                    <button 
+                    <button
                       key={pageNum}
                       className={`pagination-number ${pageNum === pagination.page ? 'active' : ''}`}
                       onClick={() => fetchPatients(pageNum, searchTerm, statusFilter, false)}
@@ -811,12 +832,12 @@ export default function PatientsPage() {
                     </button>
                   );
                 })}
-                
+
                 {/* Última página */}
                 {pagination.page < pagination.totalPages - 2 && (
                   <>
                     {pagination.page < pagination.totalPages - 3 && <span className="pagination-dots">...</span>}
-                    <button 
+                    <button
                       className="pagination-number"
                       onClick={() => fetchPatients(pagination.totalPages, searchTerm, statusFilter, false)}
                     >
@@ -824,8 +845,8 @@ export default function PatientsPage() {
                     </button>
                   </>
                 )}
-                
-                <button 
+
+                <button
                   className="pagination-btn"
                   disabled={pagination.page === pagination.totalPages}
                   onClick={() => fetchPatients(pagination.page + 1, searchTerm, statusFilter, false)}
@@ -841,7 +862,7 @@ export default function PatientsPage() {
 
       {/* Modal de Formulário */}
       {showForm && (
-        <div 
+        <div
           className="modal-overlay"
           onClick={(e) => {
             if (e.target === e.currentTarget) {
@@ -861,7 +882,7 @@ export default function PatientsPage() {
 
       {/* Modal de Edição */}
       {editingPatient && (
-        <div 
+        <div
           className="modal-overlay"
           onClick={(e) => {
             if (e.target === e.currentTarget) {
@@ -882,7 +903,7 @@ export default function PatientsPage() {
 
       {/* Modal de Confirmação de Exclusão */}
       {showDeleteConfirm && (
-        <div 
+        <div
           className="modal-overlay"
           onClick={(e) => {
             if (e.target === e.currentTarget) {
@@ -894,8 +915,8 @@ export default function PatientsPage() {
             <div className="delete-modal-icon-wrapper">
               <div className="delete-modal-icon">
                 <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="none"/>
-                  <path d="M12 8v4M12 16h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="none" />
+                  <path d="M12 8v4M12 16h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                 </svg>
               </div>
             </div>
@@ -907,18 +928,18 @@ export default function PatientsPage() {
               <p className="warning-text">⚠️ Esta ação não pode ser desfeita.</p>
             </div>
             <div className="modal-actions">
-              <button 
+              <button
                 className="btn btn-secondary delete-modal-cancel"
                 onClick={() => setShowDeleteConfirm(null)}
               >
                 Cancelar
               </button>
-              <button 
+              <button
                 className="btn btn-danger delete-modal-confirm"
                 onClick={() => handleConfirmDelete(showDeleteConfirm)}
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: '6px' }}>
-                  <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
                 Excluir
               </button>
@@ -929,7 +950,7 @@ export default function PatientsPage() {
 
       {/* Modal de Gerenciamento de Acesso */}
       {showUserManagementModal && (
-        <div 
+        <div
           className="modal-overlay"
           onClick={(e) => {
             if (e.target === e.currentTarget) {
@@ -940,17 +961,17 @@ export default function PatientsPage() {
           <div className="modal-content user-management-modal">
             <div className="modal-header">
               <h3 className="modal-title">Gerenciar Acesso do Paciente</h3>
-              <button 
+              <button
                 className="modal-close-btn"
                 onClick={() => setShowUserManagementModal(null)}
                 aria-label="Fechar"
               >
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </button>
             </div>
-            
+
             <div className="modal-body">
               <div className="user-management-info">
                 <div className="user-management-patient-info">
@@ -1051,7 +1072,7 @@ export default function PatientsPage() {
                         )}
                       </button>
                     )}
-                    
+
                     {showUserManagementModal.user_auth && (
                       <button
                         className="btn btn-secondary user-action-btn"
@@ -1085,7 +1106,7 @@ export default function PatientsPage() {
             </div>
 
             <div className="modal-actions">
-              <button 
+              <button
                 className="btn btn-secondary"
                 onClick={() => {
                   setShowUserManagementModal(null);
