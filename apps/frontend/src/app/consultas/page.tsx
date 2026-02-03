@@ -7212,15 +7212,12 @@ function ConsultasPageContent() {
               // Atualizar a consulta em background para garantir que solucao_etapa seja null
               // Mas não esperar por isso para renderizar a tela
               if (consultaId) {
-                fetch(`/api/consultations/${consultaId}`, {
-                  method: 'PATCH',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ solucao_etapa: null })
-                }).then(() => {
-                  fetchConsultaDetails(consultaId, true); // silent = true para não mostrar loading
-                }).catch((error) => {
-                  console.error('Erro ao atualizar solucao_etapa:', error);
-                });
+                gatewayClient.patch(`/consultations/${consultaId}`, { solucao_etapa: null })
+                  .then(() => {
+                    fetchConsultaDetails(consultaId, true); // silent = true para não mostrar loading
+                  }).catch((error) => {
+                    console.error('Erro ao atualizar solucao_etapa:', error);
+                  });
               }
             } else if (section === 'EXAMES') {
               setSelectedSection('EXAMES');

@@ -16,13 +16,20 @@ const TABLE_MAP: Record<string, string> = {
  * Helper genérico para buscar solução
  */
 async function getSolucaoGeneric(tableName: string, consultaId: string) {
+  console.log(`[getSolucaoGeneric] Buscando em ${tableName} para consulta ${consultaId}`);
+
   const { data, error } = await supabase
     .from(tableName)
     .select('*')
-    .eq('consultation_id', consultaId)
+    .eq('consulta_id', consultaId)
     .maybeSingle();
 
-  if (error) throw error;
+  if (error) {
+    console.error(`[getSolucaoGeneric] ❌ Erro em ${tableName}:`, JSON.stringify(error, null, 2));
+    throw error;
+  }
+
+  console.log(`[getSolucaoGeneric] ✅ Resultado:`, data ? 'encontrado' : 'não encontrado');
   return data || null;
 }
 
@@ -30,39 +37,53 @@ async function getSolucaoGeneric(tableName: string, consultaId: string) {
  * Helper genérico para atualizar campo da solução
  */
 async function updateSolucaoFieldGeneric(tableName: string, consultaId: string, updateData: any) {
+  console.log(`[updateSolucaoFieldGeneric] Atualizando ${tableName} para consulta ${consultaId}`);
+  console.log(`[updateSolucaoFieldGeneric] Dados:`, JSON.stringify(updateData, null, 2));
+
   // Verificar se já existe registro
-  const { data: existing } = await supabase
+  const { data: existing, error: existingError } = await supabase
     .from(tableName)
-    .select('id')
-    .eq('consultation_id', consultaId)
+    .select('consulta_id')
+    .eq('consulta_id', consultaId)
     .maybeSingle();
+
+  if (existingError) {
+    console.error(`[updateSolucaoFieldGeneric] ❌ Erro ao buscar existente:`, existingError);
+  }
 
   if (existing) {
     // Atualizar
+    console.log(`[updateSolucaoFieldGeneric] Registro existe, atualizando...`);
     const { data, error } = await supabase
       .from(tableName)
-      .update({
-        ...updateData,
-        updated_at: new Date().toISOString()
-      })
-      .eq('consultation_id', consultaId)
+      .update(updateData)
+      .eq('consulta_id', consultaId)
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error(`[updateSolucaoFieldGeneric] ❌ Erro UPDATE:`, JSON.stringify(error, null, 2));
+      throw error;
+    }
+    console.log(`[updateSolucaoFieldGeneric] ✅ Atualizado com sucesso`);
     return data;
   } else {
     // Criar
+    console.log(`[updateSolucaoFieldGeneric] Registro não existe, criando...`);
     const { data, error } = await supabase
       .from(tableName)
       .insert({
-        consultation_id: consultaId,
+        consulta_id: consultaId,
         ...updateData
       })
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error(`[updateSolucaoFieldGeneric] ❌ Erro INSERT:`, JSON.stringify(error, null, 2));
+      throw error;
+    }
+    console.log(`[updateSolucaoFieldGeneric] ✅ Criado com sucesso`);
     return data;
   }
 }
