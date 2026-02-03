@@ -456,18 +456,12 @@ export default function AgendaPage() {
       const [hours, minutes] = editFormData.time.split(':').map(Number);
       const consultaInicio = new Date(year, month - 1, day, hours, minutes).toISOString();
 
-      const response = await fetch(`/api/consultations/${editingConsultation.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          consulta_inicio: consultaInicio,
-          consultation_type: editFormData.type
-        })
+      const response = await gatewayClient.patch(`/consultations/${editingConsultation.id}`, {
+        consulta_inicio: consultaInicio,
+        consultation_type: editFormData.type
       });
 
-      const data = await response.json();
-
-      if (!data.success) { throw new Error(data.error || "Erro na requisição"); }
+      if (!response.success) { throw new Error(response.error || "Erro na requisição"); }
 
       // Atualizar lista local
       setConsultations(prev => prev.map(c => {

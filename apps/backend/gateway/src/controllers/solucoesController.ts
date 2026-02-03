@@ -4,12 +4,12 @@ import { AuthenticatedRequest } from '../middleware/auth';
 
 // Mapeamento de rotas para tabelas
 const TABLE_MAP: Record<string, string> = {
-  'solucao-mentalidade': 'a_solucao_mentalidade',
-  'solucao-suplementacao': 'a_solucao_suplementacao',
+  'solucao-mentalidade': 's_agente_mentalidade_2',
+  'solucao-suplementacao': 's_suplementacao2',
   'solucao-habitos-vida': 'a_solucao_habitos_vida',
   'solucao-ltb': 'a_solucao_ltb',
-  'alimentacao': 'a_alimentacao',
-  'atividade-fisica': 'a_atividade_fisica'
+  'alimentacao': 's_gramaturas_alimentares',
+  'atividade-fisica': 's_exercicios_fisicos'
 };
 
 /**
@@ -98,12 +98,21 @@ export async function getSolucaoMentalidade(req: AuthenticatedRequest, res: Resp
     }
 
     const { consultaId } = req.params;
-    const data = await getSolucaoGeneric(TABLE_MAP['solucao-mentalidade'], consultaId);
+    console.log('[getSolucaoMentalidade] Buscando para consulta:', consultaId);
 
-    return res.json({ success: true, solucao: data });
-  } catch (error) {
-    console.error('Erro ao buscar solução mentalidade:', error);
-    return res.status(500).json({ success: false, error: 'Erro interno do servidor' });
+    const data = await getSolucaoGeneric(TABLE_MAP['solucao-mentalidade'], consultaId);
+    console.log('[getSolucaoMentalidade] Resultado:', data ? 'encontrado' : 'null');
+
+    // Frontend espera mentalidade_data
+    return res.json({ success: true, mentalidade_data: data });
+  } catch (error: any) {
+    console.error('[getSolucaoMentalidade] ❌ Erro:', error?.message || error);
+    console.error('[getSolucaoMentalidade] ❌ Detalhes:', JSON.stringify(error, null, 2));
+    return res.status(500).json({
+      success: false,
+      error: 'Erro interno do servidor',
+      details: error?.message || 'Erro desconhecido'
+    });
   }
 }
 
@@ -166,6 +175,7 @@ export async function updateSolucaoSuplementacaoField(req: AuthenticatedRequest,
 
 /**
  * GET /alimentacao/:consultaId
+ * Tabela s_gramaturas_alimentares usa paciente_id, não consulta_id
  */
 export async function getAlimentacao(req: AuthenticatedRequest, res: Response) {
   try {
@@ -174,11 +184,43 @@ export async function getAlimentacao(req: AuthenticatedRequest, res: Response) {
     }
 
     const { consultaId } = req.params;
-    const data = await getSolucaoGeneric(TABLE_MAP['alimentacao'], consultaId);
+    console.log('[getAlimentacao] Buscando para consulta:', consultaId);
 
-    return res.json({ success: true, alimentacao: data });
-  } catch (error) {
-    console.error('Erro ao buscar alimentação:', error);
+    // Primeiro, buscar a consulta para obter o paciente_id
+    const { data: consulta, error: consultaError } = await supabase
+      .from('consultations')
+      .select('patient_id')
+      .eq('id', consultaId)
+      .maybeSingle();
+
+    if (consultaError) {
+      console.error('[getAlimentacao] ❌ Erro ao buscar consulta:', consultaError);
+      throw consultaError;
+    }
+
+    if (!consulta || !consulta.patient_id) {
+      console.log('[getAlimentacao] Consulta não encontrada ou sem paciente');
+      return res.json({ success: true, alimentacao_data: null });
+    }
+
+    console.log('[getAlimentacao] Paciente ID:', consulta.patient_id);
+
+    // Agora buscar alimentação pelo paciente_id
+    const { data, error } = await supabase
+      .from('s_gramaturas_alimentares')
+      .select('*')
+      .eq('paciente_id', consulta.patient_id);
+
+    if (error) {
+      console.error('[getAlimentacao] ❌ Erro ao buscar alimentação:', error);
+      throw error;
+    }
+
+    console.log('[getAlimentacao] ✅ Registros encontrados:', data?.length || 0);
+
+    return res.json({ success: true, alimentacao_data: data });
+  } catch (error: any) {
+    console.error('[getAlimentacao] ❌ Erro:', error?.message || error);
     return res.status(500).json({ success: false, error: 'Erro interno do servidor' });
   }
 }
@@ -204,6 +246,7 @@ export async function updateAlimentacaoField(req: AuthenticatedRequest, res: Res
 
 /**
  * GET /atividade-fisica/:consultaId
+ * Retorna múltiplos exercícios por consulta
  */
 export async function getAtividadeFisica(req: AuthenticatedRequest, res: Response) {
   try {
@@ -212,11 +255,24 @@ export async function getAtividadeFisica(req: AuthenticatedRequest, res: Respons
     }
 
     const { consultaId } = req.params;
-    const data = await getSolucaoGeneric(TABLE_MAP['atividade-fisica'], consultaId);
+    console.log('[getAtividadeFisica] Buscando exercícios para consulta:', consultaId);
 
-    return res.json({ success: true, atividadeFisica: data });
-  } catch (error) {
-    console.error('Erro ao buscar atividade física:', error);
+    // Buscar múltiplos exercícios (sem .single())
+    const { data, error } = await supabase
+      .from('s_exercicios_fisicos')
+      .select('*')
+      .eq('consulta_id', consultaId);
+
+    if (error) {
+      console.error('[getAtividadeFisica] ❌ Erro:', error);
+      throw error;
+    }
+
+    console.log('[getAtividadeFisica] ✅ Exercícios encontrados:', data?.length || 0);
+
+    return res.json({ success: true, atividade_fisica_data: data || [] });
+  } catch (error: any) {
+    console.error('[getAtividadeFisica] Erro:', error?.message || error);
     return res.status(500).json({ success: false, error: 'Erro interno do servidor' });
   }
 }
