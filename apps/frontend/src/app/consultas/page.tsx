@@ -5684,7 +5684,7 @@ function ConsultasPageContent() {
       if (response.success) {
         const data = response;
         console.log('🔍 DEBUG [REFERENCIA] Dados recebidos da API:', data);
-        const exercicios = data.exercicios || [];
+        const exercicios = data.atividade_fisica_data || [];
         console.log('🔍 DEBUG [REFERENCIA] Exercícios para setar:', exercicios.length, 'exercícios');
         setAtividadeFisicaData(exercicios);
         console.log('🔍 DEBUG [REFERENCIA] Estado atividadeFisicaData atualizado');

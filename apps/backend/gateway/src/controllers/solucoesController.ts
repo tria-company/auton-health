@@ -147,7 +147,27 @@ export async function getSolucaoSuplementacao(req: AuthenticatedRequest, res: Re
     const { consultaId } = req.params;
     const data = await getSolucaoGeneric(TABLE_MAP['solucao-suplementacao'], consultaId);
 
-    return res.json({ success: true, solucao: data });
+    // Parse JSON strings in arrays (the table stores as text[] with JSON strings)
+    let parsedData = null;
+    if (data) {
+      parsedData = {
+        suplementos: (data.suplementos || []).map((item: string) => {
+          try { return JSON.parse(item); } catch { return item; }
+        }),
+        fitoterapicos: (data.fitoterapicos || []).map((item: string) => {
+          try { return JSON.parse(item); } catch { return item; }
+        }),
+        homeopatia: (data.homeopatia || []).map((item: string) => {
+          try { return JSON.parse(item); } catch { return item; }
+        }),
+        florais_bach: (data.florais_bach || []).map((item: string) => {
+          try { return JSON.parse(item); } catch { return item; }
+        })
+      };
+    }
+
+    // Return with key that frontend expects
+    return res.json({ success: true, suplementacao_data: parsedData });
   } catch (error) {
     console.error('Erro ao buscar solução suplementação:', error);
     return res.status(500).json({ success: false, error: 'Erro interno do servidor' });
@@ -176,6 +196,7 @@ export async function updateSolucaoSuplementacaoField(req: AuthenticatedRequest,
 /**
  * GET /alimentacao/:consultaId
  * Tabela s_gramaturas_alimentares usa paciente_id, não consulta_id
+ * Frontend espera: { cafe_da_manha: [], almoco: [], cafe_da_tarde: [], jantar: [] }
  */
 export async function getAlimentacao(req: AuthenticatedRequest, res: Response) {
   try {
@@ -184,7 +205,7 @@ export async function getAlimentacao(req: AuthenticatedRequest, res: Response) {
     }
 
     const { consultaId } = req.params;
-    console.log('[getAlimentacao] Buscando para consulta:', consultaId);
+    console.log('[getAlimentacao] 🔍 Iniciando busca para consulta:', consultaId);
 
     // Primeiro, buscar a consulta para obter o paciente_id
     const { data: consulta, error: consultaError } = await supabase
@@ -193,34 +214,77 @@ export async function getAlimentacao(req: AuthenticatedRequest, res: Response) {
       .eq('id', consultaId)
       .maybeSingle();
 
+    console.log('[getAlimentacao] 📋 Resultado consulta:', { consulta, consultaError });
+
     if (consultaError) {
       console.error('[getAlimentacao] ❌ Erro ao buscar consulta:', consultaError);
       throw consultaError;
     }
 
     if (!consulta || !consulta.patient_id) {
-      console.log('[getAlimentacao] Consulta não encontrada ou sem paciente');
-      return res.json({ success: true, alimentacao_data: null });
+      console.log('[getAlimentacao] ⚠️ Consulta não encontrada ou sem paciente');
+      return res.json({ success: true, alimentacao_data: { cafe_da_manha: [], almoco: [], cafe_da_tarde: [], jantar: [] } });
     }
 
-    console.log('[getAlimentacao] Paciente ID:', consulta.patient_id);
+    const patientId = consulta.patient_id;
+    console.log('[getAlimentacao] 👤 Paciente ID encontrado:', patientId);
 
-    // Agora buscar alimentação pelo paciente_id
+    // Buscar alimentação pelo paciente_id
     const { data, error } = await supabase
       .from('s_gramaturas_alimentares')
       .select('*')
-      .eq('paciente_id', consulta.patient_id);
+      .eq('paciente_id', patientId);
+
+    console.log('[getAlimentacao] 🍽️ Registros encontrados:', data?.length || 0);
 
     if (error) {
       console.error('[getAlimentacao] ❌ Erro ao buscar alimentação:', error);
       throw error;
     }
 
-    console.log('[getAlimentacao] ✅ Registros encontrados:', data?.length || 0);
+    // Transformar dados para o formato esperado pelo frontend
+    // Tabela tem: alimento, tipo_de_alimentos, ref1_g/kcal (café), ref2_g/kcal (almoço), ref3_g/kcal (tarde), ref4_g/kcal (jantar)
+    const alimentacaoData = {
+      cafe_da_manha: (data || []).filter(item => item.ref1_g || item.ref1_kcal).map(item => ({
+        id: item.id,
+        alimento: item.alimento,
+        tipo: item.tipo_de_alimentos,
+        gramatura: item.ref1_g ? `${item.ref1_g}g` : null,
+        kcal: item.ref1_kcal ? `${item.ref1_kcal}kcal` : null
+      })),
+      almoco: (data || []).filter(item => item.ref2_g || item.ref2_kcal).map(item => ({
+        id: item.id,
+        alimento: item.alimento,
+        tipo: item.tipo_de_alimentos,
+        gramatura: item.ref2_g ? `${item.ref2_g}g` : null,
+        kcal: item.ref2_kcal ? `${item.ref2_kcal}kcal` : null
+      })),
+      cafe_da_tarde: (data || []).filter(item => item.ref3_g || item.ref3_kcal).map(item => ({
+        id: item.id,
+        alimento: item.alimento,
+        tipo: item.tipo_de_alimentos,
+        gramatura: item.ref3_g ? `${item.ref3_g}g` : null,
+        kcal: item.ref3_kcal ? `${item.ref3_kcal}kcal` : null
+      })),
+      jantar: (data || []).filter(item => item.ref4_g || item.ref4_kcal).map(item => ({
+        id: item.id,
+        alimento: item.alimento,
+        tipo: item.tipo_de_alimentos,
+        gramatura: item.ref4_g ? `${item.ref4_g}g` : null,
+        kcal: item.ref4_kcal ? `${item.ref4_kcal}kcal` : null
+      }))
+    };
 
-    return res.json({ success: true, alimentacao_data: data });
+    console.log('[getAlimentacao] ✅ Dados transformados:', {
+      cafe_da_manha: alimentacaoData.cafe_da_manha.length,
+      almoco: alimentacaoData.almoco.length,
+      cafe_da_tarde: alimentacaoData.cafe_da_tarde.length,
+      jantar: alimentacaoData.jantar.length
+    });
+
+    return res.json({ success: true, alimentacao_data: alimentacaoData });
   } catch (error: any) {
-    console.error('[getAlimentacao] ❌ Erro:', error?.message || error);
+    console.error('[getAlimentacao] ❌ Erro geral:', error?.message || error);
     return res.status(500).json({ success: false, error: 'Erro interno do servidor' });
   }
 }

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import SolutionsList from './SolutionsList';
 import SolutionDetails from './SolutionDetails';
+import { gatewayClient } from '@/lib/gatewayClient';
 import { supabase } from '@/lib/supabase';
 
 interface SolutionsViewerProps {
@@ -33,27 +34,35 @@ export default function SolutionsViewer({ consultaId, onBack, onSolutionSelect }
   const fetchSolutions = async () => {
     try {
       setLoading(true);
-      
-      // Buscar todas as soluções relacionadas à consulta via Supabase
-      const [ltbResult, mentalidadeResult, suplementacaoResult, habitosResult, alimentacaoResult, atividadeResult] = await Promise.all([
-        supabase.from('solucoes_ltb').select('*').eq('consulta_id', consultaId).single(),
-        supabase.from('solucoes_mentalidade').select('*').eq('consulta_id', consultaId).single(),
-        supabase.from('solucoes_suplementacao').select('*').eq('consulta_id', consultaId).single(),
-        supabase.from('solucoes_habitos_vida').select('*').eq('consulta_id', consultaId).single(),
-        supabase.from('alimentacao').select('*').eq('consulta_id', consultaId),
-        supabase.from('atividade_fisica').select('*').eq('consulta_id', consultaId)
+
+      // Buscar soluções via Gateway (que usa os nomes corretos das tabelas)
+      // Tabelas reais: s_agente_mentalidade_2, s_suplementacao2, s_gramaturas_alimentares, s_exercicios_fisicos
+      const [mentalidadeResult, suplementacaoResult, alimentacaoResult, atividadeResult] = await Promise.all([
+        gatewayClient.get<any>(`/solucao-mentalidade/${consultaId}`),
+        gatewayClient.get<any>(`/solucao-suplementacao/${consultaId}`),
+        gatewayClient.get<any>(`/alimentacao/${consultaId}`),
+        gatewayClient.get<any>(`/atividade-fisica/${consultaId}`)
       ]);
+
+      // Buscar Hábitos de Vida diretamente via Supabase (tabela: s_agente_habitos_de_vida_final)
+      // Nota: LTB não existe como tabela separada
+      const { data: habitosData } = await supabase
+        .from('s_agente_habitos_de_vida_final')
+        .select('*')
+        .eq('consulta_id', consultaId)
+        .maybeSingle();
 
       // Montar objeto de soluções
       const solutionsData: SolutionsData = {
-        ltb: ltbResult.data || null,
-        mentalidade: mentalidadeResult.data || null,
-        alimentacao: alimentacaoResult.data || [],
-        suplementacao: suplementacaoResult.data || null,
-        exercicios: atividadeResult.data || [],
-        habitos: habitosResult.data || null
+        ltb: null, // Tabela LTB não existe
+        mentalidade: mentalidadeResult.mentalidade_data || null,
+        alimentacao: alimentacaoResult.alimentacao_data || [],
+        suplementacao: suplementacaoResult.suplementacao_data || null,
+        exercicios: atividadeResult.atividade_fisica_data || [],
+        habitos: habitosData || null
       };
 
+      console.log('✅ SolutionsViewer - Dados carregados:', solutionsData);
       setSolutions(solutionsData);
     } catch (err) {
       console.error('❌ SolutionsViewer - Erro ao buscar soluções:', err);
@@ -63,7 +72,7 @@ export default function SolutionsViewer({ consultaId, onBack, onSolutionSelect }
   };
 
   const handleSolutionSelect = (solutionId: string) => {
-    
+
     if (onSolutionSelect) {
       // Se há uma função onSolutionSelect, usa ela (integração com o sistema principal)
       onSolutionSelect(solutionId);
