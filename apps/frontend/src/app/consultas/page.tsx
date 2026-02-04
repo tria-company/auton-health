@@ -17,7 +17,7 @@ import { getWebhookEndpoints, getWebhookHeaders } from '@/lib/webhook-config';
 import { gatewayClient } from '@/lib/gatewayClient';
 import { supabase } from '@/lib/supabase';
 import { downloadSolutionsDocx } from '@/lib/solutionsToDocx';
-import { fetchSolutionsByConsultaId } from '@/lib/fetchSolutions';
+import { fetchSolutionsFromGateway } from '@/lib/fetchSolutions';
 import './consultas.css';
 import '../../components/solutions/solutions.css';
 
@@ -4699,7 +4699,7 @@ function ConsultasPageContent() {
     if (!effectiveConsultaId) return;
     setDownloadingDocx(true);
     try {
-      const solutions = await fetchSolutionsByConsultaId(effectiveConsultaId);
+      const solutions = await fetchSolutionsFromGateway(effectiveConsultaId);
       await downloadSolutionsDocx(solutions, `solucoes-consulta-${effectiveConsultaId.slice(0, 8)}.docx`);
     } catch (err) {
       console.error('Erro ao gerar DOCX:', err);
