@@ -147,14 +147,31 @@ export function buildSolutionsDocx(solutions: SolutionsDataForDocx): Paragraph[]
 }
 
 /**
+ * Garante que solutions tem todos os campos esperados (evita undefined no build do doc).
+ */
+function normalizeSolutions(solutions: Partial<SolutionsDataForDocx> | null): SolutionsDataForDocx {
+  if (!solutions || typeof solutions !== 'object') {
+    return { ltb: null, mentalidade: null, alimentacao: [], suplementacao: null, exercicios: [], habitos: null };
+  }
+  return {
+    ltb: solutions.ltb ?? null,
+    mentalidade: solutions.mentalidade ?? null,
+    alimentacao: Array.isArray(solutions.alimentacao) ? solutions.alimentacao : [],
+    suplementacao: solutions.suplementacao ?? null,
+    exercicios: Array.isArray(solutions.exercicios) ? solutions.exercicios : [],
+    habitos: solutions.habitos ?? null,
+  };
+}
+
+/**
  * Gera o DOCX e dispara o download no navegador.
  */
 export async function downloadSolutionsDocx(
-  solutions: SolutionsDataForDocx,
+  solutions: SolutionsDataForDocx | Partial<SolutionsDataForDocx> | null,
   filename: string = 'solucoes-consulta.docx'
 ): Promise<void> {
-  const { saveAs } = await import('file-saver');
-  const paragraphs = buildSolutionsDocx(solutions);
+  const normalized = normalizeSolutions(solutions);
+  const paragraphs = buildSolutionsDocx(normalized);
 
   const doc = new Document({
     sections: [
@@ -165,6 +182,18 @@ export async function downloadSolutionsDocx(
     ],
   });
 
-  const blob = await Packer.toBlob(doc);
+  let blob: Blob;
+  try {
+    blob = await Packer.toBlob(doc);
+  } catch (e) {
+    console.error('Erro ao gerar DOCX (Packer.toBlob):', e);
+    throw new Error('Falha ao gerar o documento. Tente novamente.');
+  }
+
+  const fileSaver = await import('file-saver');
+  const saveAs = fileSaver.saveAs ?? (fileSaver as { default?: typeof fileSaver.saveAs }).default;
+  if (typeof saveAs !== 'function') {
+    throw new Error('Download não disponível neste navegador.');
+  }
   saveAs(blob, filename);
 }
