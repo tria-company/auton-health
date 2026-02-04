@@ -1,6 +1,10 @@
 import { Response } from 'express';
 import { AuthenticatedRequest } from '../middleware/auth';
 
+/**
+ * WhatsApp: usa APENAS Evolution API (mesmo fluxo da anamnese).
+ * Resend é usado somente para e-mail (emailController / sendCredentialsEmail).
+ */
 const EVOLUTION_API_URL = (process.env.EVOLUTION_API_URL || process.env.EVO_SERVICE_URL || 'https://evo.triacompany.com.br').trim().replace(/\/$/, '');
 const EVOLUTION_API_KEY = (process.env.EVOLUTION_API_KEY || process.env.EVO_APIKEY || '').trim();
 const EVOLUTION_INSTANCE = (process.env.EVOLUTION_INSTANCE || process.env.EVO_INSTANCE_NAME || 'omnilink_05').trim();
@@ -79,10 +83,9 @@ export async function sendAnamneseWhatsApp(req: AuthenticatedRequest, res: Respo
       // Se falhar a verificação, continua com o envio (melhor tentar enviar do que bloquear)
     }
 
-    const appName = process.env.APP_NAME || 'Auton Health';
     const text = `Olá *${patientName}*! 👋
 
-Seu médico solicitou que você preencha sua *Anamnese Inicial* pela plataforma ${appName}.
+Sua anamnese Chegou pela plataforma Auton Health.
 
 📋 *O que é:* formulário com dados de saúde para uma avaliação mais personalizada.
 ⏱️ *Tempo estimado:* 10-15 minutos.
@@ -130,5 +133,97 @@ Esta é uma mensagem automática.`;
       success: false,
       error: error instanceof Error ? error.message : 'Erro ao enviar mensagem WhatsApp'
     });
+  }
+}
+
+const DEFAULT_PATIENT_LOGIN_URL = 'https://pacientes.autonhealth.com.br';
+
+/**
+ * Envia credenciais de acesso por WhatsApp via Evolution API (não usa Resend).
+ * Mesmo canal da anamnese: Evolution API only.
+ * Usado internamente ao criar/reenviar usuário do paciente.
+ */
+export async function sendCredentialsWhatsApp(
+  phone: string,
+  patientName: string,
+  userEmail: string,
+  password: string,
+  loginUrl: string = process.env.PATIENT_LOGIN_URL || DEFAULT_PATIENT_LOGIN_URL
+): Promise<{ success: boolean; error?: string; code?: string }> {
+  const rawPhone = (phone || '').trim();
+  if (!rawPhone) {
+    console.log('📱 [WHATSAPP] Credenciais: telefone vazio, não enviando');
+    return { success: false, error: 'Telefone não informado' };
+  }
+
+  if (!EVOLUTION_API_KEY) {
+    console.warn('⚠️ [WHATSAPP] EVOLUTION_API_KEY não configurado, ignorando envio de credenciais');
+    return { success: false, error: 'WhatsApp não configurado (EVOLUTION_API_KEY)' };
+  }
+
+  const number = normalizePhoneToE164(rawPhone);
+  if (number.length < 12) {
+    console.warn('⚠️ [WHATSAPP] Credenciais: número inválido após normalização:', number.length, 'dígitos');
+    return { success: false, error: 'Número de telefone inválido. Use DDD + número (ex: 11999999999)' };
+  }
+
+  console.log('📱 [WHATSAPP] Credenciais: enviando para número', number.slice(0, 4) + '****' + number.slice(-4));
+
+  const signinUrl = `${loginUrl.replace(/\/$/, '')}/auth/signin`;
+  const appName = process.env.APP_NAME || 'Auton Health';
+
+  const text = `Olá *${patientName}*! 👋
+
+Sua conta de acesso ao *${appName}* foi criada.
+
+📧 *E-mail:* ${userEmail}
+🔑 *Senha temporária:* ${password}
+
+Acesse para entrar: ${signinUrl}
+
+⚠️ Recomendamos alterar a senha no primeiro acesso.
+Esta é uma mensagem automática.`;
+
+  // Verificar se o número possui WhatsApp (mesmo fluxo da anamnese)
+  const checkUrl = `${EVOLUTION_API_URL}/chat/whatsappNumbers/${EVOLUTION_INSTANCE}`;
+  try {
+    const checkResponse = await fetch(checkUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': EVOLUTION_API_KEY },
+      body: JSON.stringify({ numbers: [number] })
+    });
+    if (checkResponse.ok) {
+      const checkData = (await checkResponse.json()) as any[];
+      if (checkData?.length > 0 && !checkData[0].exists) {
+        console.log('❌ [WHATSAPP] Número não possui WhatsApp:', number.slice(-4) + '****');
+        return { success: false, error: 'O número informado não possui WhatsApp', code: 'WHATSAPP_NOT_FOUND' };
+      }
+      console.log('✅ [WHATSAPP] Número verificado - possui WhatsApp');
+    }
+  } catch (checkError) {
+    console.warn('⚠️ [WHATSAPP] Erro ao verificar número (credenciais), continuando envio:', checkError);
+    // Igual à anamnese: se falhar a verificação, tenta enviar mesmo assim
+  }
+
+  const url = `${EVOLUTION_API_URL}/message/sendText/${EVOLUTION_INSTANCE}`;
+  console.log('📱 [WHATSAPP] Enviando credenciais via Evolution API...', { number: number.slice(-4) + '****' });
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': EVOLUTION_API_KEY },
+      body: JSON.stringify({ number, text })
+    });
+    const data = (await response.json().catch(() => ({}))) as { message?: string; error?: string };
+
+    if (!response.ok) {
+      const errMsg = data?.message || data?.error || (typeof data === 'object' ? JSON.stringify(data) : String(data)) || `HTTP ${response.status}`;
+      console.error('❌ [WHATSAPP] Erro Evolution API (credenciais):', response.status, errMsg);
+      return { success: false, error: errMsg };
+    }
+    console.log('✅ [WHATSAPP] Credenciais enviadas por WhatsApp com sucesso');
+    return { success: true };
+  } catch (err: any) {
+    console.error('❌ [WHATSAPP] Erro ao enviar credenciais:', err);
+    return { success: false, error: err?.message || 'Erro ao enviar WhatsApp' };
   }
 }

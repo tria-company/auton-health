@@ -200,10 +200,16 @@ export default function PatientsPage() {
         throw new Error(response.error || 'Erro ao sincronizar usuário');
       }
 
-      // Verificar se o email foi enviado
+      // Verificar se o email/WhatsApp foram enviados
       if (action === 'create') {
-        if (response.emailSent) {
-          showSuccess(`${response.message || 'Usuário criado com sucesso!'} Email com credenciais enviado.`, 'Sucesso');
+        if (response.emailSent || response.whatsappSent) {
+          const parts = [response.message || 'Usuário criado com sucesso!'];
+          if (response.emailSent) parts.push('Email com credenciais enviado.');
+          if (response.whatsappSent) parts.push('Credenciais enviadas por WhatsApp.');
+          if (!response.whatsappSent && response.whatsappError) {
+            parts.push(` WhatsApp não enviado: ${response.whatsappError}`);
+          }
+          showSuccess(parts.join(' '), 'Sucesso');
         } else {
           const passwordInfo = response.password ? `\n\nSenha gerada: ${response.password}\n\nPor favor, informe esta senha ao paciente manualmente.` : '';
           showWarning(
@@ -267,8 +273,14 @@ export default function PatientsPage() {
         throw new Error(response.error || 'Erro ao reenviar email');
       }
 
-      if (response.emailSent) {
-        showSuccess('Email com credenciais reenviado com sucesso!', 'Email Enviado');
+      if (response.emailSent || response.whatsappSent) {
+        const parts = [];
+        if (response.emailSent) parts.push('Email com credenciais reenviado.');
+        if (response.whatsappSent) parts.push('Credenciais enviadas por WhatsApp.');
+        if (!response.whatsappSent && response.whatsappError) {
+          parts.push(` WhatsApp não enviado: ${response.whatsappError}`);
+        }
+        showSuccess(parts.join(' '), 'Credenciais Enviadas');
       } else {
         const passwordInfo = response.password ? `\n\nNova senha gerada: ${response.password}\n\nPor favor, informe esta senha ao paciente manualmente.` : '';
         showWarning(
@@ -277,7 +289,7 @@ export default function PatientsPage() {
         );
       }
     } catch (error) {
-      console.error('Erro ao reenviar email:', error);
+      console.error('Erro ao reenviar credenciais:', error);
       showError(`Erro ao reenviar email: ${error instanceof Error ? error.message : 'Erro desconhecido'}`, 'Erro');
     } finally {
       setResendingEmail(false);
@@ -1089,7 +1101,7 @@ export default function PatientsPage() {
                         ) : (
                           <>
                             <Mail size={16} />
-                            Reenviar Email com Credenciais
+                            Reenviar credenciais por Email e WhatsApp
                           </>
                         )}
                       </button>

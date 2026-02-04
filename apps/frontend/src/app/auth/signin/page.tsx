@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/lib/supabase';
 import { LoadingScreen } from '@/components/shared/LoadingScreen';
 import { useTheme } from 'next-themes';
 import './signin.css';
@@ -22,6 +23,8 @@ export default function SignInPage() {
   
   const { signIn, signInWithGoogle, user, loading: authLoading } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const reasonPatient = searchParams.get('reason') === 'patient';
 
   useEffect(() => {
     setMounted(true);
@@ -31,10 +34,13 @@ export default function SignInPage() {
   const currentTheme = mounted ? (theme === 'system' ? systemTheme : theme) : 'light';
   const logoSrc = currentTheme === 'dark' ? '/logo-white.svg' : '/logo-black.svg';
 
-  // Redirecionar se já estiver logado
+  // Redirecionar se já estiver logado (apenas médicos; pacientes são bloqueados na área do médico)
   useEffect(() => {
     if (!authLoading && user) {
-      router.push('/dashboard');
+      const role = (user as { user_metadata?: { role?: string } })?.user_metadata?.role;
+      if (role !== 'patient') {
+        router.push('/dashboard');
+      }
     }
   }, [user, authLoading, router]);
 
@@ -75,6 +81,14 @@ export default function SignInPage() {
       if (error) {
         setError(translateError(error.message));
       } else {
+        // Verificar se é paciente: pacientes não têm acesso à área do médico
+        const { data: { session } } = await supabase.auth.getSession();
+        const role = session?.user?.user_metadata?.role;
+        if (role === 'patient') {
+          await supabase.auth.signOut();
+          setError('Esta área é apenas para médicos. Como paciente, use o link enviado no seu email para acessar suas informações.');
+          return;
+        }
         router.push('/dashboard');
       }
     } catch (err) {
@@ -114,6 +128,12 @@ export default function SignInPage() {
               Entre com sua conta para acessar a plataforma
             </p>
           </div>
+
+          {reasonPatient && (
+            <div className="signin-info-message" style={{ background: '#e0f2fe', border: '1px solid #0ea5e9', borderRadius: '8px', padding: '12px 16px', marginBottom: '16px', fontSize: '14px', color: '#0369a1' }}>
+              A área do médico é restrita. Como paciente, use o link enviado no seu email para acessar suas informações.
+            </div>
+          )}
 
           <div className="signin-form-wrapper">
             <form onSubmit={handleSubmit} className="signin-form">

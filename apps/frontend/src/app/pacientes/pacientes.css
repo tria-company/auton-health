@@ -2976,9 +2976,10 @@
 }
 
 .btn-secondary.user-action-btn:hover:not(:disabled) {
-  background: linear-gradient(135deg, #4b5563 0%, #374151 100%);
+  background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%);
+  color: #1f2937;
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(107, 114, 128, 0.45);
+  box-shadow: 0 6px 20px rgba(209, 213, 219, 0.5);
 }
 
 .user-management-warning {

@@ -20,8 +20,8 @@
   --table-row-bg: #f8f9fa;
   --table-text: #1a1a1a;
   --table-header: #666666;
-  --primary-color: #A6CE39;
-  --primary-hover: #95B832;
+  --primary-color: #1e3a5f;
+  --primary-hover: #2d4a6f;
 }
 .consultas-admin-page * {
   box-sizing: border-box;
@@ -38,8 +38,8 @@
   --table-row-bg: #252525;
   --table-text: #FFFFFF;
   --table-header: #CCCCCC;
-  --primary-color: #A6CE39;
-  --primary-hover: #95B832;
+  --primary-color: #1e3a5f;
+  --primary-hover: #2d4a6f;
 }
 
 .consultas-admin-page .admin-page {

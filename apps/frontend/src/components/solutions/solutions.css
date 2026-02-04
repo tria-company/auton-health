@@ -20,6 +20,45 @@
   margin-bottom: 40px;
   padding-bottom: 24px;
   border-bottom: 1px solid #f1f5f9;
+  flex-wrap: wrap;
+}
+
+.solutions-header .solutions-title {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Apenas para botões que não são o da tela "Selecionar Solução" (evita verde do --primary-color) */
+.download-docx-button:not(.selecionar-solucao-docx-btn) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--primary-color, #0ea5e9);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.download-docx-button:not(.selecionar-solucao-docx-btn):hover:not(:disabled) {
+  background: var(--primary-hover, #0284c7);
+}
+
+.download-docx-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.dark .download-docx-button:not(.selecionar-solucao-docx-btn) {
+  background: var(--primary-color, #0ea5e9);
+}
+
+.dark .download-docx-button:not(.selecionar-solucao-docx-btn):hover:not(:disabled) {
+  background: var(--primary-hover, #0284c7);
 }
 
 .back-button {

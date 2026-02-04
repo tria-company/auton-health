@@ -7,7 +7,7 @@ import {
   MoreVertical, Calendar, Video, User, AlertCircle, ArrowLeft,
   Clock, Phone, FileText, Stethoscope, Mic, Download, Play,
   Save, X, Sparkles, Edit, Plus, Trash2, Pencil, ArrowRight, Search,
-  Dna, Brain, Apple, Pill, Dumbbell, Leaf, LogIn, Scale, Ruler, Droplet, FolderOpen, AlertTriangle
+  Dna, Brain, Apple, Pill, Dumbbell, Leaf, LogIn, Scale, Ruler, Droplet, FolderOpen, AlertTriangle, FileDown
 } from 'lucide-react';
 import Image from 'next/image';
 import { StatusBadge, mapBackendStatus } from '../../components/StatusBadge';
@@ -16,6 +16,8 @@ import SolutionsViewer from '../../components/solutions/SolutionsViewer';
 import { getWebhookEndpoints, getWebhookHeaders } from '@/lib/webhook-config';
 import { gatewayClient } from '@/lib/gatewayClient';
 import { supabase } from '@/lib/supabase';
+import { downloadSolutionsDocx } from '@/lib/solutionsToDocx';
+import { fetchSolutionsByConsultaId } from '@/lib/fetchSolutions';
 import './consultas.css';
 import '../../components/solutions/solutions.css';
 
@@ -4658,6 +4660,7 @@ function ConsultasPageContent() {
 
   const [selectedSection, setSelectedSection] = useState<'ANAMNESE' | 'DIAGNOSTICO' | 'SOLUCOES' | 'EXAMES' | null>(null);
   const [forceShowSolutionSelection, setForceShowSolutionSelection] = useState(false);
+  const [downloadingDocx, setDownloadingDocx] = useState(false);
 
   // Função para voltar para a tela de seleção de soluções
   const handleBackToSolutionSelection = async () => {
@@ -4687,6 +4690,22 @@ function ConsultasPageContent() {
       setSelectedSection(null);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  // Baixar todas as soluções em DOCX (tela "Selecionar Solução")
+  const handleDownloadAllDocx = async () => {
+    const effectiveConsultaId = consultaId || consultaDetails?.id || null;
+    if (!effectiveConsultaId) return;
+    setDownloadingDocx(true);
+    try {
+      const solutions = await fetchSolutionsByConsultaId(effectiveConsultaId);
+      await downloadSolutionsDocx(solutions, `solucoes-consulta-${effectiveConsultaId.slice(0, 8)}.docx`);
+    } catch (err) {
+      console.error('Erro ao gerar DOCX:', err);
+      showError('Erro ao gerar documento. Tente novamente.', 'Erro');
+    } finally {
+      setDownloadingDocx(false);
     }
   };
 
@@ -6856,6 +6875,18 @@ function ConsultasPageContent() {
               }}>
                 Selecione a solução que deseja implementar para este paciente.
               </p>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
+                <button
+                  type="button"
+                  className="download-docx-button selecionar-solucao-docx-btn"
+                  onClick={handleDownloadAllDocx}
+                  disabled={downloadingDocx}
+                  title="Baixar todas as soluções em um documento Word editável (DOCX)"
+                >
+                  <FileDown className="w-5 h-5" />
+                  {downloadingDocx ? 'Gerando...' : 'Baixar todas em DOCX'}
+                </button>
+              </div>
             </div>
 
             <div style={{
@@ -8203,6 +8234,18 @@ function ConsultasPageContent() {
               }}>
                 Selecione a solução que deseja implementar para este paciente.
               </p>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
+                <button
+                  type="button"
+                  className="download-docx-button selecionar-solucao-docx-btn"
+                  onClick={handleDownloadAllDocx}
+                  disabled={downloadingDocx}
+                  title="Baixar todas as soluções em um documento Word editável (DOCX)"
+                >
+                  <FileDown className="w-5 h-5" />
+                  {downloadingDocx ? 'Gerando...' : 'Baixar todas em DOCX'}
+                </button>
+              </div>
             </div>
 
             <div style={{

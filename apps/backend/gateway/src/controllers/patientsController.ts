@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { supabase } from '../config/database';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { Resend } from 'resend';
+import { sendCredentialsWhatsApp } from './whatsappController';
 
 /**
  * GET /patients
@@ -797,9 +798,11 @@ export async function syncPatientUser(req: AuthenticatedRequest, res: Response) 
     let userAuthId: string | null = patient.user_auth || null;
     let userStatus: 'active' | 'inactive' = (patient.user_status as 'active' | 'inactive') || 'inactive';
 
-    // Variáveis para controle de email (declaradas no escopo da função)
+    // Variáveis para controle de email e WhatsApp
     let emailSent = false;
     let emailError: any = null;
+    let whatsappSent = false;
+    let whatsappError: string | null = null;
     let generatedPassword: string | null = null;
 
     // Função para gerar senha temporária segura
@@ -875,6 +878,27 @@ export async function syncPatientUser(req: AuthenticatedRequest, res: Response) 
         });
         // Não falhar se apenas o email não for enviado - usuário já foi criado
       }
+
+      // Enviar credenciais por WhatsApp se o paciente tiver telefone (suporta phone ou telefone no banco)
+      const rawPhone = (patient as { phone?: string; telefone?: string }).phone ?? (patient as { telefone?: string }).telefone;
+      const patientPhone = (rawPhone || '').trim();
+      console.log('📱 [USER] Telefone do paciente:', patientPhone ? `presente (***${patientPhone.slice(-4)})` : 'ausente');
+      if (patientPhone && generatedPassword) {
+        const loginUrl = process.env.PATIENT_LOGIN_URL || 'https://pacientes.autonhealth.com.br';
+        try {
+          const result = await sendCredentialsWhatsApp(patientPhone, patient.name, patient.email!, generatedPassword, loginUrl);
+          whatsappSent = result.success;
+          whatsappError = result.error || null;
+          if (result.success) console.log('✅ [USER] Credenciais enviadas por WhatsApp para:', patientPhone.slice(-4) + '****');
+          else console.warn('⚠️ [USER] WhatsApp não enviado:', result.error);
+        } catch (err: any) {
+          whatsappError = err?.message || 'Erro ao enviar WhatsApp';
+          console.warn('⚠️ [USER] Erro ao enviar credenciais por WhatsApp:', err?.message);
+        }
+      } else if (!patientPhone) {
+        whatsappError = 'Telefone não cadastrado para o paciente';
+        console.log('📱 [USER] Paciente sem telefone cadastrado, WhatsApp não enviado');
+      }
     } else {
       // Atualizar status do usuário existente
       if (action === 'activate') {
@@ -933,6 +957,8 @@ export async function syncPatientUser(req: AuthenticatedRequest, res: Response) 
           : 'Usuário criado com sucesso',
       emailSent: emailSent || false,
       emailError: emailError ? emailError.message : null,
+      whatsappSent: whatsappSent || false,
+      whatsappError: whatsappError || null,
       password: generatedPassword || undefined // Retornar senha para debug (remover em produção se necessário)
     });
 
@@ -1137,21 +1163,48 @@ export async function resendPatientCredentials(req: AuthenticatedRequest, res: R
     let emailSent = false;
     let emailError: any = null;
     try {
-      console.log('📧 [RESEND] Tentando reenviar email com credenciais para:', patient.email);
+      console.log('📧 [REENVIO-CRED] Email: reenviando credenciais para:', patient.email);
       await sendCredentialsEmail(patient.email!, patient.name, authUser.user.email!, newPassword, true);
       emailSent = true;
-      console.log('✅ [RESEND] Email reenviado com sucesso para:', patient.email);
+      console.log('✅ [REENVIO-CRED] Email enviado (Resend). WhatsApp é via Evolution API.');
     } catch (err: any) {
       emailError = err;
-      console.error('❌ [RESEND] Erro ao reenviar email:', err);
+      console.error('❌ [REENVIO-CRED] Erro ao reenviar email:', err);
       // Não falhar completamente se apenas o email não for enviado
+    }
+
+    // WhatsApp: sempre Evolution API (nunca Resend). Executar após o email.
+    console.log('📱 [REENVIO-CRED] Etapa WhatsApp (Evolution API)...');
+    let whatsappSent = false;
+    let whatsappError: string | null = null;
+    const rawPhoneResend = (patient as { phone?: string; telefone?: string }).phone ?? (patient as { telefone?: string }).telefone;
+    const patientPhoneResend = (rawPhoneResend || '').trim();
+    if (!patientPhoneResend) console.log('📱 [REENVIO-CRED] WhatsApp: telefone ausente. Campos:', { phone: (patient as any).phone, telefone: (patient as any).telefone });
+    else console.log('📱 [REENVIO-CRED] WhatsApp: Evolution API (não Resend). Telefone presente (***' + patientPhoneResend.slice(-4) + ')');
+    if (patientPhoneResend) {
+      const loginUrl = process.env.PATIENT_LOGIN_URL || 'https://pacientes.autonhealth.com.br';
+      try {
+        const result = await sendCredentialsWhatsApp(patientPhoneResend, patient.name, authUser.user.email!, newPassword, loginUrl);
+        whatsappSent = result.success;
+        whatsappError = result.error || null;
+        if (result.success) console.log('✅ [REENVIO-CRED] Credenciais enviadas por WhatsApp (Evolution API) para:', patientPhoneResend.slice(-4) + '****');
+        else console.warn('⚠️ [REENVIO-CRED] WhatsApp não enviado:', result.error);
+      } catch (err: any) {
+        whatsappError = err?.message || 'Erro ao enviar WhatsApp';
+        console.warn('⚠️ [REENVIO-CRED] Erro ao enviar credenciais por WhatsApp (Evolution API):', err?.message);
+      }
+    } else {
+      whatsappError = 'Telefone não cadastrado para o paciente';
+      console.log('📱 [REENVIO-CRED] Paciente sem telefone cadastrado, WhatsApp não enviado');
     }
 
     return res.json({
       success: true,
-      message: emailSent ? 'Email com credenciais reenviado com sucesso' : 'Senha atualizada, mas email não foi enviado',
+      message: emailSent || whatsappSent ? (emailSent && whatsappSent ? 'Credenciais reenviadas por email e WhatsApp' : emailSent ? 'Email com credenciais reenviado com sucesso' : 'Credenciais enviadas por WhatsApp') : 'Senha atualizada, mas nenhum envio realizado',
       emailSent: emailSent,
       emailError: emailError ? emailError.message : null,
+      whatsappSent: whatsappSent,
+      whatsappError: whatsappError || null,
       password: emailSent ? undefined : newPassword // Retornar senha apenas se email falhou
     });
 
@@ -1188,12 +1241,12 @@ async function sendCredentialsEmail(
   const resend = new Resend(process.env.RESEND_API_KEY);
   const fromEmail = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
   const appName = process.env.APP_NAME || 'Auton Health';
-  const loginUrl = process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_FRONTEND_URL || 'http://localhost:3000';
+  const loginUrl = process.env.PATIENT_LOGIN_URL || 'https://pacientes.autonhealth.com.br';
 
   console.log('📧 [EMAIL] Configurações:');
   console.log('  - From:', fromEmail);
   console.log('  - App Name:', appName);
-  console.log('  - Login URL:', loginUrl);
+  console.log('  - Login URL (pacientes):', loginUrl);
 
   // Verificar se está em modo de teste
   const isTestMode = fromEmail.includes('@resend.dev');
@@ -1267,7 +1320,7 @@ async function sendCredentialsEmail(
           
           <div style="text-align: center; margin: 30px 0;">
             <a 
-              href="${loginUrl}/auth/login" 
+              href="${loginUrl}/auth/signin" 
               style="display: inline-block; background: linear-gradient(135deg, #1B4266 0%, #153350 100%); color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 12px rgba(27, 66, 102, 0.3);">
               Acessar Sistema
             </a>
