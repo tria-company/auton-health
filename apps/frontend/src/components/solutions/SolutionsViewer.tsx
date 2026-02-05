@@ -10,6 +10,7 @@ interface SolutionsViewerProps {
   consultaId: string;
   onBack: () => void;
   onSolutionSelect?: (solutionType: string) => void;
+  mentalidadeData?: any; // New optional prop for immediate updates
 }
 
 interface SolutionsData {
@@ -21,7 +22,7 @@ interface SolutionsData {
   habitos: any;
 }
 
-export default function SolutionsViewer({ consultaId, onBack, onSolutionSelect }: SolutionsViewerProps) {
+export default function SolutionsViewer({ consultaId, onBack, onSolutionSelect, mentalidadeData }: SolutionsViewerProps) {
   const [solutions, setSolutions] = useState<SolutionsData | null>(null);
   const [selectedSolution, setSelectedSolution] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -87,21 +88,27 @@ export default function SolutionsViewer({ consultaId, onBack, onSolutionSelect }
   };
 
   const getSolutionData = () => {
-    if (!solutions || !selectedSolution) return null;
+    // Merge state with props (props take precedence for mentalidadeData)
+    const effectiveSolutions = solutions ? {
+      ...solutions,
+      mentalidade: mentalidadeData || solutions.mentalidade
+    } : null;
+
+    if (!effectiveSolutions || !selectedSolution) return null;
 
     switch (selectedSolution) {
       case 'ltb':
-        return solutions.ltb;
+        return effectiveSolutions.ltb;
       case 'mentalidade':
-        return solutions.mentalidade;
+        return effectiveSolutions.mentalidade;
       case 'alimentacao':
-        return solutions.alimentacao;
+        return effectiveSolutions.alimentacao;
       case 'suplementacao':
-        return solutions.suplementacao;
+        return effectiveSolutions.suplementacao;
       case 'exercicios':
-        return solutions.exercicios;
+        return effectiveSolutions.exercicios;
       case 'habitos':
-        return solutions.habitos;
+        return effectiveSolutions.habitos;
       default:
         return null;
     }
@@ -139,7 +146,10 @@ export default function SolutionsViewer({ consultaId, onBack, onSolutionSelect }
       consultaId={consultaId}
       onBack={onBack}
       onSolutionSelect={handleSolutionSelect}
-      solutions={solutions}
+      solutions={solutions ? {
+        ...solutions,
+        mentalidade: mentalidadeData || solutions.mentalidade
+      } : null}
       loading={loading}
     />
   );

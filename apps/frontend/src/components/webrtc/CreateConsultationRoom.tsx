@@ -462,98 +462,78 @@ export function CreateConsultationRoom({
         // Combinar data e hora para criar o timestamp
         const consultaInicio = new Date(`${scheduledDate}T${scheduledTime}`).toISOString();
 
-        // Buscar usuário autenticado
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
-
-        if (userError || !user) {
-          setIsCreatingRoom(false);
-          showError('Usuário não autenticado', 'Erro ao Criar');
-          return;
-        }
-
-        // Buscar médico na tabela medicos usando a FK do auth.users
-        const { data: medico, error: medicoError } = await supabase
-          .from('medicos')
-          .select('id')
-          .eq('user_auth', user.id)
-          .single();
-
-        if (medicoError || !medico) {
-          setIsCreatingRoom(false);
-          showError('Médico não encontrado. Verifique se sua conta está sincronizada.', 'Erro ao Criar');
-          return;
-        }
-
-        // Criar consulta no Supabase
-        const { data: consultation, error: insertError } = await supabase
-          .from('consultations')
-          .insert({
-            patient_id: selectedPatient,
-            patient_name: selectedPatientData.name,
-            consultation_type: consultationType === 'online' ? 'TELEMEDICINA' : 'PRESENCIAL',
-            status: 'AGENDAMENTO',
-            consulta_inicio: consultaInicio,
-            doctor_id: medico.id,
-          })
-          .select()
-          .single();
+        // ✅ NOVO: Criar agendamento via Gateway (verifica conflitos)
+        const response = await gatewayClient.post<{ consultation: any }>('/consultations/schedule', {
+          patient_id: selectedPatient,
+          patient_name: selectedPatientData.name,
+          consultation_type: consultationType,
+          scheduled_date: consultaInicio,
+          duration_minutes: 60 // Padrão 1 hora
+        });
 
         setIsCreatingRoom(false);
 
-        if (insertError || !consultation) {
-          showError('Erro ao criar agendamento: ' + (insertError?.message || 'Erro desconhecido'), 'Erro ao Criar');
-        } else {
-          console.log('✅ Agendamento criado:', consultation);
-
-          // 📅 Sincronizar com Google Calendar (se falhar, não impedir o fluxo principal)
-          try {
-            const endTime = new Date(new Date(consultaInicio).getTime() + 60 * 60 * 1000).toISOString(); // 1 hora de duração padrão
-
-            gatewayClient.post('/api/auth/google-calendar/events', {
-              title: `Consulta MedCall: ${selectedPatientData.name}`,
-              description: `Consulta agendada via MedCall.\nPaciente: ${selectedPatientData.name}\nTipo: ${consultationType === 'online' ? 'Online' : 'Presencial'}\nLink: ${window.location.origin}/consulta/online/doctor?roomId=${consultation.id}`, // Link placeholder, idealmente seria o link real
-              startTime: consultaInicio,
-              endTime: endTime,
-              attendees: selectedPatientData.email ? [selectedPatientData.email] : []
-            }).then(async (res) => {
-              if (res.success && res.eventId) {
-                console.log('✅ Evento criado no Google Calendar:', res.eventId);
-                showSuccess('Evento adicionado ao Google Calendar', 'Agenda');
-
-                // 🔄 CRITICAL FIX: Salvar ID do evento no banco para permitir exclusão futura
-                try {
-                  const { error: updateError } = await supabase
-                    .from('consultations')
-                    .update({
-                      google_event_id: res.eventId,
-                      sync_status: 'synced',
-                      last_synced_at: new Date().toISOString()
-                    })
-                    .eq('id', consultation.id);
-
-                  if (updateError) {
-                    console.error('❌ Erro ao salvar google_event_id no banco:', updateError);
-                  } else {
-                    console.log('✅ google_event_id salvo com sucesso na consulta');
-                  }
-                } catch (dbError) {
-                  console.error('❌ Exceção ao salvar google_event_id:', dbError);
-                }
-
-              } else if (res.error?.includes('não conectado')) {
-                console.warn('Google Calendar não conectado para este médico');
-              } else {
-                console.error('Erro ao sync Google Calendar:', res.error);
-              }
-            });
-
-          } catch (calError) {
-            console.error('Erro ao preparar sync do Calendar:', calError);
+        if (!response.success) {
+          // Tratar erro de conflito de horário (409)
+          if ((response as any).status === 409 || response.error?.includes('ocupado')) {
+            showWarning(response.error || 'Este horário já está ocupado por outra consulta.', 'Horário Indisponível');
+          } else {
+            showError('Erro ao criar agendamento: ' + (response.error || 'Erro desconhecido'), 'Erro ao Criar');
           }
-
-          // Redirecionar para página de consultas
-          router.push('/consultas');
+          return;
         }
+
+        const consultation = response.consultation;
+        console.log('✅ Agendamento criado:', consultation);
+
+        // 📅 Sincronizar com Google Calendar (se falhar, não impedir o fluxo principal)
+        try {
+          const endTime = new Date(new Date(consultaInicio).getTime() + 60 * 60 * 1000).toISOString(); // 1 hora de duração padrão
+
+          gatewayClient.post('/api/auth/google-calendar/events', {
+            title: `Consulta MedCall: ${selectedPatientData.name}`,
+            description: `Consulta agendada via MedCall.\nPaciente: ${selectedPatientData.name}\nTipo: ${consultationType === 'online' ? 'Online' : 'Presencial'}\nLink: ${window.location.origin}/consulta/online/doctor?roomId=${consultation.id}`, // Link placeholder, idealmente seria o link real
+            startTime: consultaInicio,
+            endTime: endTime,
+            attendees: selectedPatientData.email ? [selectedPatientData.email] : []
+          }).then(async (res) => {
+            if (res.success && res.eventId) {
+              console.log('✅ Evento criado no Google Calendar:', res.eventId);
+              showSuccess('Evento adicionado ao Google Calendar', 'Agenda');
+
+              // 🔄 CRITICAL FIX: Salvar ID do evento no banco para permitir exclusão futura
+              try {
+                const { error: updateError } = await supabase
+                  .from('consultations')
+                  .update({
+                    google_event_id: res.eventId,
+                    sync_status: 'synced',
+                    last_synced_at: new Date().toISOString()
+                  })
+                  .eq('id', consultation.id);
+
+                if (updateError) {
+                  console.error('❌ Erro ao salvar google_event_id no banco:', updateError);
+                } else {
+                  console.log('✅ google_event_id salvo com sucesso na consulta');
+                }
+              } catch (dbError) {
+                console.error('❌ Exceção ao salvar google_event_id:', dbError);
+              }
+
+            } else if (res.error?.includes('não conectado')) {
+              console.warn('Google Calendar não conectado para este médico');
+            } else {
+              console.error('Erro ao sync Google Calendar:', res.error);
+            }
+          });
+
+        } catch (calError) {
+          console.error('Erro ao preparar sync do Calendar:', calError);
+        }
+
+        // Redirecionar para página de consultas
+        router.push('/consultas');
         return;
       }
 
@@ -1116,7 +1096,7 @@ export function CreateConsultationRoom({
             </>
           ) : (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#A3A3A3', fontSize: '14px', textAlign: 'center', padding: '20px' }}>
-              Microfone disponível apenas para consultas online instantâneas
+              Clique em Criar Consulta para configurar os microfones que serão usados na consulta
             </div>
           )}
         </div>

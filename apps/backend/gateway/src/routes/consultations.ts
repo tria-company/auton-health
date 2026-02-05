@@ -5,7 +5,8 @@ import {
   getConsultationById,
   updateConsultation,
   deleteConsultation,
-  finalizeConsultationRemote
+  finalizeConsultationRemote,
+  createScheduledConsultation
 } from '../controllers/consultationsController';
 
 const router = Router();
@@ -22,6 +23,12 @@ router.get('/', authenticateToken, getConsultations);
  * Usado pelo popup "Consulta em Andamento" quando o médico clica em Finalizar.
  */
 router.post('/:id/finalize-remote', authenticateToken, finalizeConsultationRemote);
+
+/**
+ * POST /consultations/schedule
+ * Cria novo agendamento com verificação de conflitos
+ */
+router.post('/schedule', authenticateToken, createScheduledConsultation);
 
 /**
  * GET /consultations/:id

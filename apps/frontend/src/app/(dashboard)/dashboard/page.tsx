@@ -3,12 +3,12 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { 
-  Users, 
-  Calendar as CalendarIcon, 
-  CheckCircle, 
-  Clock, 
-  TrendingUp, 
+import {
+  Users,
+  Calendar as CalendarIcon,
+  CheckCircle,
+  Clock,
+  TrendingUp,
   AlertCircle,
   Plus,
   Eye,
@@ -31,18 +31,18 @@ const WeeklyBarChart = ({ data }: { data: { labels: string[]; values: number[]; 
   const padding = { top: 20, right: 20, bottom: 40, left: 40 };
   const chartAreaHeight = chartHeight - padding.top - padding.bottom;
   const chartAreaWidth = '100%';
-  
+
   // Valores do eixo Y (0, 2, 4, 6, 8)
   const yTicks = [0, 2, 4, 6, 8];
-  
+
   const getBarHeight = (value: number) => {
     return (value / maxValue) * chartAreaHeight;
   };
-  
+
   const getYPosition = (value: number) => {
     return padding.top + chartAreaHeight - getBarHeight(value);
   };
-  
+
   return (
     <div className="weekly-bar-chart-container">
       <svg width={chartWidth} height={chartHeight} style={{ display: 'block' }}>
@@ -62,7 +62,7 @@ const WeeklyBarChart = ({ data }: { data: { labels: string[]; values: number[]; 
             />
           );
         })}
-        
+
         {/* Barras */}
         {data.labels.map((label, index) => {
           const value = data.values[index];
@@ -73,7 +73,7 @@ const WeeklyBarChart = ({ data }: { data: { labels: string[]; values: number[]; 
           const x = index * (barWidth + spacing) + padding.left;
           const barHeight = getBarHeight(value);
           const y = getYPosition(value);
-          
+
           return (
             <g key={label}>
               <rect
@@ -87,7 +87,7 @@ const WeeklyBarChart = ({ data }: { data: { labels: string[]; values: number[]; 
             </g>
           );
         })}
-        
+
         {/* Labels do eixo Y */}
         {yTicks.map((tick) => {
           const y = padding.top + chartAreaHeight - (tick / maxValue) * chartAreaHeight;
@@ -105,14 +105,14 @@ const WeeklyBarChart = ({ data }: { data: { labels: string[]; values: number[]; 
             </text>
           );
         })}
-        
+
         {/* Labels do eixo X */}
         {data.labels.map((label, index) => {
           const barWidth = 40;
           const spacing = 20;
           const x = index * (barWidth + spacing) + padding.left + barWidth / 2;
           const y = chartHeight - padding.bottom + 20;
-          
+
           return (
             <text
               key={label}
@@ -192,6 +192,13 @@ interface DashboardData {
       telemedicina: number;
       concluidas: number;
     }>;
+    atendimentosSemanaAtual?: Array<{
+      date: string;
+      total: number;
+      presencial: number;
+      telemedicina: number;
+      concluidas: number;
+    }>;
   };
 }
 
@@ -204,7 +211,7 @@ export default function DashboardPage() {
   // Função para gerar saudação dinâmica
   const getGreeting = () => {
     const hour = new Date().getHours();
-    
+
     if (hour >= 5 && hour < 12) {
       return 'Bom dia';
     } else if (hour >= 12 && hour < 18) {
@@ -397,6 +404,9 @@ export default function DashboardPage() {
           consultasPorDia: [
             { date: new Date().toISOString().split('T')[0], total: 2, presencial: 1, telemedicina: 1, concluidas: 1 },
           ],
+          atendimentosSemanaAtual: [
+            { date: new Date().toISOString().split('T')[0], total: 2, presencial: 1, telemedicina: 1, concluidas: 1 },
+          ]
         },
       });
       setLoading(false);
@@ -409,21 +419,21 @@ export default function DashboardPage() {
   // Atualizar dados quando o período mudar (sem recarregar página)
   useEffect(() => {
     if (isMock || !dashboardData || isUpdatingRef.current) return;
-    
+
     // Usar um pequeno delay para evitar múltiplas chamadas rápidas
     const timeoutId = setTimeout(async () => {
       if (isUpdatingRef.current) return;
-      
+
       try {
         isUpdatingRef.current = true;
         setUpdatingPeriodData(true);
-        
+
         // Construir parâmetros para o gráfico de Presencial/Telemedicina
         const queryParams: Record<string, string | number> = {
           year: selectedYear,
           period: selectedPeriod,
         };
-        
+
         if (chartPeriodType === 'day') {
           queryParams.chartPeriod = 'day';
           queryParams.chartDate = chartSelectedDate;
@@ -437,15 +447,15 @@ export default function DashboardPage() {
           queryParams.chartPeriod = 'year';
           queryParams.chartYear = chartSelectedYear;
         }
-        
+
         const response = await gatewayClient.get('/dashboard', { queryParams });
-        
+
         if (!response.success) {
           throw new Error(response.error || 'Erro ao carregar dados do período');
         }
-        
+
         const data = response.data;
-        
+
         // Atualizar apenas os dados que mudam com o período, mantendo o resto
         setDashboardData(prev => {
           if (!prev) return prev;
@@ -455,7 +465,9 @@ export default function DashboardPage() {
             distribuicoes: data.distribuicoes || prev.distribuicoes,
             graficos: {
               ...prev.graficos,
-              consultasPorDia: data.graficos?.consultasPorDia || prev.graficos.consultasPorDia
+              consultasPorDia: data.graficos?.consultasPorDia || prev.graficos.consultasPorDia,
+              // Preservar atendimentosSemanaAtual se não vier atualizado (ou atualizar se vier)
+              atendimentosSemanaAtual: data.graficos?.atendimentosSemanaAtual || prev.graficos.atendimentosSemanaAtual
             }
           };
         });
@@ -467,7 +479,7 @@ export default function DashboardPage() {
         setUpdatingPeriodData(false);
       }
     }, 300);
-    
+
     return () => {
       clearTimeout(timeoutId);
     };
@@ -483,25 +495,25 @@ export default function DashboardPage() {
       console.log('⏸️ [CHART UPDATE] Bloqueado:', { isMock, hasDashboardData: !!dashboardData, isUpdatingChart: isUpdatingChartRef.current, isUpdatingPeriod: isUpdatingRef.current });
       return;
     }
-    
+
     console.log('🔄 [CHART UPDATE] Iniciando atualização do gráfico:', { chartPeriodType, chartSelectedMonth, chartSelectedDate, chartSelectedYear });
-    
+
     // Usar um pequeno delay para evitar múltiplas chamadas rápidas
     const timeoutId = setTimeout(async () => {
       if (isUpdatingChartRef.current || isUpdatingRef.current) {
         console.log('⏸️ [CHART UPDATE] Bloqueado durante timeout');
         return;
       }
-      
+
       try {
         isUpdatingChartRef.current = true;
-        
+
         // Construir parâmetros para o gráfico de Presencial/Telemedicina
         const queryParams: Record<string, string | number> = {
           year: selectedYear,
           period: selectedPeriod,
         };
-        
+
         if (chartPeriodType === 'day') {
           queryParams.chartPeriod = 'day';
           queryParams.chartDate = chartSelectedDate;
@@ -515,19 +527,19 @@ export default function DashboardPage() {
           queryParams.chartPeriod = 'year';
           queryParams.chartYear = chartSelectedYear;
         }
-        
+
         console.log('📊 [CHART UPDATE] Buscando dados:', queryParams);
-        
+
         const response = await gatewayClient.get('/dashboard', { queryParams });
-        
+
         if (!response.success) {
           throw new Error(response.error || 'Erro ao carregar dados do gráfico');
         }
-        
+
         const data = response.data;
-        
+
         console.log('✅ [CHART UPDATE] Dados recebidos:', data.graficos?.consultasPorDia?.length || 0, 'dias');
-        
+
         // Atualizar apenas os dados do gráfico, mantendo o resto dos dados
         setDashboardData(prev => {
           if (!prev) return prev;
@@ -535,7 +547,9 @@ export default function DashboardPage() {
             ...prev,
             graficos: {
               ...prev.graficos,
-              consultasPorDia: data.graficos?.consultasPorDia || prev.graficos.consultasPorDia
+              consultasPorDia: data.graficos?.consultasPorDia || prev.graficos.consultasPorDia,
+              // Preservar atendimentosSemanaAtual para não ser afetado pelos filtros
+              atendimentosSemanaAtual: prev.graficos.atendimentosSemanaAtual || data.graficos?.atendimentosSemanaAtual
             }
           };
         });
@@ -546,7 +560,7 @@ export default function DashboardPage() {
         isUpdatingChartRef.current = false;
       }
     }, 300);
-    
+
     return () => {
       clearTimeout(timeoutId);
     };
@@ -557,13 +571,13 @@ export default function DashboardPage() {
     try {
       setLoading(true);
       setError(null);
-      
+
       // Construir parâmetros para o gráfico de Presencial/Telemedicina
       const queryParams: Record<string, string | number | boolean> = {
         year: selectedYear,
         period: selectedPeriod,
       };
-      
+
       if (chartPeriodType === 'day') {
         queryParams.chartPeriod = 'day';
         queryParams.chartDate = chartSelectedDate;
@@ -577,13 +591,13 @@ export default function DashboardPage() {
         queryParams.chartPeriod = 'year';
         queryParams.chartYear = chartSelectedYear;
       }
-      
+
       const response = await gatewayClient.get('/dashboard', { queryParams });
-      
+
       if (!response.success) {
         throw new Error(response.error || 'Erro ao carregar dados do dashboard');
       }
-      
+
       setDashboardData(response.data);
     } catch (err) {
       console.error('Erro ao carregar dashboard:', err);
@@ -598,7 +612,7 @@ export default function DashboardPage() {
   const formatDuration = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
-    
+
     if (hours > 0) {
       return `${hours}h ${minutes}m`;
     } else if (minutes > 0) {
@@ -617,9 +631,13 @@ export default function DashboardPage() {
     return type === 'PRESENCIAL' ? 'Presencial' : 'Telemedicina';
   };
 
-  // Processa dados da semana a partir dos dados de consultas
+  // Processa dados da semana a partir dos dados de consultas FIXAS DA SEMANA
   const getWeeklyData = () => {
-    if (!dashboardData?.graficos?.consultasPorDia) {
+    // Usar atendimentosSemanaAtual se disponível (novo campo)
+    // Se não, fallback para consultasPorDia (comportamento antigo, mas só se o novo não existir)
+    const dataToUse = dashboardData?.graficos?.atendimentosSemanaAtual || [];
+
+    if (!dataToUse || dataToUse.length === 0) {
       return {
         labels: ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'],
         values: [0, 0, 0, 0, 0, 0],
@@ -627,13 +645,13 @@ export default function DashboardPage() {
       };
     }
 
-    // Últimos 7 dias
+    // Últimos 7 dias (da semana atual)
     const last7Days: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }; // Segunda a Sábado
-    
-    dashboardData.graficos.consultasPorDia.forEach(item => {
-      const date = new Date(item.date);
+
+    dataToUse.forEach(item => {
+      const date = new Date(item.date + 'T00:00:00'); // Forçar timezone local/sem shift indevido
       const dayOfWeek = date.getDay(); // 0 = Domingo, 1 = Segunda, etc.
-      
+
       // Mapear: 1=Segunda, 2=Terça, ..., 6=Sábado (ignoramos domingo)
       if (dayOfWeek >= 1 && dayOfWeek <= 6) {
         last7Days[dayOfWeek] = (last7Days[dayOfWeek] || 0) + item.total;
@@ -653,23 +671,23 @@ export default function DashboardPage() {
     const chartHeight = 280;
     const padding = { top: 20, right: 40, bottom: 40, left: 50 };
     const chartAreaHeight = chartHeight - padding.top - padding.bottom;
-    
+
     // Valores do eixo Y (0, 2, 4, 6, 8)
     const yTicks = [0, 2, 4, 6, 8];
-    
+
     const getBarHeight = (value: number) => {
       return (value / maxValue) * chartAreaHeight;
     };
-    
+
     const getYPosition = (value: number) => {
       return padding.top + chartAreaHeight - getBarHeight(value);
     };
-    
+
     const barWidth = 40;
     const spacing = 16;
     const totalBarArea = data.labels.length * (barWidth + spacing) - spacing;
     const chartStartX = padding.left;
-    
+
     return (
       <div className="weekly-bar-chart-container">
         <svg width="100%" height={chartHeight} viewBox={`0 0 700 ${chartHeight}`} preserveAspectRatio="xMidYMid meet">
@@ -689,14 +707,14 @@ export default function DashboardPage() {
               />
             );
           })}
-          
+
           {/* Barras */}
           {data.labels.map((label, index) => {
             const value = data.values[index];
             const x = chartStartX + index * (barWidth + spacing);
             const barHeight = getBarHeight(value);
             const y = getYPosition(value);
-            
+
             return (
               <g key={label}>
                 <rect
@@ -710,7 +728,7 @@ export default function DashboardPage() {
               </g>
             );
           })}
-          
+
           {/* Labels do eixo Y */}
           {yTicks.map((tick) => {
             const y = padding.top + chartAreaHeight - (tick / maxValue) * chartAreaHeight;
@@ -728,12 +746,12 @@ export default function DashboardPage() {
               </text>
             );
           })}
-          
+
           {/* Labels do eixo X */}
           {data.labels.map((label, index) => {
             const x = chartStartX + index * (barWidth + spacing) + barWidth / 2;
             const y = chartHeight - padding.bottom + 20;
-            
+
             return (
               <text
                 key={label}
@@ -760,11 +778,11 @@ export default function DashboardPage() {
   if (error || !dashboardData) {
     return (
       <div className="dashboard-exact">
-        <div style={{ 
-          display: 'flex', 
-          flexDirection: 'column', 
-          alignItems: 'center', 
-          justifyContent: 'center', 
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
           minHeight: '60vh',
           gap: '20px',
           padding: '40px'
@@ -776,7 +794,7 @@ export default function DashboardPage() {
           <p style={{ color: '#888', textAlign: 'center', maxWidth: '500px' }}>
             Não foi possível carregar as informações do dashboard. Verifique sua conexão e tente novamente.
           </p>
-          <button 
+          <button
             onClick={fetchDashboardData}
             style={{
               padding: '12px 24px',
@@ -801,7 +819,7 @@ export default function DashboardPage() {
     <div className="dashboard-exact">
       {/* Banner de consulta em andamento */}
       <ActiveConsultationBanner />
-      
+
       {/* Saudação do dashboard */}
       <div className="dashboard-greeting-section">
         <h1 className="dashboard-title">
@@ -826,7 +844,7 @@ export default function DashboardPage() {
             {(() => {
               const duracaoSegundos = dashboardData.estatisticas.duracaoMediaSegundos || 0;
               if (duracaoSegundos === 0) {
-                return 'N/A';
+                return 'Sem consultas';
               }
               const minutes = Math.floor(duracaoSegundos / 60);
               const seconds = duracaoSegundos % 60;
@@ -877,7 +895,7 @@ export default function DashboardPage() {
               </div>
             </div>
           )}
-          <ConsultationStatusChart 
+          <ConsultationStatusChart
             data={{
               created: dashboardData?.distribuicoes?.porStatus?.CREATED || 0,
               inProgress: dashboardData?.distribuicoes?.porStatus?.PROCESSING || 0,
@@ -885,16 +903,16 @@ export default function DashboardPage() {
               cancelled: dashboardData?.distribuicoes?.porStatus?.CANCELLED || 0
             }}
             metrics={[
-              { 
-                label: 'Consultas concluídas', 
-                value: dashboardData?.estatisticas?.consultasConcluidasMes || 0, 
-                change: dashboardData?.estatisticas?.variacaoConsultas || 0, 
+              {
+                label: 'Consultas concluídas',
+                value: dashboardData?.estatisticas?.consultasConcluidasMes || 0,
+                change: dashboardData?.estatisticas?.variacaoConsultas || 0,
                 isPositive: (dashboardData?.estatisticas?.variacaoConsultas || 0) >= 0
               },
-              { 
-                label: 'Total de pacientes', 
-                value: dashboardData?.estatisticas?.totalPacientes || 0, 
-                change: dashboardData?.estatisticas?.variacaoPacientes || 0, 
+              {
+                label: 'Total de pacientes',
+                value: dashboardData?.estatisticas?.totalPacientes || 0,
+                change: dashboardData?.estatisticas?.variacaoPacientes || 0,
                 isPositive: (dashboardData?.estatisticas?.variacaoPacientes || 0) >= 0
               }
             ]}
@@ -913,7 +931,7 @@ export default function DashboardPage() {
           <div className="card-header">
             <div className="card-title">Presencial vs Telemedicina</div>
             <div className="card-actions" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              <select 
+              <select
                 className="year-select"
                 value={chartPeriodType}
                 onChange={(e) => setChartPeriodType(e.target.value as 'day' | 'week' | 'month' | 'year')}
@@ -924,7 +942,7 @@ export default function DashboardPage() {
                 <option value="month">Mês</option>
                 <option value="year">Ano</option>
               </select>
-              
+
               {chartPeriodType === 'day' && (
                 <input
                   type="date"
@@ -934,7 +952,7 @@ export default function DashboardPage() {
                   style={{ minWidth: '140px' }}
                 />
               )}
-              
+
               {chartPeriodType === 'week' && (
                 <input
                   type="date"
@@ -944,7 +962,7 @@ export default function DashboardPage() {
                   style={{ minWidth: '140px' }}
                 />
               )}
-              
+
               {chartPeriodType === 'month' && (
                 <input
                   ref={monthInputRef}
@@ -982,9 +1000,9 @@ export default function DashboardPage() {
                   style={{ minWidth: '140px' }}
                 />
               )}
-              
+
               {chartPeriodType === 'year' && (
-                <select 
+                <select
                   className="year-select"
                   value={chartSelectedYear}
                   onChange={(e) => setChartSelectedYear(Number(e.target.value))}
@@ -1009,7 +1027,7 @@ export default function DashboardPage() {
                 </div>
               </div>
               <div className="chart-area">
-                <Chart3D 
+                <Chart3D
                   data={{
                     presencial: dashboardData?.graficos?.consultasPorDia?.map(d => d.presencial) || [],
                     telemedicina: dashboardData?.graficos?.consultasPorDia?.map(d => d.telemedicina) || [],
@@ -1078,9 +1096,9 @@ export default function DashboardPage() {
           <div className="consultations-list">
             {dashboardData?.atividades?.ultimasConsultas && dashboardData.atividades.ultimasConsultas.length > 0 ? (
               dashboardData.atividades.ultimasConsultas.slice(0, 3).map((consulta: any) => {
-                // Obter iniciais do médico
-                const medicoNome = consulta.medicos?.name || dashboardData?.medico?.name || 'Médico';
-                const iniciais = medicoNome
+                // Obter iniciais do paciente
+                const patientName = consulta.patients?.name || consulta.patient_name || 'Paciente';
+                const iniciais = patientName
                   .split(' ')
                   .map((n: string) => n[0])
                   .join('')
@@ -1088,25 +1106,25 @@ export default function DashboardPage() {
                   .substring(0, 2);
 
                 // Formatar horário de início
-                const inicioDate = consulta.consulta_inicio 
+                const inicioDate = consulta.consulta_inicio
                   ? new Date(consulta.consulta_inicio)
                   : new Date(consulta.created_at);
-                const horarioInicio = inicioDate.toLocaleTimeString('pt-BR', { 
-                  hour: '2-digit', 
-                  minute: '2-digit' 
+                const horarioInicio = inicioDate.toLocaleTimeString('pt-BR', {
+                  hour: '2-digit',
+                  minute: '2-digit'
                 });
 
                 // Formatar duração
-                const duracaoMinutos = consulta.duracao 
-                  ? Math.round(consulta.duracao) 
-                  : consulta.duration 
-                    ? Math.round(consulta.duration / 60) 
+                const duracaoMinutos = consulta.duracao
+                  ? Math.round(consulta.duracao)
+                  : consulta.duration
+                    ? Math.round(consulta.duration / 60)
                     : 0;
                 const duracaoFormatada = `${duracaoMinutos} min`;
 
                 // Determinar tipo de sala
-                const sala = consulta.consultation_type === 'TELEMEDICINA' 
-                  ? 'Sala virtual' 
+                const sala = consulta.consultation_type === 'TELEMEDICINA'
+                  ? 'Sala virtual'
                   : 'Presencial';
 
                 // Tipo de consulta formatado
@@ -1115,8 +1133,8 @@ export default function DashboardPage() {
                   : 'Presencial';
 
                 return (
-                  <div 
-                    key={consulta.id} 
+                  <div
+                    key={consulta.id}
                     className="consultation-row"
                     onClick={() => router.push(`/consultas?consulta_id=${consulta.id}`)}
                   >
@@ -1125,7 +1143,7 @@ export default function DashboardPage() {
                         {iniciais}
                       </div>
                       <div className="consultation-patient-info">
-                        <div className="consultation-medico-name">{medicoNome}</div>
+                        <div className="consultation-medico-name">{patientName}</div>
                         <div className="consultation-type">{tipoConsulta}</div>
                       </div>
                     </div>

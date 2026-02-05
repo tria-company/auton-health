@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { createClient } from '@supabase/supabase-js';
-import { config } from '../config';
+import jwt from 'jsonwebtoken';
+import { config, isDevelopment } from '../config';
 
 // Interface para adicionar user ao Request
 export interface AuthenticatedRequest extends Request {
@@ -40,36 +41,67 @@ export async function authenticateToken(
     const token = authHeader.substring(7); // Remove 'Bearer '
 
     // Criar cliente Supabase temporário para validar o token
-    // Usar ANON_KEY para validar tokens de usuário
-    if (!config.SUPABASE_ANON_KEY) {
-      console.error('[AUTH] SUPABASE_ANON_KEY não configurada');
-      res.status(500).json({
-        success: false,
-        error: 'Configuração de autenticação inválida'
-      });
-      return;
-    }
-
+    // Usar SERVICE_ROLE_KEY para garantir permissão de validação e configurar cliente SERVER-SIDE (stateless)
     const supabase = createClient(
       config.SUPABASE_URL,
-      config.SUPABASE_ANON_KEY
+      config.SUPABASE_SERVICE_ROLE_KEY,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+          detectSessionInUrl: false
+        }
+      }
     );
 
-    // Verificar token
-    const { data: { user }, error } = await supabase.auth.getUser(token);
+    // 4. Tentar validar com Supabase (Método Preferencial)
+    try {
+      const { data: { user }, error } = await supabase.auth.getUser(token);
 
-    if (error || !user) {
-      console.error('[AUTH] Erro ao validar token:', error);
+      if (error) throw error;
+      if (user) {
+        req.user = user;
+        return next();
+      }
+    } catch (supabaseError: any) {
+      // Se for o erro específico de sessão, tentar validação manual como fallback
+      if (supabaseError.name === 'AuthSessionMissingError' || supabaseError.message?.includes('Auth session missing')) {
+        console.warn('[AUTH] Aviso: Falha na validação Supabase (AuthSessionMissingError). Tentando validação manual JWT...');
+
+        try {
+          // Fallback: Validar assinatura JWT manualmente
+          // Necessita que JWT_SECRET esteja configurado corretamente no .env
+          const decoded = jwt.verify(token, config.JWT_SECRET) as any;
+
+          if (decoded && decoded.sub) {
+            // Construir usuário mascarado a partir do token
+            req.user = {
+              id: decoded.sub,
+              email: decoded.email,
+              role: decoded.role || 'authenticated',
+              app_metadata: decoded.app_metadata || {},
+              user_metadata: decoded.user_metadata || {},
+              aud: decoded.aud,
+              created_at: new Date().toISOString()
+            };
+
+            console.log('[AUTH] ✅ Token validado manualmente via JWT Verify');
+            return next();
+          }
+        } catch (jwtError) {
+          console.error('[AUTH] ❌ Falha na validação manual JWT:', jwtError);
+        }
+      }
+
+      // Se chegou aqui, ambas validações falharam
+      console.error('[AUTH] Erro ao validar token:', supabaseError);
       res.status(401).json({
         success: false,
-        error: 'Token inválido ou expirado'
+        error: 'Token inválido ou expirado',
+        details: isDevelopment ? supabaseError.message : undefined
       });
       return;
     }
-
-    // Adicionar usuário ao request
-    req.user = user;
-    next();
   } catch (error) {
     console.error('[AUTH] Erro na autenticação:', error);
     res.status(500).json({

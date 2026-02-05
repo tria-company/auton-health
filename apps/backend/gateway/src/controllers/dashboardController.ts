@@ -9,7 +9,7 @@ import { AuthenticatedRequest } from '../middleware/auth';
 export async function getDashboardData(req: AuthenticatedRequest, res: Response) {
   try {
     console.log('=== GET /dashboard (Gateway) ===');
-    
+
     // Verificar autenticação
     if (!req.user) {
       return res.status(401).json({
@@ -26,7 +26,7 @@ export async function getDashboardData(req: AuthenticatedRequest, res: Response)
       .select('id, name, specialty, crm, subscription_type')
       .eq('user_auth', doctorAuthId)
       .single();
-    
+
     if (medicoError || !medico) {
       console.error('❌ Médico não encontrado:', medicoError);
       return res.status(404).json({
@@ -76,7 +76,7 @@ export async function getDashboardData(req: AuthenticatedRequest, res: Response)
     const fimMesAtual = new Date();
     fimMesAtual.setMonth(fimMesAtual.getMonth() + 1, 0);
     fimMesAtual.setHours(23, 59, 59, 999);
-    
+
     const inicioMesAnterior = new Date(inicioMesAtual);
     inicioMesAnterior.setMonth(inicioMesAnterior.getMonth() - 1);
     const fimMesAnterior = new Date(inicioMesAtual);
@@ -120,7 +120,7 @@ export async function getDashboardData(req: AuthenticatedRequest, res: Response)
       .select('*', { count: 'exact', head: true })
       .eq('doctor_id', medico.id)
       .eq('status', 'COMPLETED');
-    
+
     if (period === 'hoje' || period === '7d' || period === '15d' || period === '30d') {
       consultasConcluidasQuery = consultasConcluidasQuery
         .gte('created_at', startDateRange.toISOString())
@@ -132,7 +132,7 @@ export async function getDashboardData(req: AuthenticatedRequest, res: Response)
       consultasConcluidasQuery = consultasConcluidasQuery
         .gte('created_at', inicioMes.toISOString());
     }
-    
+
     const { count: consultasConcluidasMes } = await consultasConcluidasQuery;
 
     // Calcular variação de consultas concluídas (mês atual vs mês anterior)
@@ -142,7 +142,7 @@ export async function getDashboardData(req: AuthenticatedRequest, res: Response)
     const fimMesAtualConsultas = new Date();
     fimMesAtualConsultas.setMonth(fimMesAtualConsultas.getMonth() + 1, 0);
     fimMesAtualConsultas.setHours(23, 59, 59, 999);
-    
+
     const inicioMesAnteriorConsultas = new Date(inicioMesAtualConsultas);
     inicioMesAnteriorConsultas.setMonth(inicioMesAnteriorConsultas.getMonth() - 1);
     const fimMesAnteriorConsultas = new Date(inicioMesAtualConsultas);
@@ -167,14 +167,14 @@ export async function getDashboardData(req: AuthenticatedRequest, res: Response)
       if (c.duration != null && c.duration !== undefined && c.duration > 0) {
         return Number(c.duration);
       }
-      
+
       // 2. Tentar usar campo duracao (pode estar em minutos)
       if (c.duracao != null && c.duracao !== undefined && c.duracao > 0) {
         const duracaoValue = Number(c.duracao);
         // Se for menor que 60, provavelmente está em minutos
         return duracaoValue < 60 && duracaoValue > 0 ? duracaoValue * 60 : duracaoValue;
       }
-      
+
       // 3. Tentar usar consulta_inicio e consulta_fim
       if (c.consulta_inicio && c.consulta_fim) {
         const inicio = new Date(c.consulta_inicio).getTime();
@@ -184,7 +184,7 @@ export async function getDashboardData(req: AuthenticatedRequest, res: Response)
           return diffSegundos;
         }
       }
-      
+
       // 4. Fallback: usar created_at e updated_at para consultas COMPLETED ou PROCESSING
       if ((c.status === 'COMPLETED' || c.status === 'PROCESSING' || c.status === 'VALID_SOLUCAO') && c.created_at && c.updated_at) {
         const inicio = new Date(c.created_at).getTime();
@@ -196,7 +196,7 @@ export async function getDashboardData(req: AuthenticatedRequest, res: Response)
           return diffSegundos;
         }
       }
-      
+
       return 0;
     };
 
@@ -208,7 +208,7 @@ export async function getDashboardData(req: AuthenticatedRequest, res: Response)
       .select('id, duration, duracao, consultation_type, created_at, updated_at, consulta_inicio, consulta_fim, status')
       .eq('doctor_id', medico.id) // ✅ FILTRO POR MÉDICO
       .in('status', ['COMPLETED', 'PROCESSING', 'VALID_SOLUCAO']);
-    
+
     // Aplicar filtro de período baseado na data real da consulta
     // Para períodos específicos, filtrar por updated_at (quando foi finalizada) ou consulta_fim
     if (period === 'hoje' || period === '7d' || period === '15d' || period === '30d') {
@@ -217,7 +217,7 @@ export async function getDashboardData(req: AuthenticatedRequest, res: Response)
         .gte('updated_at', startDateRange.toISOString())
         .lte('updated_at', endDateRange.toISOString());
     }
-    
+
     const { data: todasConsultas, error: consultasError } = await consultasComDuracaoQuery;
 
     if (consultasError) {
@@ -305,13 +305,13 @@ export async function getDashboardData(req: AuthenticatedRequest, res: Response)
     if (period === 'hoje' || period === '7d' || period === '15d' || period === '30d') {
       const inicioPeriodo = startDateRange.getTime();
       const fimPeriodo = endDateRange.getTime();
-      
+
       consultasComDuracao = consultasComDuracao.filter(c => {
         // Priorizar consulta_fim, depois updated_at, depois created_at (para call_sessions)
-        const dataFinalizacao = c.consulta_fim 
-          ? new Date(c.consulta_fim).getTime() 
+        const dataFinalizacao = c.consulta_fim
+          ? new Date(c.consulta_fim).getTime()
           : (c.updated_at ? new Date(c.updated_at).getTime() : new Date(c.created_at).getTime());
-        
+
         // Se a consulta tem duração de call_session, ela já foi filtrada por ended_at na query
         // Então podemos confiar que está no período se passou pelos filtros anteriores
         return dataFinalizacao >= inicioPeriodo && dataFinalizacao <= fimPeriodo;
@@ -338,11 +338,11 @@ export async function getDashboardData(req: AuthenticatedRequest, res: Response)
       consultasPresencial: consultasPresencial.length,
       consultasTelemedicina: consultasTelemedicina.length
     });
-    
+
     const duracaoMediaPresencial = consultasPresencial.length > 0
       ? consultasPresencial.reduce((acc, c) => acc + calcularDuracaoEmSegundos(c), 0) / consultasPresencial.length
       : 0;
-    
+
     const duracaoMediaTelemedicina = consultasTelemedicina.length > 0
       ? consultasTelemedicina.reduce((acc, c) => acc + calcularDuracaoEmSegundos(c), 0) / consultasTelemedicina.length
       : 0;
@@ -352,13 +352,13 @@ export async function getDashboardData(req: AuthenticatedRequest, res: Response)
       .from('consultations')
       .select('status')
       .eq('doctor_id', medico.id);
-    
+
     if (period === 'hoje' || period === '7d' || period === '15d' || period === '30d') {
       consultasPorStatusQuery = consultasPorStatusQuery
         .gte('created_at', startDateRange.toISOString())
         .lte('created_at', endDateRange.toISOString());
     }
-    
+
     const { data: consultasPorStatus } = await consultasPorStatusQuery;
 
     const statusCounts = consultasPorStatus?.reduce((acc, c) => {
@@ -371,13 +371,13 @@ export async function getDashboardData(req: AuthenticatedRequest, res: Response)
       .from('consultations')
       .select('consultation_type')
       .eq('doctor_id', medico.id);
-    
+
     if (period === 'hoje' || period === '7d' || period === '15d' || period === '30d') {
       consultasPorTipoQuery = consultasPorTipoQuery
         .gte('created_at', startDateRange.toISOString())
         .lte('created_at', endDateRange.toISOString());
     }
-    
+
     const { data: consultasPorTipo } = await consultasPorTipoQuery;
 
     const tipoCounts = consultasPorTipo?.reduce((acc, c) => {
@@ -491,8 +491,8 @@ export async function getDashboardData(req: AuthenticatedRequest, res: Response)
     // Taxa de sucesso
     const totalConsultas = Object.values(statusCounts).reduce((acc, count) => acc + count, 0);
     const consultasCompletas = (statusCounts.COMPLETED || 0) + (statusCounts.VALID_SOLUCAO || 0);
-    const taxaSucesso = totalConsultas > 0 
-      ? (consultasCompletas / totalConsultas) * 100 
+    const taxaSucesso = totalConsultas > 0
+      ? (consultasCompletas / totalConsultas) * 100
       : 0;
 
     // Próximas consultas
@@ -513,6 +513,45 @@ export async function getDashboardData(req: AuthenticatedRequest, res: Response)
       .lt('created_at', tomorrow.toISOString())
       .order('created_at', { ascending: true })
       .limit(5);
+
+    // --- DADOS FIXOS PARA A SEMANA ATUAL (Atendimentos na Semana) ---
+    // Sempre retorna a semana atual, independente dos filtros
+    const hojeSemana = new Date();
+    const dayOfWeekSemana = hojeSemana.getDay(); // 0 (Domingo) a 6 (Sábado)
+
+    // Calcular início da semana (Segunda-feira) e fim (Sábado)
+    // Se hoje é Domingo (0), a segunda-feira da semana "atual" (perspectiva de trabalho) seria amanhã?
+    // Ou consideramos Domingo como início? O gráfico mostra Seg-Sáb.
+    // Vamos considerar semana começando no Domingo para facilitar, mas o gráfico só usa Seg-Sáb.
+
+    const startOfWeek = new Date(hojeSemana);
+    startOfWeek.setDate(hojeSemana.getDate() - dayOfWeekSemana); // Domingo
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6); // Sábado
+    endOfWeek.setHours(23, 59, 59, 999);
+
+    const { data: consultasSemanaAtual } = await supabase
+      .from('consultations')
+      .select('created_at, status, consultation_type')
+      .eq('doctor_id', medico.id)
+      .gte('created_at', startOfWeek.toISOString())
+      .lte('created_at', endOfWeek.toISOString());
+
+    const dadosSemanaAtual = consultasSemanaAtual?.reduce((acc, c) => {
+      const dateKey = dayKeyFormatter.format(new Date(c.created_at));
+      if (!acc[dateKey]) {
+        acc[dateKey] = { total: 0, presencial: 0, telemedicina: 0, concluidas: 0 };
+      }
+      acc[dateKey].total += 1;
+      return acc;
+    }, {} as Record<string, any>) || {};
+
+    const graficoSemanaAtual = Object.entries(dadosSemanaAtual).map(([date, data]) => ({
+      date,
+      ...data
+    })).sort((a, b) => a.date.localeCompare(b.date));
 
     return res.json({
       success: true,
@@ -544,7 +583,8 @@ export async function getDashboardData(req: AuthenticatedRequest, res: Response)
           proximasConsultas: proximasConsultas || []
         },
         graficos: {
-          consultasPorDia: graficoConsultas
+          consultasPorDia: graficoConsultas,
+          atendimentosSemanaAtual: graficoSemanaAtual
         }
       }
     });

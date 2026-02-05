@@ -24,7 +24,9 @@ const envSchema = z.object({
 
 
   // Security
-  JWT_SECRET: z.string().default('default-jwt-secret-change-me-in-production-12345678'),
+  // Security
+  // Tenta pegar JWT_SECRET ou SUPABASE_JWT_SECRET do env, ou usa default
+  JWT_SECRET: z.string().default(process.env.SUPABASE_JWT_SECRET || process.env.JWT_SECRET || 'default-jwt-secret-change-me-in-production-12345678'),
   ENCRYPTION_KEY: z.string().default('default-encryption-key-change-me-prod-12345678'),
 
 

@@ -118,6 +118,9 @@ export async function getSolucaoMentalidade(req: AuthenticatedRequest, res: Resp
 
 /**
  * POST /solucao-mentalidade/:consultaId/update-field
+ * Atualiza um campo da tabela s_agente_mentalidade_2
+ * O frontend envia fieldPath: 'mentalidade_data.nome_coluna' (ex: mentalidade_data.padrao_01)
+ * Mapeamos isso para a coluna real 'nome_coluna' (ex: padrao_01)
  */
 export async function updateSolucaoMentalidadeField(req: AuthenticatedRequest, res: Response) {
   try {
@@ -126,9 +129,92 @@ export async function updateSolucaoMentalidadeField(req: AuthenticatedRequest, r
     }
 
     const { consultaId } = req.params;
-    const result = await updateSolucaoFieldGeneric(TABLE_MAP['solucao-mentalidade'], consultaId, req.body);
+    const { fieldPath, value } = req.body;
 
-    return res.json({ success: true, solucao: result });
+    console.log('[updateSolucaoMentalidadeField] 📝 Atualizando:', { consultaId, fieldPath, value });
+
+    if (!fieldPath) {
+      return res.status(400).json({ success: false, error: 'fieldPath é obrigatório' });
+    }
+
+    // Extrair o nome da coluna real
+    // Esperado: mentalidade_data.NOME_COLUNA (ex: mentalidade_data.padrao_01)
+    const parts = fieldPath.split('.');
+
+    // Validação básica do formato
+    if (parts[0] !== 'mentalidade_data' || parts.length < 2) {
+      return res.status(400).json({ success: false, error: 'fieldPath deve começar com mentalidade_data.nome_coluna' });
+    }
+
+    // O nome da coluna é a segunda parte (ex: padrao_01, resumo_executivo, higiene_sono)
+    let columnName = parts[1];
+
+    // Lógica de atualização
+    const updatePayload: any = {};
+
+    // Se o path tiver mais de 2 partes (ex: mentalidade_data.higiene_sono.duracao_alvo),
+    // precisamos fazer um merge manual, pois o Supabase/Postgres substituiria o JSON inteiro.
+    if (parts.length > 2) {
+      console.log(`[updateSolucaoMentalidadeField] 🔄 Atualização aninhada detectada para coluna '${columnName}'`);
+
+      // 1. Buscar valor atual da coluna
+      const { data: currentData, error: fetchError } = await supabase
+        .from('s_agente_mentalidade_2')
+        .select(columnName)
+        .eq('consulta_id', consultaId)
+        .single();
+
+      if (fetchError) {
+        console.error(`[updateSolucaoMentalidadeField] ❌ Erro ao buscar dados atuais:`, fetchError);
+        throw fetchError;
+      }
+
+      let columnValue: any = currentData ? currentData[columnName] : {};
+      // Garantir que é objeto
+      if (!columnValue || typeof columnValue !== 'object') columnValue = {};
+
+      // 2. Aplicar a atualização no objeto (deep set)
+      let current: any = columnValue;
+      for (let i = 2; i < parts.length - 1; i++) {
+        const key = parts[i];
+        if (!current[key] || typeof current[key] !== 'object') {
+          current[key] = {}; // Criar caminho se não existir
+        }
+        current = current[key];
+      }
+
+      const lastKey = parts[parts.length - 1];
+      current[lastKey] = value;
+
+      // 3. Definir payload com o objeto completo atualizado
+      updatePayload[columnName] = columnValue;
+
+    } else {
+      // Atualização direta da coluna (root level)
+      updatePayload[columnName] = value;
+    }
+
+    // Salvar atualização
+    const { data, error: updateError } = await supabase
+      .from('s_agente_mentalidade_2')
+      .update(updatePayload)
+      .eq('consulta_id', consultaId)
+      .select()
+      .single();
+
+    if (updateError) {
+      // Se der erro de coluna não existe, tentamos dar uma dica melhor
+      if (updateError.code === '42703') { // Undefined column
+        console.error(`[updateSolucaoMentalidadeField] ❌ Coluna '${columnName}' não existe na tabela s_agente_mentalidade_2`);
+        return res.status(400).json({ success: false, error: `Campo '${columnName}' inválido para esta solução.` });
+      }
+
+      console.error('[updateSolucaoMentalidadeField] ❌ Erro ao atualizar:', updateError);
+      throw updateError;
+    }
+
+    console.log('[updateSolucaoMentalidadeField] ✅ Atualizado com sucesso');
+    return res.json({ success: true, solucao: data });
   } catch (error) {
     console.error('Erro ao atualizar solução mentalidade:', error);
     return res.status(500).json({ success: false, error: 'Erro ao atualizar' });
@@ -176,6 +262,8 @@ export async function getSolucaoSuplementacao(req: AuthenticatedRequest, res: Re
 
 /**
  * POST /solucao-suplementacao/:consultaId/update-field
+ * Atualiza um campo específico de um item dentro de uma categoria de suplementação
+ * Body: { category: 'suplementos'|'fitoterapicos'|'homeopatia'|'florais_bach', index: number, field: string, value: any }
  */
 export async function updateSolucaoSuplementacaoField(req: AuthenticatedRequest, res: Response) {
   try {
@@ -184,9 +272,67 @@ export async function updateSolucaoSuplementacaoField(req: AuthenticatedRequest,
     }
 
     const { consultaId } = req.params;
-    const result = await updateSolucaoFieldGeneric(TABLE_MAP['solucao-suplementacao'], consultaId, req.body);
+    const { category, index, field, value } = req.body;
 
-    return res.json({ success: true, solucao: result });
+    console.log('[updateSolucaoSuplementacaoField] 📝 Atualizando:', { consultaId, category, index, field, value });
+
+    if (!category || index === undefined || !field) {
+      return res.status(400).json({ success: false, error: 'category, index e field são obrigatórios' });
+    }
+
+    // Buscar dados existentes
+    const { data: existing, error: fetchError } = await supabase
+      .from('s_suplementacao2')
+      .select('*')
+      .eq('consulta_id', consultaId)
+      .maybeSingle();
+
+    if (fetchError) {
+      console.error('[updateSolucaoSuplementacaoField] ❌ Erro ao buscar:', fetchError);
+      throw fetchError;
+    }
+
+    if (!existing) {
+      return res.status(404).json({ success: false, error: 'Registro de suplementação não encontrado' });
+    }
+
+    // Obter o array da categoria
+    const categoryArray = existing[category] || [];
+
+    // Parse cada item do array (são JSON strings)
+    const parsedArray = categoryArray.map((item: string) => {
+      try { return JSON.parse(item); } catch { return item; }
+    });
+
+    // Verificar se o índice existe
+    if (index < 0 || index >= parsedArray.length) {
+      return res.status(400).json({ success: false, error: 'Índice inválido' });
+    }
+
+    // Atualizar o campo do item específico
+    parsedArray[index] = {
+      ...parsedArray[index],
+      [field]: value
+    };
+
+    // Converter de volta para JSON strings
+    const updatedArray = parsedArray.map((item: any) => JSON.stringify(item));
+
+    // Salvar no banco
+    const { data, error: updateError } = await supabase
+      .from('s_suplementacao2')
+      .update({ [category]: updatedArray })
+      .eq('consulta_id', consultaId)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error('[updateSolucaoSuplementacaoField] ❌ Erro ao atualizar:', updateError);
+      throw updateError;
+    }
+
+    console.log('[updateSolucaoSuplementacaoField] ✅ Atualizado com sucesso');
+    return res.json({ success: true, solucao: data });
   } catch (error) {
     console.error('Erro ao atualizar solução suplementação:', error);
     return res.status(500).json({ success: false, error: 'Erro ao atualizar' });
@@ -291,6 +437,8 @@ export async function getAlimentacao(req: AuthenticatedRequest, res: Response) {
 
 /**
  * POST /alimentacao/:consultaId/update-field
+ * Atualiza um campo específico de um alimento pelo ID do registro
+ * Body: { id: number, field: string, value: any } ou { id: number, alimento, tipo, gramatura, kcal }
  */
 export async function updateAlimentacaoField(req: AuthenticatedRequest, res: Response) {
   try {
@@ -299,9 +447,46 @@ export async function updateAlimentacaoField(req: AuthenticatedRequest, res: Res
     }
 
     const { consultaId } = req.params;
-    const result = await updateSolucaoFieldGeneric(TABLE_MAP['alimentacao'], consultaId, req.body);
+    const { id, field, value, alimento, tipo, gramatura, kcal } = req.body;
 
-    return res.json({ success: true, alimentacao: result });
+    console.log('[updateAlimentacaoField] 📝 Atualizando alimento:', { consultaId, alimentoId: id, body: req.body });
+
+    if (!id) {
+      return res.status(400).json({ success: false, error: 'ID do alimento é obrigatório' });
+    }
+
+    // Construir objeto de atualização
+    let updateData: Record<string, any> = {};
+
+    if (field && value !== undefined) {
+      // Formato { id, field, value }
+      updateData[field] = value;
+    } else {
+      // Formato legado com campos específicos
+      if (alimento !== undefined) updateData.alimento = alimento;
+      if (tipo !== undefined) updateData.tipo_de_alimentos = tipo;
+      if (gramatura !== undefined) updateData.gramatura = gramatura;
+      if (kcal !== undefined) updateData.kcal = kcal;
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ success: false, error: 'Nenhum campo para atualizar' });
+    }
+
+    const { data, error } = await supabase
+      .from('s_gramaturas_alimentares')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('[updateAlimentacaoField] ❌ Erro:', error);
+      throw error;
+    }
+
+    console.log('[updateAlimentacaoField] ✅ Atualizado:', data);
+    return res.json({ success: true, alimentacao: data });
   } catch (error) {
     console.error('Erro ao atualizar alimentação:', error);
     return res.status(500).json({ success: false, error: 'Erro ao atualizar' });
@@ -343,6 +528,8 @@ export async function getAtividadeFisica(req: AuthenticatedRequest, res: Respons
 
 /**
  * POST /atividade-fisica/:consultaId/update-field
+ * Atualiza um campo específico de um exercício pelo ID do exercício
+ * Body: { id: number, field: string, value: any }
  */
 export async function updateAtividadeFisicaField(req: AuthenticatedRequest, res: Response) {
   try {
@@ -351,9 +538,33 @@ export async function updateAtividadeFisicaField(req: AuthenticatedRequest, res:
     }
 
     const { consultaId } = req.params;
-    const result = await updateSolucaoFieldGeneric(TABLE_MAP['atividade-fisica'], consultaId, req.body);
+    const { id, field, value } = req.body;
 
-    return res.json({ success: true, atividadeFisica: result });
+    console.log('[updateAtividadeFisicaField] 📝 Atualizando exercício:', { consultaId, exercicioId: id, field, value });
+
+    if (!id || !field) {
+      return res.status(400).json({ success: false, error: 'ID e field são obrigatórios' });
+    }
+
+    // Atualizar o campo específico do exercício pelo seu ID
+    const updateData: Record<string, any> = {};
+    updateData[field] = value;
+
+    const { data, error } = await supabase
+      .from('s_exercicios_fisicos')
+      .update(updateData)
+      .eq('id', id)
+      .eq('consulta_id', consultaId) // Garantir que pertence à consulta certa
+      .select()
+      .single();
+
+    if (error) {
+      console.error('[updateAtividadeFisicaField] ❌ Erro:', error);
+      throw error;
+    }
+
+    console.log('[updateAtividadeFisicaField] ✅ Atualizado:', data);
+    return res.json({ success: true, atividadeFisica: data });
   } catch (error) {
     console.error('Erro ao atualizar atividade física:', error);
     return res.status(500).json({ success: false, error: 'Erro ao atualizar' });

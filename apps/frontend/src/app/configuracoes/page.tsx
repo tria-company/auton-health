@@ -58,27 +58,27 @@ export default function ConfiguracoesPage() {
   const fetchMedicoData = async () => {
     try {
       setLoading(true);
-      
+
       // Buscar usuário autenticado
       const { data: { user }, error: userError } = await supabase.auth.getUser();
-      
+
       if (userError || !user) {
         throw new Error('Usuário não autenticado');
       }
-      
+
       // Buscar dados do médico
       const { data: medico, error: medicoError } = await supabase
         .from('medicos')
         .select('*')
         .eq('user_auth', user.id)
         .single();
-      
+
       if (medicoError || !medico) {
         throw new Error('Erro ao carregar dados do médico');
       }
-      
+
       setMedico(medico);
-      
+
       // Preencher formulário com dados existentes e aplicar máscaras
       setFormData({
         name: medico.name || '',
@@ -99,10 +99,10 @@ export default function ConfiguracoesPage() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    
+
     // Aplica máscaras específicas
     let formattedValue = value;
-    
+
     if (name === 'phone') {
       formattedValue = formatPhone(value);
     } else if (name === 'cpf') {
@@ -118,7 +118,7 @@ export default function ConfiguracoesPage() {
         setCpfError(null);
       }
     }
-    
+
     setFormData(prev => ({
       ...prev,
       [name]: formattedValue
@@ -127,14 +127,14 @@ export default function ConfiguracoesPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Validações antes de enviar
     if (formData.cpf && !validateCPF(formData.cpf)) {
       setError('Por favor, insira um CPF válido.');
       setCpfError('CPF inválido');
       return;
     }
-    
+
     try {
       setSaving(true);
       setError(null);
@@ -142,7 +142,7 @@ export default function ConfiguracoesPage() {
 
       // Buscar usuário autenticado
       const { data: { user }, error: userError } = await supabase.auth.getUser();
-      
+
       if (userError || !user) {
         throw new Error('Usuário não autenticado');
       }
@@ -152,6 +152,7 @@ export default function ConfiguracoesPage() {
         ...formData,
         phone: removeMask(formData.phone),
         cpf: removeMask(formData.cpf),
+        birth_date: formData.birth_date ? formData.birth_date : null,
       };
 
       // Atualizar dados do médico no Supabase
@@ -168,7 +169,7 @@ export default function ConfiguracoesPage() {
 
       setMedico(updatedMedico);
       setSuccess('Dados atualizados com sucesso!');
-      
+
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao atualizar dados');
     } finally {
@@ -192,7 +193,7 @@ export default function ConfiguracoesPage() {
           <h1 className="configuracoes-title">Configurações</h1>
           <p className="configuracoes-subtitle">Gerenciando suas informações pessoais</p>
         </div>
-        
+
         <div className="loading-indicator">
           <div className="loading-icon"></div>
           <span>Carregando dados...</span>
@@ -392,8 +393,8 @@ export default function ConfiguracoesPage() {
           )}
 
           <div className="form-actions">
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               className="btn btn-primary btn-large"
               disabled={saving}
             >

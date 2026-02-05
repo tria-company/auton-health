@@ -528,3 +528,97 @@ export async function finalizeConsultationRemote(req: AuthenticatedRequest, res:
     });
   }
 }
+
+/**
+ * POST /consultations/schedule
+ * Cria um agendamento de consulta com verificação de conflito de horário
+ */
+export async function createScheduledConsultation(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autorizado' });
+    }
+
+    const { patient_id, patient_name, consultation_type, scheduled_date, duration_minutes = 60 } = req.body;
+    const doctorAuthId = req.user.id;
+
+    if (!patient_id || !scheduled_date) {
+      return res.status(400).json({ success: false, error: 'Dados incompletos para agendamento' });
+    }
+
+    // Buscar médico
+    const { data: medico, error: medicoError } = await supabase
+      .from('medicos')
+      .select('id')
+      .eq('user_auth', doctorAuthId)
+      .single();
+
+    if (medicoError || !medico) {
+      return res.status(404).json({ success: false, error: 'Médico não encontrado' });
+    }
+
+    const doctorId = medico.id;
+    const startTime = new Date(scheduled_date);
+    const endTime = new Date(startTime.getTime() + duration_minutes * 60000);
+
+    // 🔍 Verificar conflitos de horário
+    // Intervalo [start, end]
+    // Conflito se: (existing.start < new.end) AND (existing.end > new.start)
+    // E status não é cancelado/arquivado
+    const { data: conflicts, error: conflictError } = await supabase
+      .from('consultations')
+      .select('id, consulta_inicio, consulta_fim, status')
+      .eq('doctor_id', doctorId)
+      .neq('status', 'cancelled')
+      .neq('status', 'archived')
+      .lt('consulta_inicio', endTime.toISOString())
+      .gt('consulta_fim', startTime.toISOString());
+
+    if (conflictError) {
+      console.error('Erro ao verificar conflitos:', conflictError);
+      return res.status(500).json({ success: false, error: 'Erro ao verificar disponibilidade' });
+    }
+
+    if (conflicts && conflicts.length > 0) {
+      console.warn(`⚠️ Conflito de horário detectado para médico ${doctorId}:`, conflicts);
+      return res.status(409).json({
+        success: false,
+        error: 'Este horário já está ocupado por outra consulta.',
+        conflicts
+      });
+    }
+
+    // ✅ Sem conflitos, criar agendamento
+    const { data: newConsultation, error: createError } = await supabase
+      .from('consultations')
+      .insert({
+        patient_id,
+        patient_name,
+        consultation_type: consultation_type === 'online' ? 'TELEMEDICINA' : 'PRESENCIAL',
+        status: 'AGENDAMENTO',
+        consulta_inicio: startTime.toISOString(),
+        consulta_fim: endTime.toISOString(),
+        doctor_id: doctorId,
+        created_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+
+    if (createError) {
+      console.error('Erro ao criar agendamento:', createError);
+      return res.status(500).json({ success: false, error: 'Erro ao criar agendamento' });
+    }
+
+    return res.status(201).json({
+      success: true,
+      consultation: newConsultation
+    });
+
+  } catch (error) {
+    console.error('Erro ao agendar consulta:', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Erro interno do servidor'
+    });
+  }
+}

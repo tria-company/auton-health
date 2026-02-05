@@ -960,7 +960,7 @@ export default function PatientsPage() {
         >
           <div className="modal-content user-management-modal">
             <div className="modal-header">
-              <h3 className="modal-title">Gerenciar Acesso do Paciente</h3>
+              <h3 className="modal-title" style={{ color: '#ffffff' }}>Gerenciar Acesso do Paciente</h3>
               <button
                 className="modal-close-btn"
                 onClick={() => setShowUserManagementModal(null)}

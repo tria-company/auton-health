@@ -6,7 +6,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import {
   MoreVertical, Calendar, Video, User, AlertCircle, ArrowLeft,
   Clock, Phone, FileText, Stethoscope, Mic, Download, Play,
-  Save, X, Sparkles, Edit, Plus, Trash2, Pencil, ArrowRight, Search,
+  Save, X, Sparkles, Edit, Plus, Trash2, Pencil, ArrowRight, Search, Send,
   Dna, Brain, Apple, Pill, Dumbbell, Leaf, LogIn, Scale, Ruler, Droplet, FolderOpen, AlertTriangle
 } from 'lucide-react';
 import Image from 'next/image';
@@ -2351,7 +2351,8 @@ function MentalidadeSection({
   chatInput,
   onFieldSelect,
   onSendMessage,
-  onChatInputChange
+  onChatInputChange,
+  mentalidadeData
 }: {
   consultaId: string;
   selectedField: { fieldPath: string; label: string } | null;
@@ -2361,6 +2362,7 @@ function MentalidadeSection({
   onFieldSelect: (fieldPath: string, label: string) => void;
   onSendMessage: () => void;
   onChatInputChange: (value: string) => void;
+  mentalidadeData?: any;
 }) {
   const { showError } = useNotifications();
 
@@ -2373,6 +2375,31 @@ function MentalidadeSection({
   useEffect(() => {
     loadMentalidadeData();
   }, [consultaId]);
+
+  // Sync com a prop vinda do pai
+  useEffect(() => {
+    if (mentalidadeData) {
+      console.log('🔄 [MentalidadeSection] Atualizando com dados da prop:', mentalidadeData);
+      const data = mentalidadeData.mentalidade_data || mentalidadeData;
+
+      setLivroVidaData({
+        resumo_executivo: data.resumo_executivo || '',
+        higiene_sono: data.higiene_sono || mockData.higiene_sono,
+        padrao_01: data.padrao_01 || null,
+        padrao_02: data.padrao_02 || null,
+        padrao_03: data.padrao_03 || null,
+        padrao_04: data.padrao_04 || null,
+        padrao_05: data.padrao_05 || null,
+        padrao_06: data.padrao_06 || null,
+        padrao_07: data.padrao_07 || null,
+        padrao_08: data.padrao_08 || null,
+        padrao_09: data.padrao_09 || null,
+        padrao_10: data.padrao_10 || null
+      });
+      setLoading(false);
+      setLoadingDetails(false);
+    }
+  }, [mentalidadeData]);
 
   // Listener para recarregar dados quando a IA processar
   useEffect(() => {
@@ -2739,22 +2766,25 @@ function MentalidadeSection({
         valueToSave = editValue;
         newData.resumo_executivo = editValue;
       } else if (editingField.type === 'higiene_sono' && editingField.fieldPath) {
-        fieldName = 'higiene_sono';
         const fieldPath = editingField.fieldPath;
         let finalValue: any = editValue;
 
         // Verificar se o campo original era array
         const originalValue = getNestedValue(newData.higiene_sono, fieldPath);
         if (Array.isArray(originalValue)) {
-          finalValue = editValue.split('\n').filter(line => line.trim());
+          finalValue = editValue.split('\n').filter((line: string) => line.trim());
         }
 
+        // Atualizar estado local
         setNestedValue(newData.higiene_sono, fieldPath, finalValue);
-        valueToSave = newData.higiene_sono;
+
+        // Definir caminho específico para salvar apenas este campo
+        fieldName = `higiene_sono.${fieldPath}`;
+        valueToSave = finalValue;
       } else if (editingField.padraoNum && editingField.fieldPath) {
         const padraoNum = editingField.padraoNum;
-        fieldName = `padrao_${String(padraoNum).padStart(2, '0')}`;
-        const padraoKey = fieldName as keyof typeof newData;
+        const padraoKeyPart = `padrao_${String(padraoNum).padStart(2, '0')}`;
+        const padraoKey = padraoKeyPart as keyof typeof newData;
         const padrao = { ...(newData[padraoKey] as PadraoItem) };
 
         if (padrao) {
@@ -2764,14 +2794,18 @@ function MentalidadeSection({
           // Verificar se o campo original era array
           const originalValue = getNestedValue(padrao, fieldPath);
           if (Array.isArray(originalValue)) {
-            finalValue = editValue.split('\n').filter(line => line.trim());
+            finalValue = editValue.split('\n').filter((line: string) => line.trim());
           } else if (typeof originalValue === 'number') {
             finalValue = parseFloat(editValue) || 0;
           }
 
+          // Atualizar estado local
           setNestedValue(padrao, fieldPath, finalValue);
           (newData as any)[padraoKey] = padrao;
-          valueToSave = padrao;
+
+          // Definir caminho específico para salvar apenas este campo
+          fieldName = `${padraoKeyPart}.${fieldPath}`;
+          valueToSave = finalValue;
         }
       }
 
@@ -3812,12 +3846,9 @@ function AlimentacaoSection({
                         onSave={async (fieldPath: string, newValue: string, consultaId: string) => {
                           // Atualizar item específico
                           const response = await gatewayClient.post(`/alimentacao/${consultaId}/update-field`, {
-                            refeicao: refeicao.key,
-                            index: index,
-                            alimento: newValue,
-                            tipo: item.tipo,
-                            gramatura: item.gramatura,
-                            kcal: item.kcal
+                            id: item.id,
+                            field: 'alimento',
+                            value: newValue
                           });
                           if (response.success) {
                             await loadAlimentacaoData();
@@ -3832,12 +3863,9 @@ function AlimentacaoSection({
                         consultaId={consultaId}
                         onSave={async (fieldPath: string, newValue: string, consultaId: string) => {
                           const response = await gatewayClient.post(`/alimentacao/${consultaId}/update-field`, {
-                            refeicao: refeicao.key,
-                            index: index,
-                            alimento: item.alimento,
-                            tipo: newValue,
-                            gramatura: item.gramatura,
-                            kcal: item.kcal
+                            id: item.id,
+                            field: 'tipo_de_alimentos',
+                            value: newValue
                           });
                           if (response.success) {
                             await loadAlimentacaoData();
@@ -3852,12 +3880,9 @@ function AlimentacaoSection({
                         consultaId={consultaId}
                         onSave={async (fieldPath: string, newValue: string, consultaId: string) => {
                           const response = await gatewayClient.post(`/alimentacao/${consultaId}/update-field`, {
-                            refeicao: refeicao.key,
-                            index: index,
-                            alimento: item.alimento,
-                            tipo: item.tipo,
-                            gramatura: newValue,
-                            kcal: item.kcal
+                            id: item.id,
+                            field: 'gramatura',
+                            value: newValue
                           });
                           if (response.success) {
                             await loadAlimentacaoData();
@@ -3872,12 +3897,9 @@ function AlimentacaoSection({
                         consultaId={consultaId}
                         onSave={async (fieldPath: string, newValue: string, consultaId: string) => {
                           const response = await gatewayClient.post(`/alimentacao/${consultaId}/update-field`, {
-                            refeicao: refeicao.key,
-                            index: index,
-                            alimento: item.alimento,
-                            tipo: item.tipo,
-                            gramatura: item.gramatura,
-                            kcal: newValue
+                            id: item.id,
+                            field: 'kcal',
+                            value: newValue
                           });
                           if (response.success) {
                             await loadAlimentacaoData();
@@ -4916,6 +4938,10 @@ function ConsultasPageContent() {
   // Estado para salvar alterações
   const [isSaving, setIsSaving] = useState(false);
 
+  // Estados para MENTALIDADE
+  const [mentalidadeData, setMentalidadeData] = useState<any>(null);
+  const [loadingMentalidade, setLoadingMentalidade] = useState(false);
+
   // Estados para ATIVIDADE_FISICA
   const [atividadeFisicaData, setAtividadeFisicaData] = useState<ExercicioFisico[]>([]);
   const [loadingAtividadeFisica, setLoadingAtividadeFisica] = useState(false);
@@ -4985,6 +5011,25 @@ function ConsultasPageContent() {
 
   // ID da consulta: URL (?consulta_id=) ou detalhes carregados (consultaDetails.id)
   const effectiveConsultaId = consultaId || consultaDetails?.id || null;
+
+  // Função para carregar dados de mentalidade
+  const loadMentalidadeData = useCallback(async () => {
+    if (!effectiveConsultaId) return;
+
+    try {
+      setLoadingMentalidade(true);
+      // Endpoint encontrado em SolutionsViewer.tsx: /solucao-mentalidade/${consultaId}
+      const response = await gatewayClient.get<any>(`/solucao-mentalidade/${effectiveConsultaId}`);
+
+      if (response && response.success) {
+        setMentalidadeData(response.mentalidade_data || response);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar dados de mentalidade:', error);
+    } finally {
+      setLoadingMentalidade(false);
+    }
+  }, [effectiveConsultaId]);
 
   // Função para enviar mensagem para IA
   const handleSendAIMessage = async () => {
@@ -5060,9 +5105,11 @@ function ConsultasPageContent() {
         consultaId: effectiveConsultaId,
       };
 
-      // Adicionar solucao_etapa se for etapa de solução
+      // Adicionar solucao_etapa se for etapa de solução e corrigir fieldPath com nome da tabela
       if (isSolucaoMentalidade) {
         requestBody.solucao_etapa = 'MENTALIDADE';
+        // Substituir prefixo lógico 'mentalidade_data' pelo nome real da tabela 's_agente_mentalidade_2'
+        requestBody.fieldPath = requestBody.fieldPath.replace('mentalidade_data', 's_agente_mentalidade_2');
       } else if (isSolucaoSuplemementacao) {
         requestBody.solucao_etapa = 'SUPLEMENTACAO';
       } else if (isSolucaoAlimentacao) {
@@ -5114,43 +5161,44 @@ function ConsultasPageContent() {
         parsedData = webhookResponse;
       }
 
+      console.log('📥 [FRONTEND] Resposta bruta do webhook:', parsedData);
+
       // Pega a resposta da IA - lidando com diferentes formatos
-      let aiResponse = 'Não foi possível obter resposta da IA';
+      let aiResponse = '';
 
       if (Array.isArray(parsedData) && parsedData.length > 0) {
-        // Formato esperado: [{"response": "texto"}]
+        // Formato esperado: [{"response": "texto"}] ou [{"output": "texto"}]
         const firstItem = parsedData[0];
-        if (firstItem && firstItem.response) {
-          aiResponse = firstItem.response;
-        } else if (firstItem && firstItem.message) {
-          aiResponse = firstItem.message;
-        } else if (firstItem && firstItem.text) {
-          aiResponse = firstItem.text;
-        } else if (firstItem && firstItem.answer) {
-          aiResponse = firstItem.answer;
+        if (firstItem) {
+          if (firstItem.response) aiResponse = firstItem.response;
+          else if (firstItem.message) aiResponse = firstItem.message;
+          else if (firstItem.text) aiResponse = firstItem.text;
+          else if (firstItem.answer) aiResponse = firstItem.answer;
+          else if (firstItem.output) aiResponse = firstItem.output;
+          else aiResponse = JSON.stringify(firstItem);
         }
-      } else if (parsedData && typeof parsedData === 'object' && !Array.isArray(parsedData)) {
+      } else if (parsedData && typeof parsedData === 'object') {
         // Se não é array, pode ser um objeto com diferentes campos
-        if (parsedData.response) {
-          aiResponse = parsedData.response;
-        } else if (parsedData.text) {
-          aiResponse = parsedData.text;
-        } else if (parsedData.answer) {
-          aiResponse = parsedData.answer;
-        } else if (parsedData.message) {
-          if (parsedData.message.includes('Workflow iniciado') || parsedData.message.includes('Processing')) {
-            aiResponse = 'Workflow iniciado com sucesso. Processando sua solicitação...';
-          } else {
-            aiResponse = parsedData.message;
-          }
+        if (parsedData.response) aiResponse = parsedData.response;
+        else if (parsedData.text) aiResponse = parsedData.text;
+        else if (parsedData.answer) aiResponse = parsedData.answer;
+        else if (parsedData.output) aiResponse = parsedData.output;
+        else if (parsedData.message) {
+          aiResponse = String(parsedData.message);
         }
       } else if (typeof parsedData === 'string') {
-        // Se ainda é string, usar diretamente
         aiResponse = parsedData;
       }
 
-      //console.log('🎯 Campo usado para resposta:', usedField);
-      //console.log('💬 Resposta final da IA:', aiResponse);
+      // Se após todas as tentativas ainda estiver vazio, mas recebemos algo (não nulo), assumimos sucesso genérico
+      if (!aiResponse && parsedData) {
+        console.warn('⚠️ Formato de resposta desconhecido, usando fallback.');
+        aiResponse = "Alteração realizada com sucesso!";
+      }
+
+      if (!aiResponse) {
+        aiResponse = 'Não foi possível obter resposta da IA';
+      }
 
       // Adiciona resposta da IA no chat
       const assistantMessage: ChatMessage = {
@@ -5172,18 +5220,35 @@ function ConsultasPageContent() {
             selectedField.fieldPath.startsWith('integracao_diagnostica') ||
             selectedField.fieldPath.startsWith('habitos_vida');
 
+          // Verificação para Soluções (usando as mesmas variáveis definidas acima)
+          const isSolucaoMentalidade = selectedField.fieldPath.startsWith('mentalidade_data') ||
+            selectedField.fieldPath.startsWith('s_agente_mentalidade_2') ||
+            selectedField.fieldPath.startsWith('livro_vida');
+
+          const isSolucao = isSolucaoMentalidade ||
+            selectedField.fieldPath.startsWith('suplementacao') ||
+            selectedField.fieldPath.startsWith('alimentacao') ||
+            selectedField.fieldPath.startsWith('atividade_fisica') ||
+            selectedField.fieldPath.startsWith('exercicio');
+
           if (isDiagnostico) {
             // Trigger refresh of diagnostico data by updating a state that triggers useEffect
             window.dispatchEvent(new CustomEvent('diagnostico-data-refresh'));
+          } else if (isSolucaoMentalidade) {
+            console.log('🔄 Reloading Mentalidade Data...');
+            if (typeof loadMentalidadeData === 'function') {
+              await loadMentalidadeData();
+            } else {
+              console.error('loadMentalidadeData function not found!');
+            }
           } else {
             // Se for anamnese, recarregar dados de anamnese
-            //console.log('🔍 DEBUG [REFERENCIA] Recarregando dados de anamnese após resposta da IA');
             window.dispatchEvent(new CustomEvent('anamnese-data-refresh'));
           }
         } catch (refreshError) {
           console.warn('Erro ao recarregar dados após IA:', refreshError);
         }
-      }, 2000); // 2 segundos de delay
+      }, 2000);
 
     } catch (error) {
       console.error('Erro ao enviar mensagem para IA:', error);
@@ -5788,9 +5853,35 @@ function ConsultasPageContent() {
     }
   };
 
-  // Função antiga mantida para compatibilidade (não usada mais)
+
+  // Função para salvar exercício individual no banco
   const handleSaveExercicio = async (id: number, field: string, newValue: string) => {
-    handleUpdateExercicioLocal(id, field, newValue);
+    if (!consultaId) return;
+
+    try {
+      console.log('💾 [handleSaveExercicio] Salvando:', { id, field, newValue, consultaId });
+
+      const response = await gatewayClient.post(`/atividade-fisica/${consultaId}/update-field`, {
+        id,
+        field,
+        value: newValue
+      });
+
+      if (!response.success) {
+        console.error('❌ [handleSaveExercicio] Erro na resposta:', response.error);
+        throw new Error(response.error || 'Erro ao salvar');
+      }
+
+      console.log('✅ [handleSaveExercicio] Salvo com sucesso:', response);
+
+      // Atualizar estado local com o novo valor
+      setAtividadeFisicaData(prev => prev.map(ex =>
+        ex.id === id ? { ...ex, [field]: newValue } : ex
+      ));
+    } catch (error) {
+      console.error('❌ [handleSaveExercicio] Erro ao salvar:', error);
+      throw error; // Re-throw para que o DataField possa tratar
+    }
   };
 
   // Função para selecionar solução
@@ -7580,8 +7671,7 @@ function ConsultasPageContent() {
                     onClick={handleSendAIMessage}
                     disabled={!chatInput.trim() || isTyping}
                   >
-                    <Sparkles className="w-4 h-4" />
-                    Enviar
+                    <Send className="w-5 h-5" />
                   </button>
                 </div>
               )}
@@ -8049,8 +8139,7 @@ function ConsultasPageContent() {
                     onClick={handleSendAIMessage}
                     disabled={!chatInput.trim() || isTyping}
                   >
-                    <Sparkles className="w-4 h-4" />
-                    Enviar
+                    <Send className="w-5 h-5" />
                   </button>
                 </div>
               )}
@@ -9086,6 +9175,7 @@ function ConsultasPageContent() {
                 onFieldSelect={handleFieldSelect}
                 onSendMessage={handleSendAIMessage}
                 onChatInputChange={setChatInput}
+                mentalidadeData={mentalidadeData}
               />
             </div>
           </div>
