@@ -36,16 +36,42 @@ interface AnamneseFormData {
   leguminosas?: any[];
   gorduras?: any[];
   frutas?: any[];
+  /** Ervas e temperos: persistido junto com vegetais (mesma coluna) */
+  ervas_temperos?: any[];
 }
 
-// Opções para seleções múltiplas
-const proteinasOptions = ['Carne bovina', 'Carne suína', 'Frango', 'Peixe', 'Ovos', 'Queijo', 'Iogurte', 'Tofu', 'Lentilha', 'Grão de bico', 'Feijão'];
-const carboidratosOptions = ['Arroz', 'Arroz integral', 'Batata', 'Batata doce', 'Massa', 'Pão', 'Pão integral', 'Aveia', 'Quinoa', 'Macarrão', 'Farinha'];
-const vegetaisOptions = ['Alface', 'Rúcula', 'Espinafre', 'Couve', 'Brócolis', 'Repolho', 'Acelga', 'Agrião', 'Salsinha', 'Cebolinha'];
-const legumesOptions = ['Abobrinha', 'Berinjela', 'Pimentão', 'Tomate', 'Cenoura', 'Chuchu', 'Vagem', 'Quiabo', 'Pepino', 'Abóbora'];
-const leguminosasOptions = ['Feijão', 'Grão de bico', 'Lentilha', 'Ervilha', 'Soja', 'Amendoim'];
-const gordurasOptions = ['Azeite de oliva', 'Óleo de coco', 'Manteiga', 'Abacate', 'Castanhas', 'Nozes', 'Amendoim', 'Sementes'];
-const frutasOptions = ['Maçã', 'Banana', 'Laranja', 'Morango', 'Uva', 'Manga', 'Abacaxi', 'Melancia', 'Pêra', 'Pêssego', 'Limão'];
+// Opções para seleções múltiplas (anamnese inicial)
+const proteinasOptions = [
+  'Peito de frango', 'Coxa e sobrecoxa de frango', 'Carne moída magra (patinho, coxão mole)', 'Bife magro (alcatra, patinho, coxão duro)',
+  'Fígado bovino', 'Fígado de frango', 'Peru', 'Ovos', 'Ovos de codorna', 'Sardinha em azeite de oliva', 'Atum em azeite de oliva',
+  'Tilápia', 'Salmão', 'Camarão', 'Linguado', 'Merluza', 'Pintado', 'Robalo', 'Dourado', 'Mariscos', 'Tofu', 'Edamame', 'Levedura nutricional'
+];
+const carboidratosOptions = [
+  'Arroz branco', 'Arroz integral', 'Arroz vermelho', 'Arroz negro', 'Batata doce (incluindo batata doce roxa)', 'Batata inglesa (batata comum)',
+  'Batata yacon', 'Mandioca (aipim)', 'Mandioca seca (farinha de mandioca, farinha de tapioca)', 'Mandioquinha (batata-baroa)', 'Inhame',
+  'Banana-da-terra', 'Abóbora (moranga, cabotiá, jerimum)', 'Milho verde', 'Aveia sem glúten', 'Quinoa em grãos', 'Tapioca', 'Cuscuz de milho',
+  'Trigo sarraceno (buckwheat)'
+];
+const vegetaisFolhososOptions = [
+  'Alface', 'Rúcula', 'Agrião', 'Couve', 'Espinafre', 'Chicória', 'Radicchio (chicória vermelha)', 'Almeirão', 'Escarola', 'Acelga', 'Endívia', 'Folhas de beterraba'
+];
+const ervasTemperosOptions = ['Coentro', 'Salsa', 'Hortelã', 'Manjericão'];
+const legumesOptions = [
+  'Brócolis', 'Chuchu', 'Vagem', 'Abóbora (moranga, cabotiá, jerimum)', 'Berinjela', 'Palmito', 'Quiabo', 'Mandioquinha (batata-baroa)',
+  'Cogumelos (shiitake, champignon, portobello etc.)', 'Ora-pro-nóbis', 'Maxixe', 'Aspargos'
+];
+const leguminosasOptions = [
+  'Feijão carioca', 'Feijão preto', 'Feijão branco', 'Feijão fradinho', 'Feijão-de-corda', 'Feijão rosinha', 'Feijão jalo', 'Feijão manteiguinha',
+  'Lentilha (vermelha e verde)', 'Grão-de-bico', 'Ervilha seca'
+];
+const gordurasOptions = [
+  'Azeite de oliva', 'Abacate', 'Castanha-do-pará', 'Castanha de caju', 'Nozes', 'Pasta de amêndoas', 'Tahine', 'Chia', 'Linhaça',
+  'Semente de abóbora', 'Semente de girassol', 'Semente de gergelim'
+];
+const frutasOptions = [
+  'Banana', 'Maçã', 'Mamão', 'Laranja', 'Tangerina', 'Melão', 'Goiaba', 'Maracujá', 'Morango', 'Framboesa', 'Mirtilo', 'Kiwi',
+  'Jabuticaba', 'Figo', 'Nectarina', 'Romã', 'Cereja', 'Pitaya'
+];
 
 function AnamneseInicialContent() {
   const router = useRouter();
@@ -79,26 +105,28 @@ function AnamneseInicialContent() {
         const loadedData = { ...data.anamnese };
         
         // Para cada categoria, calcular o inverso (todos - desejados = não desejados)
+        const desejados = data.anamnese;
         if (loadedData.proteinas) {
-          loadedData.proteinas = proteinasOptions.filter(item => !(data.anamnese.proteinas || []).includes(item));
+          loadedData.proteinas = proteinasOptions.filter(item => !(desejados.proteinas || []).includes(item));
         }
         if (loadedData.carboidratos) {
-          loadedData.carboidratos = carboidratosOptions.filter(item => !(data.anamnese.carboidratos || []).includes(item));
+          loadedData.carboidratos = carboidratosOptions.filter(item => !(desejados.carboidratos || []).includes(item));
         }
-        if (loadedData.vegetais) {
-          loadedData.vegetais = vegetaisOptions.filter(item => !(data.anamnese.vegetais || []).includes(item));
-        }
+        // vegetais no DB pode conter folhosos + ervas/temperos; ao carregar separamos
+        const vegetaisDesejados = desejados.vegetais || [];
+        loadedData.vegetais = vegetaisFolhososOptions.filter(item => !vegetaisDesejados.includes(item));
+        loadedData.ervas_temperos = ervasTemperosOptions.filter(item => !vegetaisDesejados.includes(item));
         if (loadedData.legumes) {
-          loadedData.legumes = legumesOptions.filter(item => !(data.anamnese.legumes || []).includes(item));
+          loadedData.legumes = legumesOptions.filter(item => !(desejados.legumes || []).includes(item));
         }
         if (loadedData.leguminosas) {
-          loadedData.leguminosas = leguminosasOptions.filter(item => !(data.anamnese.leguminosas || []).includes(item));
+          loadedData.leguminosas = leguminosasOptions.filter(item => !(desejados.leguminosas || []).includes(item));
         }
         if (loadedData.gorduras) {
-          loadedData.gorduras = gordurasOptions.filter(item => !(data.anamnese.gorduras || []).includes(item));
+          loadedData.gorduras = gordurasOptions.filter(item => !(desejados.gorduras || []).includes(item));
         }
         if (loadedData.frutas) {
-          loadedData.frutas = frutasOptions.filter(item => !(data.anamnese.frutas || []).includes(item));
+          loadedData.frutas = frutasOptions.filter(item => !(desejados.frutas || []).includes(item));
         }
         
         setFormData(loadedData);
@@ -155,9 +183,12 @@ function AnamneseInicialContent() {
       if (invertedFormData.carboidratos) {
         invertedFormData.carboidratos = carboidratosOptions.filter(item => !(formData.carboidratos || []).includes(item));
       }
-      if (invertedFormData.vegetais) {
-        invertedFormData.vegetais = vegetaisOptions.filter(item => !(formData.vegetais || []).includes(item));
-      }
+      // vegetais: junta folhosos + ervas/temperos (mesma coluna no DB)
+      const vegetaisDesejados = [
+        ...vegetaisFolhososOptions.filter(item => !(formData.vegetais || []).includes(item)),
+        ...ervasTemperosOptions.filter(item => !(formData.ervas_temperos || []).includes(item))
+      ];
+      invertedFormData.vegetais = vegetaisDesejados;
       if (invertedFormData.legumes) {
         invertedFormData.legumes = legumesOptions.filter(item => !(formData.legumes || []).includes(item));
       }
@@ -513,38 +544,6 @@ function AnamneseInicialContent() {
             </div>
 
             <div className="preference-group">
-              <label className="preference-group-label">Vegetais</label>
-              <div className="checkbox-group">
-                {vegetaisOptions.map((item) => (
-                  <label key={item} className="checkbox-item">
-                    <input
-                      type="checkbox"
-                      checked={(formData.vegetais || []).includes(item)}
-                      onChange={(e) => handleMultiSelect('vegetais', item, e.target.checked)}
-                    />
-                    <span>{item}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div className="preference-group">
-              <label className="preference-group-label">Legumes</label>
-              <div className="checkbox-group">
-                {legumesOptions.map((item) => (
-                  <label key={item} className="checkbox-item">
-                    <input
-                      type="checkbox"
-                      checked={(formData.legumes || []).includes(item)}
-                      onChange={(e) => handleMultiSelect('legumes', item, e.target.checked)}
-                    />
-                    <span>{item}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div className="preference-group">
               <label className="preference-group-label">Leguminosas</label>
               <div className="checkbox-group">
                 {leguminosasOptions.map((item) => (
@@ -561,7 +560,55 @@ function AnamneseInicialContent() {
             </div>
 
             <div className="preference-group">
-              <label className="preference-group-label">Gorduras</label>
+              <label className="preference-group-label">Vegetais folhosos</label>
+              <div className="checkbox-group">
+                {vegetaisFolhososOptions.map((item) => (
+                  <label key={item} className="checkbox-item">
+                    <input
+                      type="checkbox"
+                      checked={(formData.vegetais || []).includes(item)}
+                      onChange={(e) => handleMultiSelect('vegetais', item, e.target.checked)}
+                    />
+                    <span>{item}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="preference-group">
+              <label className="preference-group-label">Ervas e temperos</label>
+              <div className="checkbox-group">
+                {ervasTemperosOptions.map((item) => (
+                  <label key={item} className="checkbox-item">
+                    <input
+                      type="checkbox"
+                      checked={(formData.ervas_temperos || []).includes(item)}
+                      onChange={(e) => handleMultiSelect('ervas_temperos', item, e.target.checked)}
+                    />
+                    <span>{item}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="preference-group">
+              <label className="preference-group-label">Legumes e vegetais</label>
+              <div className="checkbox-group">
+                {legumesOptions.map((item) => (
+                  <label key={item} className="checkbox-item">
+                    <input
+                      type="checkbox"
+                      checked={(formData.legumes || []).includes(item)}
+                      onChange={(e) => handleMultiSelect('legumes', item, e.target.checked)}
+                    />
+                    <span>{item}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="preference-group">
+              <label className="preference-group-label">Gorduras saudáveis</label>
               <div className="checkbox-group">
                 {gordurasOptions.map((item) => (
                   <label key={item} className="checkbox-item">
