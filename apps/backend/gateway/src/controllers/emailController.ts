@@ -171,7 +171,7 @@ export async function sendPatientCredentialsEmail(req: AuthenticatedRequest, res
 
     const fromEmail = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
     const appName = process.env.APP_NAME || 'Auton Health';
-    const loginUrl = process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_FRONTEND_URL || 'http://localhost:3000';
+    const loginUrl = process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_FRONTEND_URL || 'https://pacientes.autonhealth.com.br';
 
     // Verificar se está em modo de teste
     const isTestMode = fromEmail.includes('@resend.dev');
@@ -248,7 +248,7 @@ export async function sendPatientCredentialsEmail(req: AuthenticatedRequest, res
             
             <div style="text-align: center; margin: 30px 0;">
               <a 
-                href="${loginUrl}/auth/login" 
+                href="${loginUrl}/auth/signin" 
                 style="display: inline-block; background: linear-gradient(135deg, #1B4266 0%, #153350 100%); color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 12px rgba(27, 66, 102, 0.3);">
                 Acessar Sistema
               </a>

@@ -14,7 +14,7 @@ interface LayoutProps {
 export function Layout({ children }: LayoutProps) {
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [isLayoutReady, setIsLayoutReady] = useState(false);
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, signOut } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   
@@ -29,6 +29,14 @@ export function Layout({ children }: LayoutProps) {
         router.push('/auth/signin');
         return;
       }
+
+      // Bloquear acesso de pacientes à área do médico
+      const role = (user as { user_metadata?: { role?: string } })?.user_metadata?.role;
+      if (role === 'patient') {
+        signOut();
+        router.replace('/auth/signin?reason=patient');
+        return;
+      }
       
       // Simula um pequeno delay para garantir que tudo está carregado
       const timer = setTimeout(() => {
@@ -37,7 +45,7 @@ export function Layout({ children }: LayoutProps) {
 
       return () => clearTimeout(timer);
     }
-  }, [user, authLoading, router]);
+  }, [user, authLoading, router, signOut]);
 
   // Mostra loading enquanto verifica autenticação ou carrega layout
   if (authLoading || !isLayoutReady || !user) {

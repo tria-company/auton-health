@@ -14,9 +14,10 @@ RUN apt-get update \
      python3 make g++ \
   && rm -rf /var/lib/apt/lists/*
 
-# Copy only manifests for better caching
+# Copy only manifests for better caching (frontend depende de @medcall/shared-types)
 COPY package.json package-lock.json lerna.json ./
 COPY apps/frontend/package.json apps/frontend/package.json
+COPY packages/shared-types/package.json packages/shared-types/package.json
 
 # Install root deps (workspaces) once
 RUN npm ci

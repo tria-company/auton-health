@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
   ArrowLeft, 
-  Clock, 
   AlertCircle,
   Brain,
   Apple,
@@ -133,7 +132,6 @@ export default function SolutionsList({ consultaId, onBack, onSolutionSelect, so
     onSolutionSelect(solutionId);
   };
 
-
   if (loading) {
     return (
       <div className="solutions-container">
@@ -188,7 +186,7 @@ export default function SolutionsList({ consultaId, onBack, onSolutionSelect, so
       <div className="solutions-content">
         <div className="solutions-intro">
           <h2>Entregáveis da Consulta</h2>
-          <p>Selecione uma solução para visualizar os detalhes</p>
+          <p>Selecione uma solução para visualizar os detalhes ou baixe todas em um documento Word editável.</p>
         </div>
 
         <div className="solutions-grid">

@@ -110,6 +110,35 @@
   letter-spacing: -0.5px;
 }
 
+/* Botão Baixar DOCX na tela Selecionar Solução - azul escuro do sistema */
+.selecionar-solucao-docx-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: #1e3a5f;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.1s ease;
+}
+.selecionar-solucao-docx-btn:hover:not(:disabled) {
+  background: #2d4a6f;
+}
+.selecionar-solucao-docx-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.dark .selecionar-solucao-docx-btn {
+  background: #1e3a5f;
+}
+.dark .selecionar-solucao-docx-btn:hover:not(:disabled) {
+  background: #2d4a6f;
+}
+
 /* Dark mode title */
 .dark .consultas-title {
   color: #ffffff;

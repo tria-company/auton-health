@@ -24,20 +24,16 @@ export default function Header() {
           transition={{ type: "spring", stiffness: 300, damping: 20 }}
         >
           <motion.div 
-            className="h-9 flex items-center"
+            className="h-11 flex items-center"
             whileHover={{ scale: 1.1 }}
             transition={{ duration: 0.3 }}
           >
             <img 
-              src="/logo-auton.png" 
+              src="/logo-black.svg" 
               alt="Auton Health" 
-              className="h-9 w-auto"
+              className="h-11 w-auto"
             />
           </motion.div>
-          <div className="flex items-baseline gap-1">
-            <span className="text-[#1a365d] font-bold text-[20px]">AUTON</span>
-            <span className="text-[#94a3b8] font-normal text-[20px]">Health</span>
-          </div>
         </motion.div>
 
         {/* Botão Hamburger - Mobile Only */}
