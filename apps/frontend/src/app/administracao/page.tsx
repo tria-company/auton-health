@@ -66,8 +66,10 @@ export default function AdministracaoPage() {
   const { theme, systemTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [periodo, setPeriodo] = useState('semana');
+  const [dataInicio, setDataInicio] = useState('');
+  const [dataFim, setDataFim] = useState('');
   const [tipoConsulta, setTipoConsulta] = useState<'PRESENCIAL' | 'TELEMEDICINA' | 'TODAS'>('TODAS');
-  const [filtrarPorClinica, setFiltrarPorClinica] = useState(false);
+
   const [loading, setLoading] = useState(true);
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [tooltip, setTooltip] = useState<{ visible: boolean; x: number; y: number; content: string }>({
@@ -102,7 +104,7 @@ export default function AdministracaoPage() {
 
   useEffect(() => {
     fetchDashboardData();
-  }, [periodo, tipoConsulta, mesAtualCalendario, filtrarPorClinica]);
+  }, [periodo, tipoConsulta, mesAtualCalendario]);
 
   // Determinar qual tema está ativo (considerando systemTheme)
   const currentTheme = mounted ? (theme === 'system' ? systemTheme : theme) : 'light';
@@ -121,18 +123,19 @@ export default function AdministracaoPage() {
     try {
       setLoading(true);
       const params = new URLSearchParams({ periodo });
+      if (periodo === 'personalizado') {
+        if (dataInicio) params.append('dataInicio', dataInicio);
+        if (dataFim) params.append('dataFim', dataFim);
+      }
       if (tipoConsulta !== 'TODAS') {
         params.append('tipoConsulta', tipoConsulta);
       }
       // Adicionar mês do calendário para buscar consultas corretas
       params.append('mesCalendario', mesAtualCalendario.toISOString());
-      // Adicionar parâmetro de filtro por clínica
-      if (filtrarPorClinica) {
-        params.append('filtrarPorClinica', 'true');
-      }
+
       const response = await gatewayClient.get(`/admin/dashboard?${params.toString()}`);
       if (!response.success) throw new Error('Erro ao buscar dados');
-      
+
       // ✅ Backend agora retorna no formato correto
       setDashboardData(response as DashboardData);
     } catch (error) {
@@ -171,40 +174,40 @@ export default function AdministracaoPage() {
       // Mostrar a semana atual (7 dias começando no domingo)
       const primeiroDiaSemana = new Date(mesAtualCalendario);
       primeiroDiaSemana.setDate(mesAtualCalendario.getDate() - mesAtualCalendario.getDay());
-      
+
       const diasSemana: Array<{ dia: number; mes: number; ano: number }> = [];
       for (let i = 0; i < 7; i++) {
         const dia = new Date(primeiroDiaSemana);
         dia.setDate(primeiroDiaSemana.getDate() + i);
-        diasSemana.push({ 
-          dia: dia.getDate(), 
-          mes: dia.getMonth(), 
-          ano: dia.getFullYear() 
+        diasSemana.push({
+          dia: dia.getDate(),
+          mes: dia.getMonth(),
+          ano: dia.getFullYear()
         });
       }
       return diasSemana;
     } else {
       // Visualização mensal (padrão)
       const diasNoMes = new Date(mesAtualCalendario.getFullYear(), mesAtualCalendario.getMonth() + 1, 0).getDate();
-      return Array.from({ length: diasNoMes }, (_, i) => ({ 
-        dia: i + 1, 
-        mes: mesAtualCalendario.getMonth(), 
-        ano: mesAtualCalendario.getFullYear() 
+      return Array.from({ length: diasNoMes }, (_, i) => ({
+        dia: i + 1,
+        mes: mesAtualCalendario.getMonth(),
+        ano: mesAtualCalendario.getFullYear()
       }));
     }
   };
 
   const diasVisualizacao = calcularDiasVisualizacao();
   const primeiroDiaMes = new Date(mesAtualCalendario.getFullYear(), mesAtualCalendario.getMonth(), 1);
-  const primeiroDiaSemana = visualizacaoCalendario === 'mes' 
-    ? primeiroDiaMes.getDay() 
+  const primeiroDiaSemana = visualizacaoCalendario === 'mes'
+    ? primeiroDiaMes.getDay()
     : 0; // Para semana e dia, não precisa de espaços vazios no início
-  
+
   // Função para formatar data no formato da chave do calendário
   const formatarDataChave = (ano: number, mes: number, dia: number) => {
     return `${ano}-${String(mes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
   };
-  
+
   // Função para obter consultas do dia
   const obterConsultasDoDia = (dia: number, mes?: number, ano?: number) => {
     const mesFinal = mes !== undefined ? mes : mesAtualCalendario.getMonth();
@@ -226,7 +229,7 @@ export default function AdministracaoPage() {
     const chave = formatarDataChave(ano, mes, dia);
     const consultasDia = dashboardData?.consultasCalendario[chave];
     const consultas = tipo === 'agendadas' ? consultasDia?.agendadas || [] : consultasDia?.canceladas || [];
-    
+
     if (consultas.length > 0) {
       setConsultasModal({
         visible: true,
@@ -254,21 +257,21 @@ export default function AdministracaoPage() {
     {
       titulo: 'Consultas',
       valor: String(dashboardData.estatisticas.totalConsultas),
-      variacao: dashboardData.estatisticas.variacaoConsultas > 0 
-        ? `+${dashboardData.estatisticas.variacaoConsultas}` 
-        : dashboardData.estatisticas.variacaoConsultas < 0 
-        ? `${dashboardData.estatisticas.variacaoConsultas}` 
-        : '0',
+      variacao: dashboardData.estatisticas.variacaoConsultas > 0
+        ? `+${dashboardData.estatisticas.variacaoConsultas}`
+        : dashboardData.estatisticas.variacaoConsultas < 0
+          ? `${dashboardData.estatisticas.variacaoConsultas}`
+          : '0',
       icone: getCardIcon(1)
     },
     {
       titulo: 'Pacientes cadastrados',
       valor: String(dashboardData.estatisticas.totalPacientes),
-      variacao: dashboardData.estatisticas.variacaoPacientes > 0 
-        ? `+${dashboardData.estatisticas.variacaoPacientes}` 
-        : dashboardData.estatisticas.variacaoPacientes < 0 
-        ? `${dashboardData.estatisticas.variacaoPacientes}` 
-        : '0',
+      variacao: dashboardData.estatisticas.variacaoPacientes > 0
+        ? `+${dashboardData.estatisticas.variacaoPacientes}`
+        : dashboardData.estatisticas.variacaoPacientes < 0
+          ? `${dashboardData.estatisticas.variacaoPacientes}`
+          : '0',
       icone: getCardIcon(2)
     },
     {
@@ -312,44 +315,62 @@ export default function AdministracaoPage() {
 
       {/* Filtros e período em uma linha */}
       <div className="filters-row">
-        <div className="period-filter">
-          <button className={periodo === 'hoje' ? 'active' : ''} onClick={() => setPeriodo('hoje')}>Hoje</button>
-          <button className={periodo === 'semana' ? 'active' : ''} onClick={() => setPeriodo('semana')}>Semana</button>
-          <button className={periodo === 'mes' ? 'active' : ''} onClick={() => setPeriodo('mes')}>Mês</button>
-          <button className={periodo === 'personalizado' ? 'active' : ''} onClick={() => setPeriodo('personalizado')}>Personalizado</button>
+        <div className="period-filter-container">
+          <div className="period-filter">
+            <button className={periodo === 'hoje' ? 'active' : ''} onClick={() => setPeriodo('hoje')}>Hoje</button>
+            <button className={periodo === 'semana' ? 'active' : ''} onClick={() => setPeriodo('semana')}>Semana</button>
+            <button className={periodo === 'mes' ? 'active' : ''} onClick={() => setPeriodo('mes')}>Mês</button>
+            <button className={periodo === 'personalizado' ? 'active' : ''} onClick={() => setPeriodo('personalizado')}>Personalizado</button>
+          </div>
+
+          {periodo === 'personalizado' && (
+            <div className="custom-date-filter">
+              <input
+                type="date"
+                value={dataInicio}
+                onChange={(e) => setDataInicio(e.target.value)}
+                placeholder="Data Início"
+              />
+              <span className="date-separator">até</span>
+              <input
+                type="date"
+                value={dataFim}
+                onChange={(e) => setDataFim(e.target.value)}
+                placeholder="Data Fim"
+              />
+              <button className="filter-btn" onClick={fetchDashboardData}>
+                Filtrar
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="header-filters">
-          <div className="clinic-filter">
-            <label>Clínica / Unidade</label>
-            <select disabled style={{ opacity: 0.6, cursor: 'not-allowed' }}>
-              <option>Todas as Clínicas</option>
-            </select>
-          </div>
-          
+
+
           <div className="professional-filter">
             <label>Profissional</label>
             <select>
               <option>Todos os Profissionais</option>
             </select>
           </div>
-          
+
           <div className="type-filter">
             <label>Tipo de Consulta</label>
             <div className="type-buttons">
-              <button 
+              <button
                 className={tipoConsulta === 'PRESENCIAL' ? 'active' : ''}
                 onClick={() => setTipoConsulta('PRESENCIAL')}
               >
                 Presencial
               </button>
-              <button 
+              <button
                 className={tipoConsulta === 'TELEMEDICINA' ? 'active' : ''}
                 onClick={() => setTipoConsulta('TELEMEDICINA')}
               >
                 Telemedicina
               </button>
-              <button 
+              <button
                 className={tipoConsulta === 'TODAS' ? 'active' : ''}
                 onClick={() => setTipoConsulta('TODAS')}
               >
@@ -358,26 +379,15 @@ export default function AdministracaoPage() {
             </div>
           </div>
 
-          <div className="type-filter">
-            <label>Filtro</label>
-            <div className="type-buttons">
-              <button 
-                className={filtrarPorClinica ? 'active' : ''}
-                onClick={() => setFiltrarPorClinica(!filtrarPorClinica)}
-                title="Filtrar apenas médicos da mesma clínica"
-              >
-                Minha Clínica
-              </button>
-            </div>
-          </div>
+
         </div>
       </div>
 
       {/* Cards de Estatísticas */}
       <div className="stats-grid">
         {estatisticas.map((stat, index) => (
-          <div 
-            key={index} 
+          <div
+            key={index}
             className="stat-card"
             style={{ backgroundImage: `url(${stat.icone})` }}
           >
@@ -410,7 +420,7 @@ export default function AdministracaoPage() {
           <div className="line-chart">
             {/* Tooltip */}
             {tooltip.visible && (
-              <div 
+              <div
                 className="chart-tooltip"
                 style={{
                   left: `${tooltip.x}px`,
@@ -435,7 +445,7 @@ export default function AdministracaoPage() {
               // Pegar primeiros 7 dias ou últimos 7 dias disponíveis
               const dadosLimitados = dados.slice(-7);
               const maxValue = Math.max(...dadosLimitados.map(d => Math.max(d.presencial, d.telemedicina)), 1);
-              
+
               // Dimensões do gráfico - ajustadas para ocupar 100% do card
               const width = 1000;
               const height = 400;
@@ -445,7 +455,7 @@ export default function AdministracaoPage() {
               const marginBottom = 15;
               const chartWidth = width - marginLeft - marginRight;
               const chartHeight = height - marginTop - marginBottom;
-              
+
               const pontosPorDia = dadosLimitados.length;
               const espacoX = pontosPorDia > 1 ? chartWidth / (pontosPorDia - 1) : chartWidth / 2;
 
@@ -471,36 +481,36 @@ export default function AdministracaoPage() {
                   <defs>
                     {/* Grid pattern */}
                     <pattern id="gridPattern" width="40" height="30" patternUnits="userSpaceOnUse">
-                      <path d="M 40 0 L 0 0 0 30" fill="none" stroke="rgba(0,0,0,0.05)" strokeWidth="1"/>
+                      <path d="M 40 0 L 0 0 0 30" fill="none" stroke="rgba(0,0,0,0.05)" strokeWidth="1" />
                     </pattern>
                   </defs>
 
                   {/* Grid lines horizontais */}
                   {[0, 1, 2, 3, 4, 5].map((i) => (
-                    <line 
-                      key={`h-${i}`} 
-                      x1={marginLeft} 
-                      y1={marginTop + (chartHeight / 5) * i} 
-                      x2={width - marginRight} 
-                      y2={marginTop + (chartHeight / 5) * i} 
-                      stroke="#F7F7F7" 
+                    <line
+                      key={`h-${i}`}
+                      x1={marginLeft}
+                      y1={marginTop + (chartHeight / 5) * i}
+                      x2={width - marginRight}
+                      y2={marginTop + (chartHeight / 5) * i}
+                      stroke="#F7F7F7"
                       strokeWidth="1"
                     />
                   ))}
-                  
+
                   {/* Linhas verticais do grid */}
                   {dadosLimitados.map((_, i) => (
-                    <line 
-                      key={`v-${i}`} 
-                      x1={marginLeft + (i * espacoX)} 
-                      y1={marginTop} 
-                      x2={marginLeft + (i * espacoX)} 
-                      y2={marginTop + chartHeight} 
-                      stroke="#E5E7EB" 
+                    <line
+                      key={`v-${i}`}
+                      x1={marginLeft + (i * espacoX)}
+                      y1={marginTop}
+                      x2={marginLeft + (i * espacoX)}
+                      y2={marginTop + chartHeight}
+                      stroke="#E5E7EB"
                       strokeWidth="1"
                     />
                   ))}
-                  
+
                   {/* Labels do eixo Y */}
                   {[5, 4, 3, 2, 1, 0].map((num, i) => {
                     const yPos = marginTop + (chartHeight / 5) * (5 - i);
@@ -511,7 +521,7 @@ export default function AdministracaoPage() {
                       </text>
                     );
                   })}
-                  
+
                   {/* Linha Presencial (roxa/violeta) */}
                   <path
                     d={pathPresencial}
@@ -521,7 +531,7 @@ export default function AdministracaoPage() {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                   />
-                  
+
                   {/* Linha Telemedicina (azul) - com traço */}
                   <path
                     d={pathTelemedicina}
@@ -532,15 +542,15 @@ export default function AdministracaoPage() {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                   />
-                  
+
                   {/* Pontos Presencial */}
                   {pontosPresencial.map((p, i) => (
                     <g key={`p-${i}`}>
-                      <circle 
-                        cx={p.x} 
-                        cy={p.y} 
-                        r="8" 
-                        fill="transparent" 
+                      <circle
+                        cx={p.x}
+                        cy={p.y}
+                        r="8"
+                        fill="transparent"
                         style={{ cursor: 'pointer' }}
                         onMouseMove={(e) => {
                           setTooltip({
@@ -552,18 +562,18 @@ export default function AdministracaoPage() {
                         }}
                         onMouseLeave={() => setTooltip({ visible: false, x: 0, y: 0, content: '' })}
                       />
-                      <circle cx={p.x} cy={p.y} r="5" fill="#976EF6" stroke="white" strokeWidth="2.5" style={{ pointerEvents: 'none' }}/>
+                      <circle cx={p.x} cy={p.y} r="5" fill="#976EF6" stroke="white" strokeWidth="2.5" style={{ pointerEvents: 'none' }} />
                     </g>
                   ))}
-                  
+
                   {/* Pontos Telemedicina */}
                   {pontosTelemedicina.map((p, i) => (
                     <g key={`t-${i}`}>
-                      <circle 
-                        cx={p.x} 
-                        cy={p.y} 
-                        r="8" 
-                        fill="transparent" 
+                      <circle
+                        cx={p.x}
+                        cy={p.y}
+                        r="8"
+                        fill="transparent"
                         style={{ cursor: 'pointer' }}
                         onMouseMove={(e) => {
                           setTooltip({
@@ -575,33 +585,33 @@ export default function AdministracaoPage() {
                         }}
                         onMouseLeave={() => setTooltip({ visible: false, x: 0, y: 0, content: '' })}
                       />
-                      <circle cx={p.x} cy={p.y} r="5" fill="#4387F6" stroke="white" strokeWidth="2.5" style={{ pointerEvents: 'none' }}/>
+                      <circle cx={p.x} cy={p.y} r="5" fill="#4387F6" stroke="white" strokeWidth="2.5" style={{ pointerEvents: 'none' }} />
                     </g>
                   ))}
-                  
+
                   {/* Labels do eixo X */}
                   {dadosLimitados.map((d, i) => (
-                    <text 
+                    <text
                       key={`x-${i}`}
-                      x={marginLeft + (i * espacoX)} 
-                      y={height - marginBottom + 25} 
-                      fill="#6B7280" 
-                      fontSize="13" 
+                      x={marginLeft + (i * espacoX)}
+                      y={height - marginBottom + 25}
+                      fill="#6B7280"
+                      fontSize="13"
                       fontWeight="600"
                       textAnchor="middle"
                     >
                       {d.data}
                     </text>
                   ))}
-                  
+
                   {/* Legenda no canto superior direito - melhor posicionada */}
                   <g>
                     {/* Presencial */}
-                    <line x1={width - marginRight - 240} y1="15" x2={width - marginRight - 205} y2="15" stroke="#976EF6" strokeWidth="4" strokeLinecap="round"/>
+                    <line x1={width - marginRight - 240} y1="15" x2={width - marginRight - 205} y2="15" stroke="#976EF6" strokeWidth="4" strokeLinecap="round" />
                     <text x={width - marginRight - 195} y="20" fill="#323232" fontSize="14" fontWeight="600">Presencial</text>
-                    
+
                     {/* Telemedicina */}
-                    <line x1={width - marginRight - 90} y1="15" x2={width - marginRight - 55} y2="15" stroke="#4387F6" strokeWidth="4" strokeDasharray="10,6" strokeLinecap="round"/>
+                    <line x1={width - marginRight - 90} y1="15" x2={width - marginRight - 55} y2="15" stroke="#4387F6" strokeWidth="4" strokeDasharray="10,6" strokeLinecap="round" />
                     <text x={width - marginRight - 45} y="20" fill="#323232" fontSize="14" fontWeight="600">Telemedicina</text>
                   </g>
                 </svg>
@@ -618,9 +628,9 @@ export default function AdministracaoPage() {
               <div key={index} className="bar-item">
                 <span className="bar-label">{item.nome}</span>
                 <div className="bar-wrapper">
-                  <div 
-                    className="bar-fill" 
-                    style={{ 
+                  <div
+                    className="bar-fill"
+                    style={{
                       width: `${Math.min((item.count / Math.max(...consultasProfissional.map(i => i.count), 1)) * 100, 100)}%`,
                       background: '#1B4266'
                     }}
@@ -635,6 +645,7 @@ export default function AdministracaoPage() {
 
       {/* Tabela de Consultas Ativas */}
       <div className="active-consultations">
+        <h3>Consultas Ativas</h3>
         <div className="section-tabs">
           <div></div>
           <button className="tab active">Nome Médico</button>
@@ -643,7 +654,7 @@ export default function AdministracaoPage() {
           <button className="tab">Duração</button>
           <button className="tab">Sala</button>
         </div>
-        
+
         <div className="consultations-list">
           {consultasAtivas.map((consulta, index) => (
             <div key={index} className="consultation-item">
@@ -723,52 +734,52 @@ export default function AdministracaoPage() {
             </div>
           </div>
 
-        {/* Situação da Consulta */}
-        <div className="status-card">
-          <h3>Situação da Consulta</h3>
-          <div className="status-card-content">
-            {(() => {
-              const statusCount = dashboardData?.graficos.statusCount || {};
-              const agendada = statusCount['AGENDAMENTO'] || 0;
-              const emAndamento = statusCount['RECORDING'] || statusCount['PROCESSING'] || statusCount['VALIDATION'] || 0;
-              const finalizada = statusCount['COMPLETED'] || 0;
-              const total = agendada + emAndamento + finalizada;
+          {/* Situação da Consulta */}
+          <div className="status-card">
+            <h3>Situação da Consulta</h3>
+            <div className="status-card-content">
+              {(() => {
+                const statusCount = dashboardData?.graficos.statusCount || {};
+                const agendada = statusCount['AGENDAMENTO'] || 0;
+                const emAndamento = statusCount['RECORDING'] || statusCount['PROCESSING'] || statusCount['VALIDATION'] || 0;
+                const finalizada = statusCount['COMPLETED'] || 0;
+                const total = agendada + emAndamento + finalizada;
 
-              // Calcular proporções para o gráfico donut (circunferência total = 282)
-              const circunferencia = 282;
-              const agendadaDash = total > 0 ? Math.round((agendada / total) * circunferencia) : 0;
-              const emAndamentoDash = total > 0 ? Math.round((emAndamento / total) * circunferencia) : 0;
-              const finalizadaDash = total > 0 ? Math.round((finalizada / total) * circunferencia) : 0;
+                // Calcular proporções para o gráfico donut (circunferência total = 282)
+                const circunferencia = 282;
+                const agendadaDash = total > 0 ? Math.round((agendada / total) * circunferencia) : 0;
+                const emAndamentoDash = total > 0 ? Math.round((emAndamento / total) * circunferencia) : 0;
+                const finalizadaDash = total > 0 ? Math.round((finalizada / total) * circunferencia) : 0;
 
-              const emAndamentoOffset = -agendadaDash;
-              const finalizadaOffset = -(agendadaDash + emAndamentoDash);
+                const emAndamentoOffset = -agendadaDash;
+                const finalizadaOffset = -(agendadaDash + emAndamentoDash);
 
-              return (
-                <>
-                  <div className="donut-chart">
-                    <svg viewBox="0 0 120 120" className="donut-svg">
-                      {agendadaDash > 0 && (
-                        <circle cx="60" cy="60" r="45" fill="none" stroke="#3B82F6" strokeWidth="20" strokeDasharray={`${agendadaDash} ${circunferencia}`} />
-                      )}
-                      {emAndamentoDash > 0 && (
-                        <circle cx="60" cy="60" r="45" fill="none" stroke="#9CA3AF" strokeWidth="20" strokeDasharray={`${emAndamentoDash} ${circunferencia}`} strokeDashoffset={emAndamentoOffset} />
-                      )}
-                      {finalizadaDash > 0 && (
-                        <circle cx="60" cy="60" r="45" fill="none" stroke="#10B981" strokeWidth="20" strokeDasharray={`${finalizadaDash} ${circunferencia}`} strokeDashoffset={finalizadaOffset} />
-                      )}
-                      <text x="60" y="65" textAnchor="middle" fill="#1F2937" fontSize="24" fontWeight="bold">{total}</text>
-                    </svg>
-                  </div>
-                  <div className="legend">
-                    <div className="legend-item"><span className="dot blue"></span> Agendada ({agendada})</div>
-                    <div className="legend-item"><span className="dot gray"></span> Em Andamento ({emAndamento})</div>
-                    <div className="legend-item"><span className="dot green"></span> Finalizada ({finalizada})</div>
-                  </div>
-                </>
-              );
-            })()}
+                return (
+                  <>
+                    <div className="donut-chart">
+                      <svg viewBox="0 0 120 120" className="donut-svg">
+                        {agendadaDash > 0 && (
+                          <circle cx="60" cy="60" r="45" fill="none" stroke="#3B82F6" strokeWidth="20" strokeDasharray={`${agendadaDash} ${circunferencia}`} />
+                        )}
+                        {emAndamentoDash > 0 && (
+                          <circle cx="60" cy="60" r="45" fill="none" stroke="#9CA3AF" strokeWidth="20" strokeDasharray={`${emAndamentoDash} ${circunferencia}`} strokeDashoffset={emAndamentoOffset} />
+                        )}
+                        {finalizadaDash > 0 && (
+                          <circle cx="60" cy="60" r="45" fill="none" stroke="#10B981" strokeWidth="20" strokeDasharray={`${finalizadaDash} ${circunferencia}`} strokeDashoffset={finalizadaOffset} />
+                        )}
+                        <text x="60" y="65" textAnchor="middle" fill="#1F2937" fontSize="24" fontWeight="bold">{total}</text>
+                      </svg>
+                    </div>
+                    <div className="legend">
+                      <div className="legend-item"><span className="dot blue"></span> Agendada ({agendada})</div>
+                      <div className="legend-item"><span className="dot gray"></span> Em Andamento ({emAndamento})</div>
+                      <div className="legend-item"><span className="dot green"></span> Finalizada ({finalizada})</div>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
           </div>
-        </div>
         </div>
 
         {/* Próximas Consultas */}
@@ -796,292 +807,292 @@ export default function AdministracaoPage() {
 
       {/* Calendário */}
       <div className="calendar-section">
-          <div className="calendar-header">
-            <button 
-              className="calendar-nav"
-              onClick={() => {
-                const novaData = new Date(mesAtualCalendario);
-                if (visualizacaoCalendario === 'dia') {
-                  novaData.setDate(novaData.getDate() - 1);
-                } else if (visualizacaoCalendario === 'semana') {
-                  novaData.setDate(novaData.getDate() - 7);
-                } else {
-                  novaData.setMonth(novaData.getMonth() - 1);
-                }
-                setMesAtualCalendario(novaData);
-              }}
-            >
-              ‹
-            </button>
-            <button 
-              className="calendar-nav"
-              onClick={() => {
-                const novaData = new Date(mesAtualCalendario);
-                if (visualizacaoCalendario === 'dia') {
-                  novaData.setDate(novaData.getDate() + 1);
-                } else if (visualizacaoCalendario === 'semana') {
-                  novaData.setDate(novaData.getDate() + 7);
-                } else {
-                  novaData.setMonth(novaData.getMonth() + 1);
-                }
-                setMesAtualCalendario(novaData);
-              }}
-            >
-              ›
-            </button>
-            <button className="add-event-btn">Adicionar evento</button>
-            <span className="calendar-month">
-              {visualizacaoCalendario === 'dia' 
-                ? mesAtualCalendario.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-                : visualizacaoCalendario === 'semana'
+        <div className="calendar-header">
+          <button
+            className="calendar-nav"
+            onClick={() => {
+              const novaData = new Date(mesAtualCalendario);
+              if (visualizacaoCalendario === 'dia') {
+                novaData.setDate(novaData.getDate() - 1);
+              } else if (visualizacaoCalendario === 'semana') {
+                novaData.setDate(novaData.getDate() - 7);
+              } else {
+                novaData.setMonth(novaData.getMonth() - 1);
+              }
+              setMesAtualCalendario(novaData);
+            }}
+          >
+            ‹
+          </button>
+          <button
+            className="calendar-nav"
+            onClick={() => {
+              const novaData = new Date(mesAtualCalendario);
+              if (visualizacaoCalendario === 'dia') {
+                novaData.setDate(novaData.getDate() + 1);
+              } else if (visualizacaoCalendario === 'semana') {
+                novaData.setDate(novaData.getDate() + 7);
+              } else {
+                novaData.setMonth(novaData.getMonth() + 1);
+              }
+              setMesAtualCalendario(novaData);
+            }}
+          >
+            ›
+          </button>
+          <button className="add-event-btn">Adicionar evento</button>
+          <span className="calendar-month">
+            {visualizacaoCalendario === 'dia'
+              ? mesAtualCalendario.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+              : visualizacaoCalendario === 'semana'
                 ? `Semana de ${new Date(diasVisualizacao[0].ano, diasVisualizacao[0].mes, diasVisualizacao[0].dia).toLocaleDateString('pt-BR', { day: 'numeric', month: 'long' })}`
                 : mesAtualCalendario.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
-              }
-            </span>
-            <div className="calendar-view-buttons">
-              <button 
-                className={`view-btn ${visualizacaoCalendario === 'mes' ? 'active' : ''}`}
-                onClick={() => setVisualizacaoCalendario('mes')}
-              >
-                Mês
-              </button>
-              <button 
-                className={`view-btn ${visualizacaoCalendario === 'semana' ? 'active' : ''}`}
-                onClick={() => setVisualizacaoCalendario('semana')}
-              >
-                Semana
-              </button>
-              <button 
-                className={`view-btn ${visualizacaoCalendario === 'dia' ? 'active' : ''}`}
-                onClick={() => setVisualizacaoCalendario('dia')}
-              >
-                Dia
-              </button>
-            </div>
-          </div>
-          
-          <div className="calendar-grid">
-            <div className="calendar-weekdays">
-              {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((dia) => (
-                <div key={dia} className="weekday">{dia}</div>
-              ))}
-            </div>
-            
-            <div className="calendar-days">
-              {visualizacaoCalendario === 'mes' && Array.from({ length: primeiroDiaSemana }).map((_, i) => (
-                <div key={`empty-${i}`} className="calendar-day empty"></div>
-              ))}
-              {diasVisualizacao.map((diaInfo, index) => {
-                const consultasDia = obterConsultasDoDia(diaInfo.dia, diaInfo.mes, diaInfo.ano);
-                const dataAtual = new Date();
-                const diaAtual = new Date(diaInfo.ano, diaInfo.mes, diaInfo.dia);
-                const isPassado = diaAtual < new Date(dataAtual.getFullYear(), dataAtual.getMonth(), dataAtual.getDate());
-                const isFuturo = diaAtual > new Date(dataAtual.getFullYear(), dataAtual.getMonth(), dataAtual.getDate());
-                
-                return (
-                  <div 
-                    key={`${diaInfo.ano}-${diaInfo.mes}-${diaInfo.dia}`} 
-                    className={`calendar-day ${isPassado ? 'past' : ''} ${isFuturo ? 'future' : ''}`}
-                    onMouseEnter={(e) => {
-                      if (consultasDia.agendadas.length > 0 || consultasDia.canceladas.length > 0) {
-                        setCalendarTooltip({
-                          visible: true,
-                          x: e.clientX,
-                          y: e.clientY,
-                          content: (
-                            <div>
-                              <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>
-                                {diaAtual.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
-                              </div>
-                              {consultasDia.agendadas.length > 0 && (
-                                <div style={{ marginBottom: '8px' }}>
-                                  <div style={{ fontWeight: '600', color: '#10B981', marginBottom: '4px' }}>
-                                    Agendadas ({consultasDia.agendadas.length})
-                                  </div>
-                                  {consultasDia.agendadas.map((c, idx) => (
-                                    <div key={idx} style={{ fontSize: '12px', marginLeft: '8px', marginBottom: '2px' }}>
-                                      {c.horario} - {c.paciente} ({c.medico})
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                              {consultasDia.canceladas.length > 0 && (
-                                <div>
-                                  <div style={{ fontWeight: '600', color: '#EF4444', marginBottom: '4px' }}>
-                                    Canceladas ({consultasDia.canceladas.length})
-                                  </div>
-                                  {consultasDia.canceladas.map((c, idx) => (
-                                    <div key={idx} style={{ fontSize: '12px', marginLeft: '8px', marginBottom: '2px' }}>
-                                      {c.horario} - {c.paciente} ({c.medico})
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          )
-                        });
-                      }
-                    }}
-                    onMouseMove={(e) => {
-                      if (calendarTooltip.visible) {
-                        setCalendarTooltip(prev => ({ ...prev, x: e.clientX, y: e.clientY }));
-                      }
-                    }}
-                    onMouseLeave={() => {
-                      setCalendarTooltip({ visible: false, x: 0, y: 0, content: null });
-                    }}
-                  >
-                    <span className="day-number">{diaInfo.dia}</span>
-                    <div className="calendar-day-content">
-                      <div 
-                        className="calendar-day-left" 
-                        style={{ 
-                          backgroundColor: consultasDia.agendadas.length > 0 ? '#D1FAE5' : 'transparent',
-                          opacity: isPassado ? 0.6 : 1,
-                          cursor: consultasDia.agendadas.length > 0 ? 'pointer' : 'default'
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (consultasDia.agendadas.length > 0) {
-                            handleAbrirModalConsultas('agendadas', diaInfo.dia, diaInfo.mes, diaInfo.ano);
-                          }
-                        }}
-                      >
-                        {consultasDia.agendadas.length > 0 && (
-                          <span className="consultation-count">{consultasDia.agendadas.length}</span>
-                        )}
-                      </div>
-                      <div className="calendar-day-divider"></div>
-                      <div 
-                        className="calendar-day-right" 
-                        style={{ 
-                          backgroundColor: consultasDia.canceladas.length > 0 ? '#FEE2E2' : 'transparent',
-                          opacity: isPassado ? 0.6 : 1,
-                          cursor: consultasDia.canceladas.length > 0 ? 'pointer' : 'default'
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (consultasDia.canceladas.length > 0) {
-                            handleAbrirModalConsultas('canceladas', diaInfo.dia, diaInfo.mes, diaInfo.ano);
-                          }
-                        }}
-                      >
-                        {consultasDia.canceladas.length > 0 && (
-                          <span className="consultation-count">{consultasDia.canceladas.length}</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            {calendarTooltip.visible && (
-              <div 
-                className="calendar-tooltip"
-                style={{
-                  left: `${calendarTooltip.x + 10}px`,
-                  top: `${calendarTooltip.y + 10}px`
-                }}
-              >
-                {calendarTooltip.content}
-              </div>
-            )}
+            }
+          </span>
+          <div className="calendar-view-buttons">
+            <button
+              className={`view-btn ${visualizacaoCalendario === 'mes' ? 'active' : ''}`}
+              onClick={() => setVisualizacaoCalendario('mes')}
+            >
+              Mês
+            </button>
+            <button
+              className={`view-btn ${visualizacaoCalendario === 'semana' ? 'active' : ''}`}
+              onClick={() => setVisualizacaoCalendario('semana')}
+            >
+              Semana
+            </button>
+            <button
+              className={`view-btn ${visualizacaoCalendario === 'dia' ? 'active' : ''}`}
+              onClick={() => setVisualizacaoCalendario('dia')}
+            >
+              Dia
+            </button>
           </div>
         </div>
 
-        {/* Modal de Consultas */}
-        {consultasModal.visible && (() => {
-          const consultasDia = dashboardData?.consultasCalendario[consultasModal.data] || { agendadas: [], canceladas: [] };
-          const consultas = consultasModal.tipo === 'agendadas' ? consultasDia.agendadas : consultasDia.canceladas;
-          const medicos = obterMedicosUnicos(consultas);
-          const consultasMedico = consultasModal.medicoSelecionado 
-            ? obterConsultasPorMedico(consultas, consultasModal.medicoSelecionado)
-            : [];
+        <div className="calendar-grid">
+          <div className="calendar-weekdays">
+            {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((dia) => (
+              <div key={dia} className="weekday">{dia}</div>
+            ))}
+          </div>
 
-          const [ano, mes, dia] = consultasModal.data.split('-').map(Number);
-          const dataFormatada = new Date(ano, mes - 1, dia).toLocaleDateString('pt-BR', { 
-            weekday: 'long', 
-            day: 'numeric', 
-            month: 'long', 
-            year: 'numeric' 
-          });
+          <div className="calendar-days">
+            {visualizacaoCalendario === 'mes' && Array.from({ length: primeiroDiaSemana }).map((_, i) => (
+              <div key={`empty-${i}`} className="calendar-day empty"></div>
+            ))}
+            {diasVisualizacao.map((diaInfo, index) => {
+              const consultasDia = obterConsultasDoDia(diaInfo.dia, diaInfo.mes, diaInfo.ano);
+              const dataAtual = new Date();
+              const diaAtual = new Date(diaInfo.ano, diaInfo.mes, diaInfo.dia);
+              const isPassado = diaAtual < new Date(dataAtual.getFullYear(), dataAtual.getMonth(), dataAtual.getDate());
+              const isFuturo = diaAtual > new Date(dataAtual.getFullYear(), dataAtual.getMonth(), dataAtual.getDate());
 
-          return (
-            <div 
-              className="consultas-modal-overlay"
-              onClick={() => setConsultasModal({ visible: false, tipo: 'agendadas', data: '', medicoSelecionado: null })}
-            >
-              <div 
-                className="consultas-modal-container"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="consultas-modal-header">
-                  <h2>
-                    {consultasModal.tipo === 'agendadas' ? 'Consultas Agendadas' : 'Consultas Canceladas'} - {dataFormatada}
-                  </h2>
-                  <button
-                    className="consultas-modal-close"
-                    onClick={() => setConsultasModal({ visible: false, tipo: 'agendadas', data: '', medicoSelecionado: null })}
-                  >
-                    <X size={20} />
-                  </button>
-                </div>
-
-                <div className="consultas-modal-body">
-                  {!consultasModal.medicoSelecionado ? (
-                    <>
-                      <h3>Selecione um médico:</h3>
-                      <div className="medicos-list">
-                        {medicos.map((medico, index) => {
-                          const count = consultas.filter(c => c.medico === medico).length;
-                          return (
-                            <div
-                              key={index}
-                              className="medico-item"
-                              onClick={() => handleSelecionarMedico(medico)}
-                            >
-                              <div className="medico-info">
-                                <strong>{medico}</strong>
-                                <span className="medico-count">{count} consulta{count > 1 ? 's' : ''}</span>
-                              </div>
+              return (
+                <div
+                  key={`${diaInfo.ano}-${diaInfo.mes}-${diaInfo.dia}`}
+                  className={`calendar-day ${isPassado ? 'past' : ''} ${isFuturo ? 'future' : ''}`}
+                  onMouseEnter={(e) => {
+                    if (consultasDia.agendadas.length > 0 || consultasDia.canceladas.length > 0) {
+                      setCalendarTooltip({
+                        visible: true,
+                        x: e.clientX,
+                        y: e.clientY,
+                        content: (
+                          <div>
+                            <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>
+                              {diaAtual.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
                             </div>
-                          );
-                        })}
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="consultas-modal-nav">
-                        <button
-                          className="consultas-modal-back"
-                          onClick={handleVoltarMedicos}
-                        >
-                          ← Voltar
-                        </button>
-                        <h3>Consultas de {consultasModal.medicoSelecionado}</h3>
-                      </div>
-                      <div className="consultas-list-modal">
-                        {consultasMedico.map((consulta, index) => (
+                            {consultasDia.agendadas.length > 0 && (
+                              <div style={{ marginBottom: '8px' }}>
+                                <div style={{ fontWeight: '600', color: '#10B981', marginBottom: '4px' }}>
+                                  Agendadas ({consultasDia.agendadas.length})
+                                </div>
+                                {consultasDia.agendadas.map((c, idx) => (
+                                  <div key={idx} style={{ fontSize: '12px', marginLeft: '8px', marginBottom: '2px' }}>
+                                    {c.horario} - {c.paciente} ({c.medico})
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {consultasDia.canceladas.length > 0 && (
+                              <div>
+                                <div style={{ fontWeight: '600', color: '#EF4444', marginBottom: '4px' }}>
+                                  Canceladas ({consultasDia.canceladas.length})
+                                </div>
+                                {consultasDia.canceladas.map((c, idx) => (
+                                  <div key={idx} style={{ fontSize: '12px', marginLeft: '8px', marginBottom: '2px' }}>
+                                    {c.horario} - {c.paciente} ({c.medico})
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      });
+                    }
+                  }}
+                  onMouseMove={(e) => {
+                    if (calendarTooltip.visible) {
+                      setCalendarTooltip(prev => ({ ...prev, x: e.clientX, y: e.clientY }));
+                    }
+                  }}
+                  onMouseLeave={() => {
+                    setCalendarTooltip({ visible: false, x: 0, y: 0, content: null });
+                  }}
+                >
+                  <span className="day-number">{diaInfo.dia}</span>
+                  <div className="calendar-day-content">
+                    <div
+                      className="calendar-day-left"
+                      style={{
+                        backgroundColor: consultasDia.agendadas.length > 0 ? '#D1FAE5' : 'transparent',
+                        opacity: isPassado ? 0.6 : 1,
+                        cursor: consultasDia.agendadas.length > 0 ? 'pointer' : 'default'
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (consultasDia.agendadas.length > 0) {
+                          handleAbrirModalConsultas('agendadas', diaInfo.dia, diaInfo.mes, diaInfo.ano);
+                        }
+                      }}
+                    >
+                      {consultasDia.agendadas.length > 0 && (
+                        <span className="consultation-count">{consultasDia.agendadas.length}</span>
+                      )}
+                    </div>
+                    <div className="calendar-day-divider"></div>
+                    <div
+                      className="calendar-day-right"
+                      style={{
+                        backgroundColor: consultasDia.canceladas.length > 0 ? '#FEE2E2' : 'transparent',
+                        opacity: isPassado ? 0.6 : 1,
+                        cursor: consultasDia.canceladas.length > 0 ? 'pointer' : 'default'
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (consultasDia.canceladas.length > 0) {
+                          handleAbrirModalConsultas('canceladas', diaInfo.dia, diaInfo.mes, diaInfo.ano);
+                        }
+                      }}
+                    >
+                      {consultasDia.canceladas.length > 0 && (
+                        <span className="consultation-count">{consultasDia.canceladas.length}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {calendarTooltip.visible && (
+            <div
+              className="calendar-tooltip"
+              style={{
+                left: `${calendarTooltip.x + 10}px`,
+                top: `${calendarTooltip.y + 10}px`
+              }}
+            >
+              {calendarTooltip.content}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Modal de Consultas */}
+      {consultasModal.visible && (() => {
+        const consultasDia = dashboardData?.consultasCalendario[consultasModal.data] || { agendadas: [], canceladas: [] };
+        const consultas = consultasModal.tipo === 'agendadas' ? consultasDia.agendadas : consultasDia.canceladas;
+        const medicos = obterMedicosUnicos(consultas);
+        const consultasMedico = consultasModal.medicoSelecionado
+          ? obterConsultasPorMedico(consultas, consultasModal.medicoSelecionado)
+          : [];
+
+        const [ano, mes, dia] = consultasModal.data.split('-').map(Number);
+        const dataFormatada = new Date(ano, mes - 1, dia).toLocaleDateString('pt-BR', {
+          weekday: 'long',
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric'
+        });
+
+        return (
+          <div
+            className="consultas-modal-overlay"
+            onClick={() => setConsultasModal({ visible: false, tipo: 'agendadas', data: '', medicoSelecionado: null })}
+          >
+            <div
+              className="consultas-modal-container"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="consultas-modal-header">
+                <h2>
+                  {consultasModal.tipo === 'agendadas' ? 'Consultas Agendadas' : 'Consultas Canceladas'} - {dataFormatada}
+                </h2>
+                <button
+                  className="consultas-modal-close"
+                  onClick={() => setConsultasModal({ visible: false, tipo: 'agendadas', data: '', medicoSelecionado: null })}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="consultas-modal-body">
+                {!consultasModal.medicoSelecionado ? (
+                  <>
+                    <h3>Selecione um médico:</h3>
+                    <div className="medicos-list">
+                      {medicos.map((medico, index) => {
+                        const count = consultas.filter(c => c.medico === medico).length;
+                        return (
                           <div
                             key={index}
-                            className="consulta-item-modal"
-                            onClick={() => handleAbrirConsulta(consulta.id)}
+                            className="medico-item"
+                            onClick={() => handleSelecionarMedico(medico)}
                           >
-                            <div className="consulta-horario">{consulta.horario}</div>
-                            <div className="consulta-info">
-                              <strong>{consulta.paciente}</strong>
-                              <span className="consulta-tipo">{consulta.tipo}</span>
+                            <div className="medico-info">
+                              <strong>{medico}</strong>
+                              <span className="medico-count">{count} consulta{count > 1 ? 's' : ''}</span>
                             </div>
                           </div>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="consultas-modal-nav">
+                      <button
+                        className="consultas-modal-back"
+                        onClick={handleVoltarMedicos}
+                      >
+                        ← Voltar
+                      </button>
+                      <h3>Consultas de {consultasModal.medicoSelecionado}</h3>
+                    </div>
+                    <div className="consultas-list-modal">
+                      {consultasMedico.map((consulta, index) => (
+                        <div
+                          key={index}
+                          className="consulta-item-modal"
+                          onClick={() => handleAbrirConsulta(consulta.id)}
+                        >
+                          <div className="consulta-horario">{consulta.horario}</div>
+                          <div className="consulta-info">
+                            <strong>{consulta.paciente}</strong>
+                            <span className="consulta-tipo">{consulta.tipo}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
             </div>
-          );
-        })()}
+          </div>
+        );
+      })()}
     </div>
   );
 }

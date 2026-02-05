@@ -33,8 +33,9 @@ export const getAdminDashboard = async (req: Request, res: Response) => {
     const dataInicio = req.query.dataInicio as string;
     const dataFim = req.query.dataFim as string;
     const tipoConsulta = req.query.tipoConsulta as string;
-    const filtrarPorClinica = req.query.filtrarPorClinica === 'true';
-    const clinicaIdFiltro = filtrarPorClinica && medico.clinica_id ? medico.clinica_id : null;
+    // Verificação de segurança: Se o médico tem clínica vinculada, FORÇA o filtro por essa clínica
+    // Isso garante isolamento de dados entre clínicas (Multitenancy via código)
+    const clinicaIdFiltro = medico.clinica_id || null;
 
     // Se filtrar por clínica, buscar IDs dos médicos da clínica
     let medicosIdsDaClinica: string[] | null = null;
@@ -43,7 +44,7 @@ export const getAdminDashboard = async (req: Request, res: Response) => {
         .from('medicos')
         .select('id')
         .eq('clinica_id', clinicaIdFiltro);
-      
+
       if (medicosClinica && medicosClinica.length > 0) {
         medicosIdsDaClinica = medicosClinica.map(m => m.id);
       } else {
@@ -83,11 +84,11 @@ export const getAdminDashboard = async (req: Request, res: Response) => {
       .select('*', { count: 'exact', head: true })
       .gte('created_at', startDate.toISOString())
       .lte('created_at', endDate.toISOString());
-    
+
     if (tipoConsulta && tipoConsulta !== 'TODAS') {
       consultasQuery = consultasQuery.eq('consultation_type', tipoConsulta);
     }
-    
+
     if (medicosIdsDaClinica !== null) {
       if (medicosIdsDaClinica.length === 0) {
         consultasQuery = consultasQuery.eq('id', '00000000-0000-0000-0000-000000000000');
@@ -95,7 +96,7 @@ export const getAdminDashboard = async (req: Request, res: Response) => {
         consultasQuery = consultasQuery.in('doctor_id', medicosIdsDaClinica);
       }
     }
-    
+
     const { count: totalConsultas } = await consultasQuery;
 
     // Calcular período anterior para comparação
@@ -109,11 +110,11 @@ export const getAdminDashboard = async (req: Request, res: Response) => {
       .select('*', { count: 'exact', head: true })
       .gte('created_at', periodoAnteriorStart.toISOString())
       .lte('created_at', periodoAnteriorEnd.toISOString());
-    
+
     if (tipoConsulta && tipoConsulta !== 'TODAS') {
       consultasAnterioresQuery = consultasAnterioresQuery.eq('consultation_type', tipoConsulta);
     }
-    
+
     if (medicosIdsDaClinica !== null) {
       if (medicosIdsDaClinica.length === 0) {
         consultasAnterioresQuery = consultasAnterioresQuery.eq('id', '00000000-0000-0000-0000-000000000000');
@@ -121,11 +122,11 @@ export const getAdminDashboard = async (req: Request, res: Response) => {
         consultasAnterioresQuery = consultasAnterioresQuery.in('doctor_id', medicosIdsDaClinica);
       }
     }
-    
+
     const { count: totalConsultasAnterior } = await consultasAnterioresQuery;
-    
+
     // Calcular variação de consultas
-    const variacaoConsultas = (totalConsultasAnterior !== null && totalConsultasAnterior !== undefined) 
+    const variacaoConsultas = (totalConsultasAnterior !== null && totalConsultasAnterior !== undefined)
       ? (totalConsultas || 0) - (totalConsultasAnterior || 0)
       : (totalConsultas || 0);
 
@@ -142,7 +143,7 @@ export const getAdminDashboard = async (req: Request, res: Response) => {
       .gte('created_at', startDate.toISOString())
       .lte('created_at', endDate.toISOString())
       .eq('status', 'active');
-    
+
     const variacaoPacientes = pacientesNovosPeriodoAtual || 0;
 
     // 3. Tempo médio de consulta
@@ -152,11 +153,11 @@ export const getAdminDashboard = async (req: Request, res: Response) => {
       .gte('created_at', startDate.toISOString())
       .lte('created_at', endDate.toISOString())
       .not('duracao', 'is', null);
-    
+
     if (tipoConsulta && tipoConsulta !== 'TODAS') {
       duracaoQuery = duracaoQuery.eq('consultation_type', tipoConsulta);
     }
-    
+
     if (medicosIdsDaClinica !== null) {
       if (medicosIdsDaClinica.length > 0) {
         duracaoQuery = duracaoQuery.in('doctor_id', medicosIdsDaClinica);
@@ -164,10 +165,10 @@ export const getAdminDashboard = async (req: Request, res: Response) => {
         duracaoQuery = duracaoQuery.eq('id', '00000000-0000-0000-0000-000000000000');
       }
     }
-    
+
     const { data: consultasComDuracao } = await duracaoQuery;
     const duracoes = consultasComDuracao?.map(c => c.duracao || 0) || [];
-    const tempoMedioMinutos = duracoes.length > 0 
+    const tempoMedioMinutos = duracoes.length > 0
       ? Math.round(duracoes.reduce((a, b) => a + b, 0) / duracoes.length)
       : 0;
 
@@ -178,11 +179,11 @@ export const getAdminDashboard = async (req: Request, res: Response) => {
       .eq('status', 'CANCELLED')
       .gte('created_at', startDate.toISOString())
       .lte('created_at', endDate.toISOString());
-    
+
     if (tipoConsulta && tipoConsulta !== 'TODAS') {
       canceladasQuery = canceladasQuery.eq('consultation_type', tipoConsulta);
     }
-    
+
     if (medicosIdsDaClinica !== null) {
       if (medicosIdsDaClinica.length > 0) {
         canceladasQuery = canceladasQuery.in('doctor_id', medicosIdsDaClinica);
@@ -190,7 +191,7 @@ export const getAdminDashboard = async (req: Request, res: Response) => {
         canceladasQuery = canceladasQuery.eq('id', '00000000-0000-0000-0000-000000000000');
       }
     }
-    
+
     const { count: consultasCanceladas } = await canceladasQuery;
     const taxaNoShow = totalConsultas && totalConsultas > 0
       ? ((consultasCanceladas || 0) / totalConsultas * 100).toFixed(1)
@@ -203,11 +204,11 @@ export const getAdminDashboard = async (req: Request, res: Response) => {
       .gte('created_at', startDate.toISOString())
       .lte('created_at', endDate.toISOString())
       .order('created_at', { ascending: true });
-    
+
     if (tipoConsulta && tipoConsulta !== 'TODAS') {
       porTipoQuery = porTipoQuery.eq('consultation_type', tipoConsulta);
     }
-    
+
     if (medicosIdsDaClinica !== null) {
       if (medicosIdsDaClinica.length > 0) {
         porTipoQuery = porTipoQuery.in('doctor_id', medicosIdsDaClinica);
@@ -215,7 +216,7 @@ export const getAdminDashboard = async (req: Request, res: Response) => {
         porTipoQuery = porTipoQuery.eq('id', '00000000-0000-0000-0000-000000000000');
       }
     }
-    
+
     const { data: consultasPorTipo } = await porTipoQuery;
 
     const consultasPorDia: Record<string, { presencial: number; telemedicina: number }> = {};
@@ -241,11 +242,11 @@ export const getAdminDashboard = async (req: Request, res: Response) => {
       `)
       .gte('created_at', startDate.toISOString())
       .lte('created_at', endDate.toISOString());
-    
+
     if (tipoConsulta && tipoConsulta !== 'TODAS') {
       porMedicoQuery = porMedicoQuery.eq('consultation_type', tipoConsulta);
     }
-    
+
     if (medicosIdsDaClinica !== null) {
       if (medicosIdsDaClinica.length > 0) {
         porMedicoQuery = porMedicoQuery.in('doctor_id', medicosIdsDaClinica);
@@ -253,7 +254,7 @@ export const getAdminDashboard = async (req: Request, res: Response) => {
         porMedicoQuery = porMedicoQuery.eq('id', '00000000-0000-0000-0000-000000000000');
       }
     }
-    
+
     const { data: consultasPorMedico } = await porMedicoQuery;
 
     const medicosCount: Record<string, { nome: string; count: number }> = {};
@@ -267,7 +268,7 @@ export const getAdminDashboard = async (req: Request, res: Response) => {
 
     const consultasPorProfissional = Object.values(medicosCount)
       .sort((a, b) => b.count - a.count)
-      .slice(0, 6);
+      ;
 
     // 7. Consultas ativas (em andamento)
     let consultasAtivasQuery = supabase
@@ -282,12 +283,12 @@ export const getAdminDashboard = async (req: Request, res: Response) => {
       `)
       .eq('status', 'RECORDING')
       .order('consulta_inicio', { ascending: false })
-      .limit(10);
-    
+      ;
+
     if (medicosIdsDaClinica !== null && medicosIdsDaClinica.length > 0) {
       consultasAtivasQuery = consultasAtivasQuery.in('doctor_id', medicosIdsDaClinica);
     }
-    
+
     const { data: consultasAtivas } = await consultasAtivasQuery;
 
     // 8. Status das consultas
@@ -296,7 +297,7 @@ export const getAdminDashboard = async (req: Request, res: Response) => {
       .select('status')
       .gte('created_at', startDate.toISOString())
       .lte('created_at', endDate.toISOString());
-    
+
     if (medicosIdsDaClinica !== null) {
       if (medicosIdsDaClinica.length > 0) {
         consultasPorStatusQuery = consultasPorStatusQuery.in('doctor_id', medicosIdsDaClinica);
@@ -304,7 +305,7 @@ export const getAdminDashboard = async (req: Request, res: Response) => {
         consultasPorStatusQuery = consultasPorStatusQuery.eq('id', '00000000-0000-0000-0000-000000000000');
       }
     }
-    
+
     const { data: consultasPorStatus } = await consultasPorStatusQuery;
 
     const statusCount: Record<string, number> = {};
@@ -319,7 +320,7 @@ export const getAdminDashboard = async (req: Request, res: Response) => {
       .gte('created_at', startDate.toISOString())
       .lte('created_at', endDate.toISOString())
       .not('etapa', 'is', null);
-    
+
     if (medicosIdsDaClinica !== null) {
       if (medicosIdsDaClinica.length > 0) {
         consultasPorEtapaQuery = consultasPorEtapaQuery.in('doctor_id', medicosIdsDaClinica);
@@ -327,7 +328,7 @@ export const getAdminDashboard = async (req: Request, res: Response) => {
         consultasPorEtapaQuery = consultasPorEtapaQuery.eq('id', '00000000-0000-0000-0000-000000000000');
       }
     }
-    
+
     const { data: consultasPorEtapa } = await consultasPorEtapaQuery;
 
     const etapaCount: Record<string, number> = {};
@@ -350,11 +351,11 @@ export const getAdminDashboard = async (req: Request, res: Response) => {
       .gte('consulta_inicio', hoje.toISOString())
       .order('consulta_inicio', { ascending: true })
       .limit(10);
-    
+
     if (medicosIdsDaClinica !== null && medicosIdsDaClinica.length > 0) {
       proximasConsultasQuery = proximasConsultasQuery.in('doctor_id', medicosIdsDaClinica);
     }
-    
+
     const { data: proximasConsultas } = await proximasConsultasQuery;
 
     // 11. Consultas para o calendário
@@ -363,7 +364,7 @@ export const getAdminDashboard = async (req: Request, res: Response) => {
     const primeiroDiaMes = new Date(dataCalendario.getFullYear(), dataCalendario.getMonth(), 1);
     const ultimoDiaMes = new Date(dataCalendario.getFullYear(), dataCalendario.getMonth() + 1, 0);
     ultimoDiaMes.setHours(23, 59, 59, 999);
-    
+
     let consultasMesQuery = supabase
       .from('consultations')
       .select(`
@@ -376,11 +377,11 @@ export const getAdminDashboard = async (req: Request, res: Response) => {
       `)
       .gte('consulta_inicio', primeiroDiaMes.toISOString())
       .lte('consulta_inicio', ultimoDiaMes.toISOString());
-    
+
     if (medicosIdsDaClinica !== null && medicosIdsDaClinica.length > 0) {
       consultasMesQuery = consultasMesQuery.in('doctor_id', medicosIdsDaClinica);
     }
-    
+
     const { data: consultasMes } = await consultasMesQuery;
 
     const consultasPorDiaCalendario: Record<string, { agendadas: any[]; canceladas: any[] }> = {};
@@ -388,11 +389,11 @@ export const getAdminDashboard = async (req: Request, res: Response) => {
       if (!c.consulta_inicio) return;
       const dataConsulta = new Date(c.consulta_inicio);
       const diaKey = `${dataConsulta.getFullYear()}-${String(dataConsulta.getMonth() + 1).padStart(2, '0')}-${String(dataConsulta.getDate()).padStart(2, '0')}`;
-      
+
       if (!consultasPorDiaCalendario[diaKey]) {
         consultasPorDiaCalendario[diaKey] = { agendadas: [], canceladas: [] };
       }
-      
+
       const consultaInfo = {
         id: c.id,
         paciente: c.patient_name,
@@ -401,7 +402,7 @@ export const getAdminDashboard = async (req: Request, res: Response) => {
         horario: new Date(c.consulta_inicio).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
         data: new Date(c.consulta_inicio)
       };
-      
+
       if (c.status === 'CANCELLED') {
         consultasPorDiaCalendario[diaKey].canceladas.push(consultaInfo);
       } else {
