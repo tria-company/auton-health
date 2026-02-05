@@ -83,7 +83,8 @@ export const getAdminDashboard = async (req: Request, res: Response) => {
       .from('consultations')
       .select('*', { count: 'exact', head: true })
       .gte('created_at', startDate.toISOString())
-      .lte('created_at', endDate.toISOString());
+      .lte('created_at', endDate.toISOString())
+      .gte('duracao', 10);
 
     if (tipoConsulta && tipoConsulta !== 'TODAS') {
       consultasQuery = consultasQuery.eq('consultation_type', tipoConsulta);
@@ -109,7 +110,8 @@ export const getAdminDashboard = async (req: Request, res: Response) => {
       .from('consultations')
       .select('*', { count: 'exact', head: true })
       .gte('created_at', periodoAnteriorStart.toISOString())
-      .lte('created_at', periodoAnteriorEnd.toISOString());
+      .lte('created_at', periodoAnteriorEnd.toISOString())
+      .gte('duracao', 10);
 
     if (tipoConsulta && tipoConsulta !== 'TODAS') {
       consultasAnterioresQuery = consultasAnterioresQuery.eq('consultation_type', tipoConsulta);
@@ -152,7 +154,8 @@ export const getAdminDashboard = async (req: Request, res: Response) => {
       .select('duracao, consultation_type')
       .gte('created_at', startDate.toISOString())
       .lte('created_at', endDate.toISOString())
-      .not('duracao', 'is', null);
+      .not('duracao', 'is', null)
+      .gte('duracao', 10);
 
     if (tipoConsulta && tipoConsulta !== 'TODAS') {
       duracaoQuery = duracaoQuery.eq('consultation_type', tipoConsulta);
@@ -203,6 +206,7 @@ export const getAdminDashboard = async (req: Request, res: Response) => {
       .select('created_at, consultation_type')
       .gte('created_at', startDate.toISOString())
       .lte('created_at', endDate.toISOString())
+      .gte('duracao', 10)
       .order('created_at', { ascending: true });
 
     if (tipoConsulta && tipoConsulta !== 'TODAS') {
@@ -241,7 +245,8 @@ export const getAdminDashboard = async (req: Request, res: Response) => {
         medicos(name)
       `)
       .gte('created_at', startDate.toISOString())
-      .lte('created_at', endDate.toISOString());
+      .lte('created_at', endDate.toISOString())
+      .gte('duracao', 10);
 
     if (tipoConsulta && tipoConsulta !== 'TODAS') {
       porMedicoQuery = porMedicoQuery.eq('consultation_type', tipoConsulta);
