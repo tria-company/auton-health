@@ -258,112 +258,27 @@ export default function DashboardPage() {
     }
   }, [dashboardData]);
 
-  // Adicionar listener para capturar mudanças nas setas do input month
+  // Adicionar listener para capturar mudanças no input month de forma mais simples
   useEffect(() => {
     const monthInput = monthInputRef.current;
     if (!monthInput || chartPeriodType !== 'month') return;
 
-    let lastValue = chartSelectedMonth;
-    let intervalId: NodeJS.Timeout | null = null;
-
     const handleInputEvent = (e: Event) => {
       const target = e.target as HTMLInputElement;
       const newValue = target.value;
-      console.log('📅 [MONTH INPUT] Event listener capturado:', newValue);
+      console.log('📅 [MONTH INPUT] Mudança detectada:', newValue);
       if (newValue && newValue !== chartSelectedMonth) {
-        lastValue = newValue;
         setChartSelectedMonth(newValue);
       }
     };
 
-    // Iniciar polling constante quando o input de mês estiver visível para capturar todas as mudanças
-    // Isso garante que mudanças feitas clicando nas setas sejam detectadas mesmo sem foco
-    intervalId = setInterval(() => {
-      if (!monthInput) return;
-      const currentValue = monthInput.value;
-      if (currentValue && currentValue !== lastValue && currentValue !== chartSelectedMonth) {
-        console.log('📅 [MONTH INPUT] Valor detectado via polling constante:', currentValue);
-        lastValue = currentValue;
-        setChartSelectedMonth(currentValue);
-      }
-    }, 100); // Verificar a cada 100ms constantemente quando o input está visível
-
-    // Handler para capturar cliques em qualquer parte do input (incluindo setas)
-    const handleClick = (e: MouseEvent) => {
-      // Forçar múltiplas verificações em intervalos para capturar mudanças das setas
-      const checkMultipleTimes = () => {
-        const delays = [10, 50, 100, 150, 200];
-        delays.forEach(delay => {
-          setTimeout(() => {
-            if (!monthInput) return;
-            const currentValue = monthInput.value;
-            if (currentValue && currentValue !== chartSelectedMonth) {
-              console.log('📅 [MONTH INPUT] Valor detectado após clique:', currentValue);
-              setChartSelectedMonth(currentValue);
-            }
-          }, delay);
-        });
-      };
-      checkMultipleTimes();
-    };
-
-    // Handler para capturar quando o mouse é pressionado/solto (ao clicar nas setas)
-    const handleMouseDown = () => {
-      // Quando mouse é pressionado, pode estar clicando na seta - verificar múltiplas vezes
-      const checkMultipleTimes = () => {
-        const delays = [10, 30, 50, 100, 150];
-        delays.forEach(delay => {
-          setTimeout(() => {
-            if (!monthInput) return;
-            const currentValue = monthInput.value;
-            if (currentValue && currentValue !== chartSelectedMonth) {
-              console.log('📅 [MONTH INPUT] Valor detectado após mousedown:', currentValue);
-              setChartSelectedMonth(currentValue);
-            }
-          }, delay);
-        });
-      };
-      checkMultipleTimes();
-    };
-
-    const handleMouseUp = () => {
-      // Quando mouse é solto, verificar novamente
-      const checkMultipleTimes = () => {
-        const delays = [10, 50, 100, 200];
-        delays.forEach(delay => {
-          setTimeout(() => {
-            if (!monthInput) return;
-            const currentValue = monthInput.value;
-            if (currentValue && currentValue !== chartSelectedMonth) {
-              console.log('📅 [MONTH INPUT] Valor detectado após mouseup:', currentValue);
-              setChartSelectedMonth(currentValue);
-            }
-          }, delay);
-        });
-      };
-      checkMultipleTimes();
-    };
-
-    // Adicionar múltiplos listeners para garantir que capture todas as mudanças
+    // Escutar eventos padrão de mudança
     monthInput.addEventListener('input', handleInputEvent);
     monthInput.addEventListener('change', handleInputEvent);
-    monthInput.addEventListener('keyup', handleInputEvent);
-    monthInput.addEventListener('click', handleClick);
-    monthInput.addEventListener('mousedown', handleMouseDown);
-    monthInput.addEventListener('mouseup', handleMouseUp);
-    monthInput.addEventListener('wheel', handleInputEvent); // Capturar scroll também
 
     return () => {
       monthInput.removeEventListener('input', handleInputEvent);
       monthInput.removeEventListener('change', handleInputEvent);
-      monthInput.removeEventListener('keyup', handleInputEvent);
-      monthInput.removeEventListener('click', handleClick);
-      monthInput.removeEventListener('mousedown', handleMouseDown);
-      monthInput.removeEventListener('mouseup', handleMouseUp);
-      monthInput.removeEventListener('wheel', handleInputEvent);
-      if (intervalId) {
-        clearInterval(intervalId);
-      }
     };
   }, [chartPeriodType, chartSelectedMonth]);
 
