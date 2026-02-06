@@ -3800,123 +3800,216 @@ function AlimentacaoSection({
     );
   }
 
-  const refeicoes = [
-    { key: 'cafe_da_manha', label: 'Café da Manhã' },
-    { key: 'almoco', label: 'Almoço' },
-    { key: 'cafe_da_tarde', label: 'Café da Tarde' },
-    { key: 'jantar', label: 'Jantar' }
-  ];
-
-  const getRefeicaoData = (refeicaoKey: string) => {
-    if (!alimentacaoData) {
-      console.log('⚠️ [FRONTEND] alimentacaoData não existe');
-      return [];
-    }
-
-    // Retornar os dados diretamente da propriedade da refeição
-    const dados = alimentacaoData[refeicaoKey as keyof typeof alimentacaoData] || [];
-
-    console.log(`📋 [FRONTEND] Dados para ${refeicaoKey}:`, dados.length, 'itens');
-
-    return Array.isArray(dados) ? dados : [];
-  };
+  // Se os dados vierem no formato antigo (objeto com chaves das refeições), tentar converter ou usar como está para compatibilidade
+  // Mas a nova estrutura é um array: [{ id: 'ref_1', nome: 'Refeição 1', data: "..." }, ...]
+  const mealsToRender = Array.isArray(alimentacaoData)
+    ? alimentacaoData.map((m: any) => {
+      let parsedData = m.data;
+      if (typeof parsedData === 'string') {
+        try {
+          parsedData = JSON.parse(parsedData);
+        } catch (e) {
+          console.error('Erro ao fazer parse dos dados da refeição:', e);
+          parsedData = { principal: [], substituicoes: {} };
+        }
+      }
+      return { ...m, data: parsedData };
+    })
+    : []; // Se não for array (null ou estrutura antiga não tratada aqui), retorna vazio por enquanto ou implemente fallback
 
   return (
     <div className="anamnese-sections">
-      {refeicoes.map((refeicao) => {
-        const items = getRefeicaoData(refeicao.key);
+      {mealsToRender.length === 0 ? (
+        <div className="anamnese-sections">
+          <p style={{ color: '#666', fontStyle: 'italic', padding: '20px' }}>
+            Nenhum dado de alimentação encontrado ou formato inválido.
+          </p>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '20px' }}>
+          {mealsToRender.map((meal: any, index: number) => {
+            const principalItems = meal.data?.principal || [];
+            const substituicoes = meal.data?.substituicoes || {};
+            const hasSubstituicoes = Object.keys(substituicoes).length > 0;
 
-        return (
-          <CollapsibleSection key={refeicao.key} title={refeicao.label} defaultOpen={true}>
-            {items.length === 0 ? (
-              <p style={{ color: '#666', fontStyle: 'italic', padding: '20px' }}>
-                Nenhum item adicionado
-              </p>
-            ) : (
-              <div className="anamnese-subsection">
-                {items.map((item: any, index: number) => (
-                  <div key={item.id || index} style={{ marginBottom: '16px' }}>
-                    <h4 style={{ marginBottom: '12px', fontSize: '14px', fontWeight: 600, color: '#374151' }}>
-                      Item {index + 1}
-                    </h4>
-                    <div className="anamnese-subsection">
-                      <DataField
-                        label="Alimento"
-                        value={formatValueForDataField(item.alimento)}
-                        fieldPath={`alimentacao_data.${refeicao.key}.${index}.alimento`}
-                        consultaId={consultaId}
-                        onSave={async (fieldPath: string, newValue: string, consultaId: string) => {
-                          // Atualizar item específico
-                          const response = await gatewayClient.post(`/alimentacao/${consultaId}/update-field`, {
-                            id: item.id,
-                            field: 'alimento',
-                            value: newValue
-                          });
-                          if (response.success) {
-                            await loadAlimentacaoData();
-                          }
-                        }}
-                        onAIEdit={handleAIEdit}
-                      />
-                      <DataField
-                        label="Tipo"
-                        value={formatValueForDataField(item.tipo)}
-                        fieldPath={`alimentacao_data.${refeicao.key}.${index}.tipo`}
-                        consultaId={consultaId}
-                        onSave={async (fieldPath: string, newValue: string, consultaId: string) => {
-                          const response = await gatewayClient.post(`/alimentacao/${consultaId}/update-field`, {
-                            id: item.id,
-                            field: 'tipo_de_alimentos',
-                            value: newValue
-                          });
-                          if (response.success) {
-                            await loadAlimentacaoData();
-                          }
-                        }}
-                        onAIEdit={handleAIEdit}
-                      />
-                      <DataField
-                        label="Gramatura"
-                        value={formatValueForDataField(item.gramatura)}
-                        fieldPath={`alimentacao_data.${refeicao.key}.${index}.gramatura`}
-                        consultaId={consultaId}
-                        onSave={async (fieldPath: string, newValue: string, consultaId: string) => {
-                          const response = await gatewayClient.post(`/alimentacao/${consultaId}/update-field`, {
-                            id: item.id,
-                            field: 'gramatura',
-                            value: newValue
-                          });
-                          if (response.success) {
-                            await loadAlimentacaoData();
-                          }
-                        }}
-                        onAIEdit={handleAIEdit}
-                      />
-                      <DataField
-                        label="Kcal"
-                        value={formatValueForDataField(item.kcal)}
-                        fieldPath={`alimentacao_data.${refeicao.key}.${index}.kcal`}
-                        consultaId={consultaId}
-                        onSave={async (fieldPath: string, newValue: string, consultaId: string) => {
-                          const response = await gatewayClient.post(`/alimentacao/${consultaId}/update-field`, {
-                            id: item.id,
-                            field: 'kcal',
-                            value: newValue
-                          });
-                          if (response.success) {
-                            await loadAlimentacaoData();
-                          }
-                        }}
-                        onAIEdit={handleAIEdit}
-                      />
-                    </div>
+            return (
+              <div key={meal.id || index} style={{
+                backgroundColor: '#ffffff',
+                borderRadius: '12px',
+                border: '1px solid #e5e7eb',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                overflow: 'hidden',
+                display: 'flex',
+                flexDirection: 'column'
+              }}>
+                {/* Header da Refeição */}
+                <div style={{
+                  padding: '16px',
+                  backgroundColor: '#f8fafc',
+                  borderBottom: '1px solid #e5e7eb',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <div style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '8px',
+                    backgroundColor: '#dbeafe',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#2563eb'
+                  }}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2" /><path d="M7 2v20" /><path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7" /></svg>
                   </div>
-                ))}
+                  <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#1e293b' }}>
+                    {meal.nome || `Refeição ${index + 1}`}
+                  </h3>
+                </div>
+
+                <div style={{ padding: '16px', flex: 1 }}>
+                  {/* Seção Principal */}
+                  <div style={{ marginBottom: '20px' }}>
+                    <h4 style={{
+                      marginBottom: '12px',
+                      fontSize: '13px',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      color: '#64748b',
+                      fontWeight: 700,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}>
+                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#22c55e' }}></span>
+                      Prato Principal
+                    </h4>
+
+                    {principalItems.length === 0 ? (
+                      <p style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: '14px' }}>Nenhum item principal.</p>
+                    ) : (
+                      <div style={{ display: 'grid', gap: '10px' }}>
+                        {principalItems.map((item: any, idx: number) => (
+                          <div key={idx} style={{
+                            padding: '12px',
+                            backgroundColor: '#f0fdf4',
+                            borderRadius: '8px',
+                            border: '1px solid #dcfce7',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '8px'
+                          }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                              <span style={{ fontWeight: 600, color: '#14532d', fontSize: '14px' }}>{item.alimento}</span>
+                              {item.categoria && (
+                                <span style={{
+                                  fontSize: '11px',
+                                  padding: '2px 6px',
+                                  borderRadius: '4px',
+                                  backgroundColor: '#ffffff',
+                                  color: '#166534',
+                                  border: '1px solid #bbf7d0',
+                                  fontWeight: 500
+                                }}>
+                                  {item.categoria}
+                                </span>
+                              )}
+                            </div>
+                            <div style={{ display: 'flex', gap: '12px', fontSize: '12px', color: '#15803d' }}>
+                              {item.gramas && (
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  ⚖️ {Number(item.gramas).toFixed(0)}g
+                                </span>
+                              )}
+                              {item.kcal && (
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  🔥 {Number(item.kcal).toFixed(0)} kcal
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Seção Substituições */}
+                  {hasSubstituicoes && (
+                    <div>
+                      <h4 style={{
+                        marginBottom: '12px',
+                        fontSize: '13px',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        color: '#64748b',
+                        fontWeight: 700,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        borderTop: '1px solid #f1f5f9',
+                        paddingTop: '16px'
+                      }}>
+                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#6366f1' }}></span>
+                        Substituições
+                      </h4>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        {Object.entries(substituicoes).map(([category, items]: [string, any], catIdx) => (
+                          (items && items.length > 0) && (
+                            <div key={catIdx}>
+                              <h5 style={{
+                                fontSize: '12px',
+                                color: '#475569',
+                                fontWeight: 600,
+                                marginBottom: '8px',
+                                paddingLeft: '4px',
+                                borderLeft: '2px solid #cbd5e1'
+                              }}>
+                                {category}
+                              </h5>
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '8px' }}>
+                                {items.slice(0, 4).map((subItem: any, subIdx: number) => (
+                                  <div key={subIdx} style={{
+                                    padding: '8px',
+                                    backgroundColor: '#f8fafc',
+                                    borderRadius: '6px',
+                                    border: '1px solid #e2e8f0',
+                                    fontSize: '12px'
+                                  }}>
+                                    <div style={{ fontWeight: 600, color: '#334155', marginBottom: '2px', lineHeight: '1.2' }}>
+                                      {subItem.alimento}
+                                    </div>
+                                    <div style={{ color: '#64748b', fontSize: '11px' }}>
+                                      {subItem.gramas ? `${Number(subItem.gramas).toFixed(0)}g` : 'Livre'}
+                                    </div>
+                                  </div>
+                                ))}
+                                {items.length > 4 && (
+                                  <div style={{
+                                    fontSize: '11px',
+                                    color: '#64748b',
+                                    fontStyle: 'italic',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    padding: '4px'
+                                  }}>
+                                    + {items.length - 4} opções...
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
-            )}
-          </CollapsibleSection>
-        );
-      })}
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -5640,18 +5733,18 @@ function ConsultasPageContent() {
 
     // Determinar intervalo baseado no status atual
     const getPollingInterval = (currentStatus: string | null) => {
-      if (!currentStatus) return 5000; // Default: 5 segundos
+      if (!currentStatus) return 10000; // Default: 10 segundos
 
       // Status que mudam frequentemente: polling mais rápido
       if (['PROCESSING', 'RECORDING'].includes(currentStatus)) {
-        return 3000; // 3 segundos
+        return 5000; // 5 segundos
       }
       // Status estáveis: polling menos frequente
       if (['COMPLETED', 'ERROR', 'CANCELLED'].includes(currentStatus)) {
-        return 60000; // 60 segundos (reduzido - status estável não precisa de polling frequente)
+        return 120000; // 2 minutos (reduzido - status estável não precisa de polling frequente)
       }
       // Status intermediários
-      return 5000; // 5 segundos
+      return 10000; // 10 segundos
     };
 
     const currentStatus = consultaDetails?.status || null;
@@ -5675,6 +5768,14 @@ function ConsultasPageContent() {
           pollingActiveRef.current = false;
           clearInterval(intervalId);
           // Não redirecionar automaticamente - deixar o usuário saber que precisa fazer login
+          return;
+        }
+
+        // ✅ CORREÇÃO: Se erro 429 (Too Many Requests), parar polling temporariamente
+        if (response.status === 429) {
+          console.warn('⚠️ Rate Limit atingido (429) - parando polling de consultas');
+          pollingActiveRef.current = false;
+          clearInterval(intervalId);
           return;
         }
 

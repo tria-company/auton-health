@@ -22,23 +22,33 @@ interface SuplementacaoResponse {
   } | null;
 }
 
-/** Item de refeição da API de alimentação */
-interface AlimentacaoItem {
-  alimento?: string;
-  tipo?: string;
-  gramatura?: string | null;
-  kcal?: string | null;
+/** Item de principal da refeição */
+interface RefeicaoPrincipalItem {
+  alimento: string;
+  gramas: number;
+  categoria: string;
+}
+
+/** Item de substituição */
+interface SubstituicaoItem {
+  alimento: string;
+  gramas: number;
+}
+
+/** Estrutura de uma refeição na nova tabela */
+interface RefeicaoData {
+  principal: RefeicaoPrincipalItem[];
+  substituicoes: Record<string, SubstituicaoItem[]>; // gordinhas, proteinas, etc.
 }
 
 /** Resposta da API de alimentação */
 interface AlimentacaoResponse {
   success: boolean;
-  alimentacao_data?: {
-    cafe_da_manha?: AlimentacaoItem[];
-    almoco?: AlimentacaoItem[];
-    cafe_da_tarde?: AlimentacaoItem[];
-    jantar?: AlimentacaoItem[];
-  } | null;
+  alimentacao_data?: Array<{
+    id: string;
+    nome: string;
+    data: RefeicaoData | string; // Pode vir como string JSON se o parse falhar em algum lugar, mas o backend manda objeto tipicamente se for jsonb no supabase. Controller manda data.ref_X que é jsonb.
+  }> | null;
 }
 
 /** Resposta da API de atividade física */
@@ -78,31 +88,36 @@ export async function fetchSolutionsFromGateway(
   const alimentacaoData = alimentacaoRes.success ? (alimentacaoRes as AlimentacaoResponse).alimentacao_data ?? null : null;
   const atividadeData = atividadeRes.success ? (atividadeRes as AtividadeFisicaResponse).atividade_fisica_data ?? null : null;
 
-  // Flatten alimentação por refeição: uma entrada por item (alimento, tipo, gramatura/kcal da refeição)
+  // Flatten alimentação por refeição para o DOCX (Adaptação para o novo formato)
+  // O DOCX espera uma lista plana. Vamos tentar converter o novo formato para algo que o DOCX "entenda" ou pelo menos não quebre.
+  // Idealmente o DOCX generator também deveria ser atualizado, mas vamos fazer um best-effort mapping.
   const alimentacaoFlat: Array<Record<string, unknown>> = [];
-  if (alimentacaoData) {
-    const meals: Array<{ key: keyof typeof alimentacaoData; label: string }> = [
-      { key: 'cafe_da_manha', label: 'Café da manhã' },
-      { key: 'almoco', label: 'Almoço' },
-      { key: 'cafe_da_tarde', label: 'Café da tarde' },
-      { key: 'jantar', label: 'Jantar' }
-    ];
-    for (const { key, label } of meals) {
-      const items = alimentacaoData[key] || [];
-      for (const item of items) {
-        alimentacaoFlat.push({
-          alimento: item.alimento || 'Item',
-          tipo_de_alimentos: item.tipo,
-          ref1_g: key === 'cafe_da_manha' ? item.gramatura : undefined,
-          ref1_kcal: key === 'cafe_da_manha' ? item.kcal : undefined,
-          ref2_g: key === 'almoco' ? item.gramatura : undefined,
-          ref2_kcal: key === 'almoco' ? item.kcal : undefined,
-          ref3_g: key === 'cafe_da_tarde' ? item.gramatura : undefined,
-          ref3_kcal: key === 'cafe_da_tarde' ? item.kcal : undefined,
-          ref4_g: key === 'jantar' ? item.gramatura : undefined,
-          ref4_kcal: key === 'jantar' ? item.kcal : undefined,
-          _meal: label
-        });
+
+  if (alimentacaoData && Array.isArray(alimentacaoData)) {
+    for (const refeicao of alimentacaoData) {
+      const nomeRefeicao = refeicao.nome;
+      // ref_data pode ser string JSON ou objeto
+      let refData = refeicao.data;
+      if (typeof refData === 'string') {
+        try {
+          refData = JSON.parse(refData);
+        } catch (e) {
+          console.error('Erro ao fazer parse de dados de refeição', e);
+          continue;
+        }
+      }
+
+      const dadosRefeicao = refData as RefeicaoData; // Cast seguro após parse
+
+      if (dadosRefeicao && dadosRefeicao.principal) {
+        for (const item of dadosRefeicao.principal) {
+          alimentacaoFlat.push({
+            alimento: item.alimento,
+            tipo_de_alimentos: item.categoria,
+            gramatura: item.gramas ? `${item.gramas.toFixed(0)}g` : null, // DOCX espera string
+            _meal: nomeRefeicao
+          });
+        }
       }
     }
   }

@@ -341,8 +341,7 @@ export async function updateSolucaoSuplementacaoField(req: AuthenticatedRequest,
 
 /**
  * GET /alimentacao/:consultaId
- * Tabela s_gramaturas_alimentares usa paciente_id, não consulta_id
- * Frontend espera: { cafe_da_manha: [], almoco: [], cafe_da_tarde: [], jantar: [] }
+ * Tabela s_refeicao usa paciente (uuid), não consulta_id
  */
 export async function getAlimentacao(req: AuthenticatedRequest, res: Response) {
   try {
@@ -369,66 +368,42 @@ export async function getAlimentacao(req: AuthenticatedRequest, res: Response) {
 
     if (!consulta || !consulta.patient_id) {
       console.log('[getAlimentacao] ⚠️ Consulta não encontrada ou sem paciente');
-      return res.json({ success: true, alimentacao_data: { cafe_da_manha: [], almoco: [], cafe_da_tarde: [], jantar: [] } });
+      return res.json({ success: true, alimentacao_data: [] });
     }
 
     const patientId = consulta.patient_id;
     console.log('[getAlimentacao] 👤 Paciente ID encontrado:', patientId);
 
-    // Buscar alimentação pelo paciente_id
+    // Buscar alimentação pelo paciente_id na nova tabela s_refeicao
+    // Pegando o criado mais recentemente
     const { data, error } = await supabase
-      .from('s_gramaturas_alimentares')
+      .from('s_refeicao')
       .select('*')
-      .eq('paciente_id', patientId);
+      .eq('paciente', patientId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-    console.log('[getAlimentacao] 🍽️ Registros encontrados:', data?.length || 0);
+    console.log('[getAlimentacao] 🍽️ Registro encontrado:', data ? 'Sim' : 'Não');
 
     if (error) {
       console.error('[getAlimentacao] ❌ Erro ao buscar alimentação:', error);
       throw error;
     }
 
+    if (!data) {
+      return res.json({ success: true, alimentacao_data: [] });
+    }
+
     // Transformar dados para o formato esperado pelo frontend
-    // Tabela tem: alimento, tipo_de_alimentos, ref1_g/kcal (café), ref2_g/kcal (almoço), ref3_g/kcal (tarde), ref4_g/kcal (jantar)
-    const alimentacaoData = {
-      cafe_da_manha: (data || []).filter(item => item.ref1_g || item.ref1_kcal).map(item => ({
-        id: item.id,
-        alimento: item.alimento,
-        tipo: item.tipo_de_alimentos,
-        gramatura: item.ref1_g ? `${item.ref1_g}g` : null,
-        kcal: item.ref1_kcal ? `${item.ref1_kcal}kcal` : null
-      })),
-      almoco: (data || []).filter(item => item.ref2_g || item.ref2_kcal).map(item => ({
-        id: item.id,
-        alimento: item.alimento,
-        tipo: item.tipo_de_alimentos,
-        gramatura: item.ref2_g ? `${item.ref2_g}g` : null,
-        kcal: item.ref2_kcal ? `${item.ref2_kcal}kcal` : null
-      })),
-      cafe_da_tarde: (data || []).filter(item => item.ref3_g || item.ref3_kcal).map(item => ({
-        id: item.id,
-        alimento: item.alimento,
-        tipo: item.tipo_de_alimentos,
-        gramatura: item.ref3_g ? `${item.ref3_g}g` : null,
-        kcal: item.ref3_kcal ? `${item.ref3_kcal}kcal` : null
-      })),
-      jantar: (data || []).filter(item => item.ref4_g || item.ref4_kcal).map(item => ({
-        id: item.id,
-        alimento: item.alimento,
-        tipo: item.tipo_de_alimentos,
-        gramatura: item.ref4_g ? `${item.ref4_g}g` : null,
-        kcal: item.ref4_kcal ? `${item.ref4_kcal}kcal` : null
-      }))
-    };
+    const refeicoes = [
+      { id: 'ref_1', nome: 'Refeição 1', data: data.ref_1 },
+      { id: 'ref_2', nome: 'Refeição 2', data: data.ref_2 },
+      { id: 'ref_3', nome: 'Refeição 3', data: data.ref_3 },
+      { id: 'ref_4', nome: 'Refeição 4', data: data.ref_4 }
+    ];
 
-    console.log('[getAlimentacao] ✅ Dados transformados:', {
-      cafe_da_manha: alimentacaoData.cafe_da_manha.length,
-      almoco: alimentacaoData.almoco.length,
-      cafe_da_tarde: alimentacaoData.cafe_da_tarde.length,
-      jantar: alimentacaoData.jantar.length
-    });
-
-    return res.json({ success: true, alimentacao_data: alimentacaoData });
+    return res.json({ success: true, alimentacao_data: refeicoes });
   } catch (error: any) {
     console.error('[getAlimentacao] ❌ Erro geral:', error?.message || error);
     return res.status(500).json({ success: false, error: 'Erro interno do servidor' });

@@ -36,7 +36,7 @@ const envSchema = z.object({
 
   // Rate Limiting
   RATE_LIMIT_WINDOW_MS: z.coerce.number().default(900000), // 15 minutos
-  RATE_LIMIT_MAX_REQUESTS: z.coerce.number().default(1000),
+  RATE_LIMIT_MAX_REQUESTS: z.coerce.number().default(5000),
 
   // CORS
   CORS_ORIGINS: z.string().optional(), // Lista de origens separadas por vírgula

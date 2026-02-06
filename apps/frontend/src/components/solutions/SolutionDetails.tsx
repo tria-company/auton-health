@@ -1,10 +1,10 @@
 'use client';
 
 import React from 'react';
-import { 
-  ArrowLeft, 
-  Download, 
-  Printer, 
+import {
+  ArrowLeft,
+  Download,
+  Printer,
   Share,
   Brain,
   Apple,
@@ -20,7 +20,7 @@ interface SolutionDetailsProps {
 }
 
 export default function SolutionDetails({ solutionId, solutionData, onBack }: SolutionDetailsProps) {
-  
+
   const getSolutionInfo = () => {
     switch (solutionId) {
       case 'mentalidade':
@@ -119,28 +119,151 @@ export default function SolutionDetails({ solutionId, solutionData, onBack }: So
     </div>
   );
 
-  const renderAlimentacaoContent = (data: any[]) => (
-    <div className="solution-content">
-      <div className="solution-section">
-        <h3>Plano Alimentar ({data.length} itens)</h3>
-        <div className="alimentacao-grid">
-          {data.map((item, index) => (
-            <div key={index} className="alimentacao-item">
-              <h4>{item.alimento}</h4>
-              <div className="alimentacao-details">
-                <p><strong>Tipo:</strong> {item.tipo_de_alimentos}</p>
-                <p><strong>Proporção de Fruta:</strong> {item.proporcao_fruta}</p>
-                {item.ref1_g && <p><strong>Refeição 1:</strong> {item.ref1_g}g ({item.ref1_kcal}kcal)</p>}
-                {item.ref2_g && <p><strong>Refeição 2:</strong> {item.ref2_g}g ({item.ref2_kcal}kcal)</p>}
-                {item.ref3_g && <p><strong>Refeição 3:</strong> {item.ref3_g}g ({item.ref3_kcal}kcal)</p>}
-                {item.ref4_g && <p><strong>Refeição 4:</strong> {item.ref4_g}g ({item.ref4_kcal}kcal)</p>}
+  const renderAlimentacaoContent = (data: any[]) => {
+    // Parse data if necessary (sometimes it might come as string JSON if not handled by fetch)
+    const meals = data.map(item => {
+      let mealData = item.data;
+      if (typeof mealData === 'string') {
+        try {
+          mealData = JSON.parse(mealData);
+        } catch (e) {
+          mealData = {};
+        }
+      }
+      return { ...item, data: mealData };
+    });
+
+    return (
+      <div className="solution-content">
+        <div className="solution-section">
+          <h3>Plano Alimentar - Refeições</h3>
+          <div className="alimentacao-list-container">
+            {meals.map((meal, index) => (
+              <div key={index} className="meal-card">
+                <h4 className="meal-title">{meal.nome}</h4>
+
+                {/* Principal */}
+                {meal.data?.principal && meal.data.principal.length > 0 ? (
+                  <div className="meal-section">
+                    <h5 className="meal-subtitle">Principal</h5>
+                    <ul className="meal-items-list">
+                      {meal.data.principal.map((item: any, idx: number) => (
+                        <li key={idx} className="meal-item">
+                          <span className="item-name">{item.alimento}</span>
+                          <div className="item-meta">
+                            <span className="item-grams">{item.gramas ? `${item.gramas.toFixed(0)}g` : ''}</span>
+                            <span className="item-category">{item.categoria}</span>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : (
+                  <p className="empty-section">Sem itens principais</p>
+                )}
+
+                {/* Substituições */}
+                {meal.data?.substituicoes && Object.keys(meal.data.substituicoes).length > 0 && (
+                  <div className="meal-section">
+                    <h5 className="meal-subtitle">Substituições</h5>
+                    <div className="substitutions-container">
+                      {Object.entries(meal.data.substituicoes as Record<string, any[]>).map(([category, items], idx) => (
+                        (items && items.length > 0) && (
+                          <div key={idx} className="substitution-group">
+                            <h6 className="substitution-category">{category.charAt(0).toUpperCase() + category.slice(1)}</h6>
+                            <ul className="substitution-list">
+                              {items.map((item: any, subIdx: number) => (
+                                <li key={subIdx} className="substitution-item">
+                                  {item.alimento} ({item.gramas ? `${item.gramas.toFixed(0)}g` : 'à v.'})
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
+
+        {/* CSS inline for this specific new layout if not present in global css */}
+        <style jsx>{`
+          .alimentacao-list-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+          }
+          .meal-card {
+            background: #fff;
+            border: 1px solid #e1e4e8;
+            border-radius: 8px;
+            padding: 16px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+          }
+          .meal-title {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 8px;
+            margin-bottom: 12px;
+          }
+          .meal-subtitle {
+            font-size: 0.9em;
+            text-transform: uppercase;
+            color: #7f8c8d;
+            margin: 12px 0 8px;
+            font-weight: 700;
+          }
+          .meal-items-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+          }
+          .meal-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 0;
+            border-bottom: 1px solid #f0f0f0;
+          }
+          .item-name {
+            font-weight: 500;
+          }
+          .item-meta {
+            display: flex;
+            gap: 8px;
+            font-size: 0.85em;
+          }
+          .item-grams {
+            background: #e8f6fd;
+            color: #2980b9;
+            padding: 2px 6px;
+            border-radius: 4px;
+          }
+          .item-category {
+            color: #95a5a6;
+          }
+          .substitution-group {
+            margin-bottom: 8px;
+          }
+          .substitution-category {
+            font-size: 0.85em;
+            color: #e67e22;
+            margin: 4px 0;
+          }
+          .substitution-list {
+            list-style: disc;
+            padding-left: 20px;
+            margin: 0;
+            font-size: 0.9em;
+            color: #555;
+          }
+        `}</style>
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderSuplementacaoContent = (data: any) => (
     <div className="solution-content">
