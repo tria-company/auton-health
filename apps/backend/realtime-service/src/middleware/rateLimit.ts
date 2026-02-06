@@ -44,6 +44,12 @@ export const generalRateLimiter = rateLimit({
     if (req.path === '/api/health' || req.path === '/health') {
       return true;
     }
+
+    // ✅ Pular requisições do Socket.IO (polling faz muitas requisições)
+    if (req.path.startsWith('/socket.io/') || req.path === '/socket.io') {
+      return true;
+    }
+
     return false;
   },
 });

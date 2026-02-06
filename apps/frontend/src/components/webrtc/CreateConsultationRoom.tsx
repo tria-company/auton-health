@@ -111,7 +111,7 @@ export function CreateConsultationRoom({
   useEffect(() => {
     if (
       isFromAgendamento &&
-      socketConnected &&
+      // socketConnected && // Removido: socket conecta sob demanda agora
       !loadingDoctor &&
       !loadingPatients &&
       selectedPatient &&
@@ -122,79 +122,63 @@ export function CreateConsultationRoom({
       console.log('🚀 Iniciando consulta automaticamente a partir do agendamento');
       handleCreateRoom();
     }
-  }, [isFromAgendamento, socketConnected, loadingDoctor, loadingPatients, selectedPatient, hostName, isCreatingRoom, roomCreated]);
+  }, [isFromAgendamento, loadingDoctor, loadingPatients, selectedPatient, hostName, isCreatingRoom, roomCreated]);
 
-  // Conectar ao Socket.IO quando hostName estiver disponível E for consulta instantânea
-  useEffect(() => {
-    // Só conectar ao Socket.IO para consultas instantâneas
-    if (creationType === 'agendamento') {
-      // Desconectar se estava conectado e mudou para agendamento
+  // ✅ Helper para conectar ao socket sob demanda
+  const connectSocket = async (hostName: string): Promise<Socket> => {
+    return new Promise((resolve, reject) => {
+      // Se já estiver conectado, retornar socket existente
+      if (socketRef.current?.connected) {
+        return resolve(socketRef.current);
+      }
+
+      // Se já existe mas está desconectado, conectar
       if (socketRef.current) {
-        socketRef.current.disconnect();
-        socketRef.current = null;
+        socketRef.current.connect();
+        return resolve(socketRef.current);
+      }
+
+      const realtimeUrl = (process.env.NEXT_PUBLIC_REALTIME_WS_URL || 'ws://localhost:3002').replace(/^ws/, 'http');
+      console.log('🔌 Conectando ao Socket.IO...', realtimeUrl);
+
+      const socket = io(realtimeUrl, {
+        auth: {
+          userName: hostName,
+          role: 'host',
+          password: 'x'
+        },
+        transports: ['polling', 'websocket'],
+        timeout: 15000,
+        reconnection: true,
+        reconnectionAttempts: 10,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        upgrade: true
+      });
+
+      socketRef.current = socket;
+
+      socket.on('connect', () => {
+        console.log('✅ Socket.IO conectado via', socket.io.engine.transport.name);
+        setSocketConnected(true);
+        resolve(socket);
+      });
+
+      socket.on('connect_error', (error: Error) => {
+        console.error('❌ Erro ao conectar Socket.IO:', error.message);
         setSocketConnected(false);
-      }
-      return;
-    }
+        reject(error);
+      });
 
-    if (!hostName) return; // aguarda carregar nome do médico
-    if (socketRef.current?.connected) return; // já conectado
-
-    // Socket.IO connects directly to realtime-service (not gateway)
-    const realtimeUrl = (process.env.NEXT_PUBLIC_REALTIME_WS_URL || 'ws://localhost:3002').replace(/^ws/, 'http');
-
-    console.log('🔌 Conectando ao Socket.IO...', realtimeUrl);
-
-    // Criar conexão Socket.IO com polling primeiro (mais confiável)
-    const socket = io(realtimeUrl, {
-      auth: {
-        userName: hostName,
-        role: 'host',
-        password: 'x'
-      },
-      // Tentar polling primeiro, depois websocket (mais confiável quando backend pode estar lento)
-      transports: ['polling', 'websocket'],
-      timeout: 15000,
-      reconnection: true,
-      reconnectionAttempts: 10,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      // Forçar upgrade para websocket após conectar via polling
-      upgrade: true
+      socket.on('disconnect', (reason) => {
+        console.log('❌ Socket.IO desconectado:', reason);
+        setSocketConnected(false);
+      });
     });
+  };
 
-    socketRef.current = socket;
-
-    // Configurar listeners de conexão
-    socket.on('connect', () => {
-      console.log('✅ Socket.IO conectado via', socket.io.engine.transport.name);
-      setSocketConnected(true);
-    });
-
-    socket.on('disconnect', (reason) => {
-      console.log('❌ Socket.IO desconectado:', reason);
-      setSocketConnected(false);
-
-      // Se foi desconexão forçada pelo servidor, não tentar reconectar
-      if (reason === 'io server disconnect') {
-        console.warn('⚠️ Servidor desconectou a conexão');
-      }
-    });
-
-    socket.on('connect_error', (error: Error) => {
-      console.error('❌ Erro ao conectar Socket.IO:', error.message);
-      console.error('💡 Verifique se o backend está rodando em', realtimeUrl);
-      setSocketConnected(false);
-    });
-
-    // Cleanup ao desmontar
-    return () => {
-      if (socketRef.current) {
-        socketRef.current.disconnect();
-        socketRef.current = null;
-      }
-    };
-  }, [hostName, creationType]);
+  // ❌ REMOVIDO: Conexão automática ao montar/mudar hostname
+  // A conexão agora é feita apenas ao clicar em "Criar Consulta"
 
   // Carregar dados do médico logado
   useEffect(() => {
@@ -600,8 +584,11 @@ export function CreateConsultationRoom({
       }
 
       // Criar sala via Socket.IO
-      if (socketRef.current) {
-        socketRef.current.emit('createRoom', {
+      try {
+        // Conectar sob demanda
+        const socket = await connectSocket(hostName);
+
+        socket.emit('createRoom', {
           hostName: hostName,
           roomName: roomName,
           patientId: selectedPatient,
@@ -649,8 +636,9 @@ export function CreateConsultationRoom({
             showError('Erro ao criar sala: ' + response.error, 'Erro ao Criar');
           }
         });
-      } else {
-        throw new Error('Socket.IO não conectado');
+      } catch (err) {
+        console.error('Erro ao conectar socket:', err);
+        showError('Erro ao conectar ao servidor de tempo real', 'Erro de Conexão');
       }
     } catch (error) {
       setIsCreatingRoom(false);
@@ -692,21 +680,15 @@ export function CreateConsultationRoom({
       if (response.success) {
         showSuccess('Mensagem enviada com sucesso para o WhatsApp do paciente!', 'Envio Concluído');
       } else {
-        throw new Error(response.error || 'Erro desconhecido ao enviar mensagem');
       }
-
-    } catch (error: any) {
-      console.error('Erro ao enviar WhatsApp:', error);
-      showError(`Erro ao enviar mensagem: ${error.message || 'Falha na comunicação com API'}`, 'Erro no Envio');
-
-      // Fallback: Tentar abrir WhatsApp Web em caso de erro na API automática? 
-      // O usuário pediu especificamente "enviar uma mensagem ... usando a API", então o fallback talvez não seja desejado se o objetivo é automatizar.
-      // Mas podemos deixar uma opção manual se o usuário quiser.
-      // Por enquanto, seguimos estritamente o erro.
-    } finally {
-      setSendingWhatsapp(false);
+    } catch (error) {
+      setIsCreatingRoom(false);
+      console.error('Erro ao criar sala:', error);
+      showError('Erro ao criar sala. Tente novamente.', 'Erro');
     }
   };
+
+
 
   const handleEnterRoom = (url: string) => {
     window.location.href = url;
