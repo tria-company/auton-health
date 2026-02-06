@@ -281,7 +281,7 @@
 }
 
 .kpi .value {
-  font-size: 36px !important;
+  font-size: 22px !important;
   font-weight: 700;
   color: var(--kpi-number, #323232) !important;
   display: block !important;
@@ -579,7 +579,7 @@
 .consultation-type {
   font-size: 12px;
   font-weight: 400;
-  color: #323232;
+  color: #1e3a5f !important; /* azul escuro no modo light */
   line-height: 1.2;
 }
 

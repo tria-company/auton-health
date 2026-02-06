@@ -210,9 +210,21 @@ export async function getPatientById(req: AuthenticatedRequest, res: Response) {
       });
     }
 
+    // Buscar status da anamnese inicial (a_cadastro_anamnese) para o paciente
+    const { data: anamneseRow } = await supabase
+      .from('a_cadastro_anamnese')
+      .select('status')
+      .eq('paciente_id', id)
+      .maybeSingle();
+
+    const patientWithAnamnese = {
+      ...patient,
+      anamnese: anamneseRow ? { status: anamneseRow.status || 'pendente' } : undefined
+    };
+
     return res.json({
       success: true,
-      patient
+      patient: patientWithAnamnese
     });
 
   } catch (error) {
