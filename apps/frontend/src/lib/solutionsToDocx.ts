@@ -1,6 +1,6 @@
 /**
  * Gera um documento DOCX editável com todas as soluções da consulta.
- * Formatação em estilo Markdown: títulos, listas e labels em negrito.
+ * Formatação profissional: margens, fontes, tabelas com bordas e sombreamento.
  */
 import {
   Document,
@@ -11,80 +11,171 @@ import {
   Table,
   TableRow,
   TableCell,
+  BorderStyle,
+  ShadingType,
+  convertInchesToTwip,
 } from 'docx';
+
+/** Margem de página em polegadas (1" = 2,54 cm) */
+const PAGE_MARGIN_INCH = 1;
+/** Tamanho de fonte: corpo (12 pt = 24 half-points) */
+const FONT_SIZE_BODY = 24;
+/** Tamanho de fonte: subtítulo (13 pt) */
+const FONT_SIZE_SUBTITLE = 26;
+/** Tamanho de fonte: H3 (13 pt) */
+const FONT_SIZE_H3 = 26;
+/** Tamanho de fonte: H2 (14 pt) */
+const FONT_SIZE_H2 = 28;
+/** Tamanho de fonte: H1 (16 pt) */
+const FONT_SIZE_H1 = 32;
+/** Espaçamento entre linhas (twips; ~1,15 linhas) */
+const LINE_SPACING = 276;
+/** Bordas das tabelas: cinza escuro */
+const TABLE_BORDER = { style: BorderStyle.SINGLE as const, size: 4, color: '333333' };
+/** Sombreamento do cabeçalho da tabela */
+const TABLE_HEADER_SHADING = { fill: 'E8E8E8', type: ShadingType.CLEAR as const };
+
+/** Item principal de uma refeição (formato gateway) */
+export interface RefeicaoPrincipalItemDocx {
+  alimento?: string;
+  categoria?: string;
+  gramas?: number;
+}
+
+/** Item de substituição (formato gateway) */
+export interface SubstituicaoItemDocx {
+  alimento?: string;
+  gramas?: number;
+}
+
+/** Dados estruturados de uma refeição (principal + substituições por categoria) */
+export interface RefeicaoDataDocx {
+  principal?: RefeicaoPrincipalItemDocx[];
+  substituicoes?: Record<string, SubstituicaoItemDocx[]>;
+}
+
+/** Item de alimentação estruturada (por refeição) para o DOCX */
+export interface AlimentacaoStructuredItem {
+  nome: string;
+  data: RefeicaoDataDocx | string;
+}
 
 export interface SolutionsDataForDocx {
   ltb: any;
   mentalidade: any;
   alimentacao: any[];
+  /** Quando presente, o DOCX usa refeições principais + substituições por refeição */
+  alimentacao_data?: AlimentacaoStructuredItem[] | null;
   suplementacao: any;
   exercicios: any[];
   habitos: any;
 }
 
-/** Parágrafo normal */
+/** Parágrafo normal (fonte 12 pt, espaçamento legível) */
 function p(text: string): Paragraph {
-  return new Paragraph({ children: [new TextRun(text)], spacing: { after: 120 } });
+  return new Paragraph({
+    children: [new TextRun({ text, size: FONT_SIZE_BODY })],
+    spacing: { after: 140, line: LINE_SPACING },
+  });
 }
 
-/** Título principal (nível 1) */
+/** Título principal (nível 1, 16 pt) */
 function h1(text: string): Paragraph {
   return new Paragraph({
     heading: HeadingLevel.HEADING_1,
-    children: [new TextRun({ text, bold: true })],
+    children: [new TextRun({ text, bold: true, size: FONT_SIZE_H1 })],
+    spacing: { before: 280, after: 140 },
+  });
+}
+
+/** Seção (nível 2, 14 pt) */
+function h2(text: string): Paragraph {
+  return new Paragraph({
+    heading: HeadingLevel.HEADING_2,
+    children: [new TextRun({ text, bold: true, size: FONT_SIZE_H2 })],
     spacing: { before: 240, after: 120 },
   });
 }
 
-/** Seção (nível 2) */
-function h2(text: string): Paragraph {
+/** Subseção (nível 3, 13 pt) */
+function h3(text: string): Paragraph {
   return new Paragraph({
-    heading: HeadingLevel.HEADING_2,
-    children: [new TextRun({ text, bold: true })],
+    heading: HeadingLevel.HEADING_3,
+    children: [new TextRun({ text, bold: true, size: FONT_SIZE_H3 })],
     spacing: { before: 200, after: 100 },
   });
 }
 
-/** Subseção (nível 3) */
-function h3(text: string): Paragraph {
+/** Subtítulo em negrito (13 pt, sem nível de heading) */
+function boldSubtitle(text: string): Paragraph {
   return new Paragraph({
-    heading: HeadingLevel.HEADING_3,
-    children: [new TextRun({ text, bold: true })],
-    spacing: { before: 160, after: 80 },
+    children: [new TextRun({ text, bold: true, size: FONT_SIZE_SUBTITLE })],
+    spacing: { before: 140, after: 80 },
+    indent: { left: 200 },
   });
 }
 
-/** Label em negrito + valor (ex: **Tipo:** valor) */
+/** Label em negrito + valor (12 pt, legível) */
 function labelVal(label: string, value: string): Paragraph {
   return new Paragraph({
     children: [
-      new TextRun({ text: `${label}: `, bold: true }),
-      new TextRun(value),
+      new TextRun({ text: `${label}: `, bold: true, size: FONT_SIZE_BODY }),
+      new TextRun({ text: value, size: FONT_SIZE_BODY }),
     ],
-    spacing: { after: 80 },
-    indent: { left: 360 },
+    spacing: { after: 100, line: LINE_SPACING },
+    indent: { left: 400 },
   });
 }
 
-/** Item de lista com marcador */
+/** Item de lista com marcador (12 pt) */
 function bullet(text: string): Paragraph {
   return new Paragraph({
-    children: [new TextRun(`• ${text}`)],
-    spacing: { after: 60 },
-    indent: { left: 360 },
+    children: [new TextRun({ text: `• ${text}`, size: FONT_SIZE_BODY })],
+    spacing: { after: 80, line: LINE_SPACING },
+    indent: { left: 400 },
   });
 }
 
 function emptyLine(): Paragraph {
-  return new Paragraph({ children: [], spacing: { after: 80 } });
+  return new Paragraph({ children: [], spacing: { after: 100 } });
 }
 
-/** Célula de tabela com texto (opcional negrito no primeiro parágrafo) */
+/** Célula de tabela com texto (12 pt; opcional negrito) */
 function tableCell(text: string, bold = false): TableCell {
   return new TableCell({
-    children: [new Paragraph({ children: [new TextRun({ text, bold })] })],
+    children: [
+      new Paragraph({
+        children: [new TextRun({ text, bold, size: FONT_SIZE_BODY })],
+        spacing: { after: 60 },
+      }),
+    ],
+    margins: { top: 80, bottom: 80, left: 100, right: 100 },
   });
 }
+
+/** Célula de cabeçalho de tabela (negrito + fundo cinza claro) */
+function tableHeaderCell(text: string): TableCell {
+  return new TableCell({
+    children: [
+      new Paragraph({
+        children: [new TextRun({ text, bold: true, size: FONT_SIZE_BODY })],
+        spacing: { after: 60 },
+      }),
+    ],
+    shading: TABLE_HEADER_SHADING,
+    margins: { top: 80, bottom: 80, left: 100, right: 100 },
+  });
+}
+
+/** Opções de bordas para tabelas (visual profissional) */
+const TABLE_BORDERS = {
+  top: TABLE_BORDER,
+  bottom: TABLE_BORDER,
+  left: TABLE_BORDER,
+  right: TABLE_BORDER,
+  insideHorizontal: TABLE_BORDER,
+  insideVertical: TABLE_BORDER,
+};
 
 /** Agrupa itens de alimentação por refeição (_meal) */
 function groupAlimentacaoByMeal(items: any[]): Map<string, any[]> {
@@ -267,8 +358,89 @@ export function buildSolutionsDocx(solutions: SolutionsDataForDocx): (Paragraph 
     children.push(emptyLine());
   }
 
-  // --- Alimentação (tabelas por refeição) ---
-  if (solutions.alimentacao && Array.isArray(solutions.alimentacao) && solutions.alimentacao.length > 0) {
+  // --- Alimentação (refeições principais + substituições por refeição, ou fallback para lista plana) ---
+  const hasStructuredAlimentacao = solutions.alimentacao_data && Array.isArray(solutions.alimentacao_data) && solutions.alimentacao_data.length > 0;
+
+  if (hasStructuredAlimentacao) {
+    children.push(h2('Plano Alimentar'));
+    children.push(p('Abaixo estão as refeições principais e as substituições sugeridas por refeição. Ajuste conforme a orientação do seu médico ou nutricionista.'));
+    children.push(emptyLine());
+
+    for (const refeicao of solutions.alimentacao_data!) {
+      let dadosRefeicao: RefeicaoDataDocx = typeof refeicao.data === 'string'
+        ? (() => { try { return JSON.parse(refeicao.data) as RefeicaoDataDocx; } catch { return {}; } })()
+        : (refeicao.data || {});
+
+      const principal = Array.isArray(dadosRefeicao.principal) ? dadosRefeicao.principal : [];
+      const substituicoes = dadosRefeicao.substituicoes && typeof dadosRefeicao.substituicoes === 'object' ? dadosRefeicao.substituicoes : {};
+
+      const temPrincipal = principal.length > 0;
+      const temSubstituicoes = Object.keys(substituicoes).length > 0;
+      if (!temPrincipal && !temSubstituicoes) continue;
+
+      children.push(h3(refeicao.nome));
+
+      if (temPrincipal) {
+        children.push(boldSubtitle('Refeições principais'));
+        const headerRow = new TableRow({
+          children: [
+            tableHeaderCell('Alimento'),
+            tableHeaderCell('Categoria'),
+            tableHeaderCell('Porção (g)'),
+          ],
+        });
+        const dataRows = principal.map((item: RefeicaoPrincipalItemDocx) => {
+          const porcao = item.gramas != null ? `${item.gramas}g` : '—';
+          return new TableRow({
+            children: [
+              tableCell(String(item.alimento || '—')),
+              tableCell(String(item.categoria || '—')),
+              tableCell(porcao),
+            ],
+          });
+        });
+        children.push(
+          new Table({
+            rows: [headerRow, ...dataRows],
+            width: { size: 100, type: 'pct' as const },
+            borders: TABLE_BORDERS,
+          })
+        );
+        children.push(emptyLine());
+      }
+
+      if (temSubstituicoes) {
+        for (const [categoria, itens] of Object.entries(substituicoes)) {
+          if (!Array.isArray(itens) || itens.length === 0) continue;
+          const labelCategoria = categoria.trim() || 'Substituições';
+          children.push(boldSubtitle(`Substituições: ${labelCategoria}`));
+          const headerRow = new TableRow({
+            children: [
+              tableHeaderCell('Alimento'),
+              tableHeaderCell('Porção (g)'),
+            ],
+          });
+          const dataRows = itens.map((item: SubstituicaoItemDocx) => {
+            const porcao = item.gramas != null ? `${item.gramas}g` : '—';
+            return new TableRow({
+              children: [
+                tableCell(String(item.alimento || '—')),
+                tableCell(porcao),
+              ],
+            });
+          });
+          children.push(
+            new Table({
+              rows: [headerRow, ...dataRows],
+              width: { size: 100, type: 'pct' as const },
+              borders: TABLE_BORDERS,
+            })
+          );
+          children.push(emptyLine());
+        }
+      }
+    }
+  } else if (solutions.alimentacao && Array.isArray(solutions.alimentacao) && solutions.alimentacao.length > 0) {
     children.push(h2('Plano Alimentar'));
     children.push(p('Abaixo estão os alimentos e porções sugeridas, separados por refeição. Ajuste conforme a orientação do seu médico ou nutricionista.'));
     children.push(emptyLine());
@@ -277,12 +449,12 @@ export function buildSolutionsDocx(solutions: SolutionsDataForDocx): (Paragraph 
       children.push(h3(mealName));
       const hasProporcao = items.some((i: any) => i.proporcao_fruta != null && i.proporcao_fruta !== '');
       const headerCells = [
-        tableCell('Alimento', true),
-        tableCell('Tipo', true),
-        tableCell('Porção (g)', true),
-        tableCell('Energia (kcal)', true),
+        tableHeaderCell('Alimento'),
+        tableHeaderCell('Tipo'),
+        tableHeaderCell('Porção (g)'),
+        tableHeaderCell('Energia (kcal)'),
       ];
-      if (hasProporcao) headerCells.push(tableCell('Proporção frutas', true));
+      if (hasProporcao) headerCells.push(tableHeaderCell('Proporção frutas'));
       const headerRow = new TableRow({ children: headerCells });
       const dataRows = items.map((item: any) => {
         const porcao = item.ref1_g ?? item.ref2_g ?? item.ref3_g ?? item.ref4_g ?? item.gramatura ?? '—';
@@ -301,6 +473,7 @@ export function buildSolutionsDocx(solutions: SolutionsDataForDocx): (Paragraph 
         new Table({
           rows: [headerRow, ...dataRows],
           width: { size: 100, type: 'pct' as const },
+          borders: TABLE_BORDERS,
         })
       );
       children.push(emptyLine());
@@ -410,15 +583,18 @@ export function buildSolutionsDocx(solutions: SolutionsDataForDocx): (Paragraph 
 
 /**
  * Garante que solutions tem todos os campos esperados (evita undefined no build do doc).
+ * Preserva alimentacao_data quando presente (formato gateway: refeições principais + substituições).
  */
 function normalizeSolutions(solutions: Partial<SolutionsDataForDocx> | null): SolutionsDataForDocx {
   if (!solutions || typeof solutions !== 'object') {
-    return { ltb: null, mentalidade: null, alimentacao: [], suplementacao: null, exercicios: [], habitos: null };
+    return { ltb: null, mentalidade: null, alimentacao: [], alimentacao_data: null, suplementacao: null, exercicios: [], habitos: null };
   }
+  const data = solutions as Partial<SolutionsDataForDocx> & { alimentacao_data?: AlimentacaoStructuredItem[] | null };
   return {
     ltb: solutions.ltb ?? null,
     mentalidade: solutions.mentalidade ?? null,
     alimentacao: Array.isArray(solutions.alimentacao) ? solutions.alimentacao : [],
+    alimentacao_data: data.alimentacao_data != null && Array.isArray(data.alimentacao_data) ? data.alimentacao_data : null,
     suplementacao: solutions.suplementacao ?? null,
     exercicios: Array.isArray(solutions.exercicios) ? solutions.exercicios : [],
     habitos: solutions.habitos ?? null,
@@ -435,10 +611,25 @@ export async function downloadSolutionsDocx(
   const normalized = normalizeSolutions(solutions);
   const paragraphs = buildSolutionsDocx(normalized);
 
+  const marginTwips = convertInchesToTwip(PAGE_MARGIN_INCH);
+  const headerFooterTwips = convertInchesToTwip(0.5);
+
   const doc = new Document({
     sections: [
       {
-        properties: {},
+        properties: {
+          page: {
+            margin: {
+              top: marginTwips,
+              right: marginTwips,
+              bottom: marginTwips,
+              left: marginTwips,
+              header: headerFooterTwips,
+              footer: headerFooterTwips,
+              gutter: 0,
+            },
+          },
+        },
         children: paragraphs,
       },
     ],
