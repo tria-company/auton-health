@@ -6124,7 +6124,8 @@ function ConsultasPageContent() {
 
   const handleConsultationClick = (consultation: Consultation) => {
     console.log('🖱️ Clicando na consulta:', consultation.id, consultation.patient_name);
-    fetchConsultaDetails(consultation.id);
+    // Navegar para a URL com o ID da consulta para permitir recarregamento e deeplinking
+    router.push(`/consultas?consulta_id=${consultation.id}`);
   };
 
   const handleBackToList = () => {
