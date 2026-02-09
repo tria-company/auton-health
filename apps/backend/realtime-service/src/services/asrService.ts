@@ -571,9 +571,12 @@ class ASRService {
         console.log(`🔍 DEBUG [WHISPER] Response received:`, result);
 
         // 📊 Registrar uso do Whisper para monitoramento de custos
+        // ✅ NOVO: Passar texto transcrito e payload completo para auditoria
         await aiPricingService.logWhisperUsage(
           audioChunk.duration,
-          audioChunk.sessionId
+          audioChunk.sessionId,
+          result.text, // Texto transcrito
+          result       // Payload completo da API
         );
 
         return this.processWhisperResponse(result, audioChunk);

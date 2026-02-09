@@ -63,6 +63,9 @@ export interface AIPricingRecord {
   // ✅ NOVO: JSONs completos dos eventos OpenAI
   response_done?: object;  // JSON completo do evento response.done
   input_audio_transcription_completed?: object; // JSON completo do evento conversation.item.input_audio_transcription.completed
+  // ✅ NOVO: Campos para auditoria Whisper
+  transcricao_da_frase?: string; // Texto transcrito pelo Whisper
+  payload?: object;       // Payload completo da resposta da API
   price: number;          // Preço calculado em USD
   tester?: boolean;       // Se é ambiente de teste
   etapa: AIStage;         // Etapa onde foi usado
@@ -241,6 +244,9 @@ class AIPricingService {
           // ✅ NOVO: JSONs completos dos eventos OpenAI
           response_done: record.response_done || null,
           input_audio_transcription_completed: record.input_audio_transcription_completed || null,
+          // ✅ NOVO: Campos para auditoria Whisper
+          transcricao_da_frase: record.transcricao_da_frase || null,
+          payload: record.payload || null,
           price: record.price,
           tester: isTester,
           etapa: record.etapa,
@@ -289,8 +295,15 @@ class AIPricingService {
    * Registra uso do Whisper (transcrição de áudio)
    * @param durationMs Duração do áudio em milissegundos
    * @param consultaId ID da consulta (opcional)
+   * @param transcription Texto transcrito pelo Whisper (opcional)
+   * @param apiResponse Resposta completa da API Whisper (opcional)
    */
-  async logWhisperUsage(durationMs: number, consultaId?: string): Promise<boolean> {
+  async logWhisperUsage(
+    durationMs: number,
+    consultaId?: string,
+    transcription?: string,
+    apiResponse?: object
+  ): Promise<boolean> {
     const durationMinutes = durationMs / 60000; // Converter para minutos
     const price = this.calculatePrice('whisper-1', durationMinutes);
 
@@ -300,6 +313,8 @@ class AIPricingService {
       token: durationMinutes, // Armazenar em minutos (para compatibilidade)
       in_tokens_ia: Math.round(durationMs), // Duração em ms como "input"
       out_tokens_ia: 0, // Whisper não tem output tokens
+      transcricao_da_frase: transcription, // ✅ NOVO: Texto transcrito
+      payload: apiResponse, // ✅ NOVO: Payload completo da API
       price,
       etapa: 'transcricao_whisper',
     });

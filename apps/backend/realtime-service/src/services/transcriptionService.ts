@@ -368,11 +368,18 @@ export class TranscriptionService extends EventEmitter {
       const result = await response.json() as any;
 
       // 📊 Registrar uso do Whisper para monitoramento de custos
-      // Estimar duração do áudio baseado no tamanho do buffer (aproximação)
-      // Para áudio WAV 16kHz mono 16-bit: 1 segundo = 32KB
-      const estimatedAudioDurationMs = Math.max(1000, (wavBuffer.length / 32000) * 1000);
-      await aiPricingService.logWhisperUsage(estimatedAudioDurationMs, consultaId);
-      console.log(`📊 [TRANSCRIPTION-SERVICE] Uso Whisper registrado: ~${Math.round(estimatedAudioDurationMs / 1000)}s de áudio`);
+      // ✅ USAR DURAÇÃO REAL DO WHISPER (result.duration em segundos)
+      // Whisper retorna a duração exata do áudio processado no campo 'duration'
+      const actualAudioDurationMs = result.duration ? (result.duration * 1000) : 1000;
+
+      // ✅ NOVO: Passar texto transcrito e payload completo
+      await aiPricingService.logWhisperUsage(
+        actualAudioDurationMs,
+        consultaId,
+        result.text, // Texto transcrito
+        result       // Payload completo da API
+      );
+      console.log(`📊 [TRANSCRIPTION-SERVICE] Uso Whisper registrado: ${(actualAudioDurationMs / 1000).toFixed(2)}s de áudio (duração real do Whisper)`);
 
       return result;
 

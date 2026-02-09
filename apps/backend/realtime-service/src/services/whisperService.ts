@@ -185,11 +185,11 @@ class WhisperService {
                         // ✅ NOVO: Usar duração REAL do áudio (ANTES de deletar o arquivo)
                         try {
                             const actualAudioDurationMs = await this.getAudioDuration(tempFilePath);
-                            await aiPricingService.logWhisperUsage(actualAudioDurationMs, consultaId);
+                            await aiPricingService.logWhisperUsage(actualAudioDurationMs, consultaId, text, result);
                         } catch (durationError) {
                             // Fallback para estimativa se ffprobe falhar
                             const estimatedAudioDurationMs = Math.max(1000, (audioBuffer.length / 16000) * 1000);
-                            await aiPricingService.logWhisperUsage(estimatedAudioDurationMs, consultaId);
+                            await aiPricingService.logWhisperUsage(estimatedAudioDurationMs, consultaId, text, result);
                         }
 
                         // Limpar arquivo temporário DEPOIS de ler a duração
@@ -228,13 +228,13 @@ class WhisperService {
                     // ✅ NOVO: Usar duração REAL do áudio (via ffprobe) em vez de estimativa
                     try {
                         const actualAudioDurationMs = await this.getAudioDuration(tempFilePath);
-                        await aiPricingService.logWhisperUsage(actualAudioDurationMs, consultaId);
+                        await aiPricingService.logWhisperUsage(actualAudioDurationMs, consultaId, text, result);
                         console.log(`📊 [WHISPER] Uso registrado: ${(actualAudioDurationMs / 1000).toFixed(2)}s de áudio (duração real)`);
                     } catch (durationError) {
                         // Fallback: se ffprobe falhar, usar estimativa
                         console.warn(`⚠️ [WHISPER] Erro ao obter duração real, usando estimativa:`, durationError);
                         const estimatedAudioDurationMs = Math.max(1000, (audioBuffer.length / 16000) * 1000);
-                        await aiPricingService.logWhisperUsage(estimatedAudioDurationMs, consultaId);
+                        await aiPricingService.logWhisperUsage(estimatedAudioDurationMs, consultaId, text, result);
                         console.log(`📊 [WHISPER] Uso registrado: ~${Math.round(estimatedAudioDurationMs / 1000)}s de áudio (estimado)`);
                     }
 
