@@ -1134,7 +1134,6 @@ export function CreateConsultationRoom({
             isCreatingRoom ||
             loadingPatients ||
             loadingDoctor ||
-            (creationType === 'instantanea' && !socketConnected) ||
             !selectedPatient ||
             !consent ||
             (creationType === 'instantanea' && consultationType === 'online' && !selectedMicrophone) ||
