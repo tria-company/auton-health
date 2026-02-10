@@ -29,7 +29,8 @@ export function getWebhookConfig(): WebhookConfig {
   const isDevelopment = nodeEnv === 'development';
 
   return {
-    baseUrl: 'https://webhook.tc1.triacompany.com.br',
+    baseUrl: 'https://triahook.gst.dev.br',
+    //baseUrl: 'https://webhook.tc1.triacompany.com.br',
     authHeader: 'Vc1mgGDEcnyqLH3LoHGUXoLTUg2BRVSu'
   };
 }
