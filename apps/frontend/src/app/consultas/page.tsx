@@ -7728,15 +7728,6 @@ function ConsultasPageContent() {
           </div>
 
 
-          {/* Botão Flutuante de IA */}
-          <button
-            className="ai-float-button"
-            onClick={() => setShowAIChat(!showAIChat)}
-            title="Abrir Assistente de IA"
-          >
-            <Sparkles className="w-6 h-6" />
-          </button>
-
           {/* Sidebar de Chat com IA */}
           <div className={`ai-chat-sidebar ${showAIChat ? 'open' : ''}`}>
             <div className="chat-container">
@@ -8195,15 +8186,6 @@ function ConsultasPageContent() {
               activeTab={activeDiagnosticoTab}
             />
           </div>
-
-          {/* Botão Flutuante de IA */}
-          <button
-            className="ai-float-button"
-            onClick={() => setShowAIChat(!showAIChat)}
-            title="Abrir Assistente de IA"
-          >
-            <Sparkles className="w-6 h-6" />
-          </button>
 
           {/* Sidebar de Chat com IA */}
           <div className={`ai-chat-sidebar ${showAIChat ? 'open' : ''}`}>
@@ -9324,15 +9306,6 @@ function ConsultasPageContent() {
               />
             </div>
           </div>
-
-          {/* Botão Flutuante de IA */}
-          <button
-            className="ai-float-button"
-            onClick={() => setShowAIChat(!showAIChat)}
-            title="Abrir Assistente de IA"
-          >
-            <Sparkles className="w-6 h-6" />
-          </button>
 
           {/* Sidebar de Chat com IA */}
           <div className={`ai-chat-sidebar ${showAIChat ? 'open' : ''}`}>
