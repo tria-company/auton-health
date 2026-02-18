@@ -394,7 +394,7 @@ class PresencialSessionManager {
                 .join('\n');
 
             // Configurar webhook
-            const webhookUrl = 'https://webhook.tc1.triacompany.com.br/webhook/usi-analise-v2';
+            const webhookUrl = 'https://triahook.gst.dev.br/webhook/usi-analise-v2';
             const webhookHeaders = {
                 'Content-Type': 'application/json',
                 'Authorization': 'Vc1mgGDEcnyqLH3LoHGUXoLTUg2BRVSu'

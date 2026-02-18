@@ -307,7 +307,7 @@ router.post('/finalize/:roomId', async (req: Request, res: Response) => {
           .map((t: any) => `[${t.speaker}]: ${t.text}`)
           .join('\n');
 
-        const webhookUrl = 'https://webhook.tc1.triacompany.com.br/webhook/usi-analise-v2';
+        const webhookUrl = 'https://triahook.gst.dev.br/webhook/usi-analise-v2';
         const webhookData = {
           consultationId,
           doctorId: consultation?.doctor_id || null,
