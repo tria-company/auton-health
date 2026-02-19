@@ -16,7 +16,7 @@ import SolutionsViewer from '../../components/solutions/SolutionsViewer';
 import { getWebhookEndpoints, getWebhookHeaders } from '@/lib/webhook-config';
 import { gatewayClient } from '@/lib/gatewayClient';
 import { supabase } from '@/lib/supabase';
-import { downloadSolutionsDocx } from '@/lib/solutionsToDocx';
+import { downloadSolutionsDocxPremium } from '@/lib/solutionsToDocx';
 import { fetchSolutionsFromGateway } from '@/lib/fetchSolutions';
 import './consultas.css';
 import '../../components/solutions/solutions.css';
@@ -4815,7 +4815,7 @@ function ConsultasPageContent() {
     setDownloadingDocx(true);
     try {
       const solutions = await fetchSolutionsFromGateway(effectiveConsultaId);
-      await downloadSolutionsDocx(solutions, `solucoes-consulta-${effectiveConsultaId.slice(0, 8)}.docx`);
+      await downloadSolutionsDocxPremium(solutions, `solucoes-consulta-${effectiveConsultaId.slice(0, 8)}.docx`);
     } catch (err) {
       console.error('Erro ao gerar DOCX:', err);
       showError('Erro ao gerar documento. Tente novamente.', 'Erro');

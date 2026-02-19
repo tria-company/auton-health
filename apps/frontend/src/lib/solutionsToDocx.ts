@@ -1,7 +1,22 @@
 /**
- * Gera um documento DOCX editável com todas as soluções da consulta.
- * Formatação profissional: margens, fontes, tabelas com bordas e sombreamento.
+ * DOCX Premium v3 — Soluções da Consulta
+ *
+ * Melhorias sobre v2:
+ * ─────────────────────────────────────────────────────────────
+ * 1. WidthType.DXA em todas as tabelas (compatível Google Docs)
+ * 2. Bullets nativos (LevelFormat.BULLET) em vez de "• " unicode
+ * 3. Estilos globais (fontes, headings, cores) via Document styles
+ * 4. Header com nome do documento + Footer com paginação
+ * 5. Table of Contents automático
+ * 6. Page breaks entre seções
+ * 7. Tipografia refinada (Inter/Arial, hierarquia visual clara)
+ * 8. Accent bar lateral nos cards (via bordas)
+ * 9. columnWidths + cell width em DXA (dual widths obrigatório)
+ * 10. Espaçamento e ritmo vertical consistentes
+ *
+ * Requisitos: npm i docx
  */
+
 import {
   Document,
   Packer,
@@ -13,48 +28,38 @@ import {
   TableCell,
   BorderStyle,
   ShadingType,
-  convertInchesToTwip,
-} from 'docx';
+  WidthType,
+  AlignmentType,
+  LevelFormat,
+  Header,
+  Footer,
+  PageNumber,
+  PageBreak,
+  TableOfContents,
+  TabStopType,
+  TabStopPosition,
+} from "docx";
 
-/** Margem de página em polegadas (1" = 2,54 cm) */
-const PAGE_MARGIN_INCH = 1;
-/** Tamanho de fonte: corpo (12 pt = 24 half-points) */
-const FONT_SIZE_BODY = 24;
-/** Tamanho de fonte: subtítulo (13 pt) */
-const FONT_SIZE_SUBTITLE = 26;
-/** Tamanho de fonte: H3 (13 pt) */
-const FONT_SIZE_H3 = 26;
-/** Tamanho de fonte: H2 (14 pt) */
-const FONT_SIZE_H2 = 28;
-/** Tamanho de fonte: H1 (16 pt) */
-const FONT_SIZE_H1 = 32;
-/** Espaçamento entre linhas (twips; ~1,15 linhas) */
-const LINE_SPACING = 276;
-/** Bordas das tabelas: cinza escuro */
-const TABLE_BORDER = { style: BorderStyle.SINGLE as const, size: 4, color: '333333' };
-/** Sombreamento do cabeçalho da tabela */
-const TABLE_HEADER_SHADING = { fill: 'E8E8E8', type: ShadingType.CLEAR as const };
+// ═══════════════════════════════════════════════════════════════
+// INTERFACES (mesmas da v2 – mantendo compatibilidade)
+// ═══════════════════════════════════════════════════════════════
 
-/** Item principal de uma refeição (formato gateway) */
 export interface RefeicaoPrincipalItemDocx {
   alimento?: string;
   categoria?: string;
   gramas?: number;
 }
 
-/** Item de substituição (formato gateway) */
 export interface SubstituicaoItemDocx {
   alimento?: string;
   gramas?: number;
 }
 
-/** Dados estruturados de uma refeição (principal + substituições por categoria) */
 export interface RefeicaoDataDocx {
   principal?: RefeicaoPrincipalItemDocx[];
   substituicoes?: Record<string, SubstituicaoItemDocx[]>;
 }
 
-/** Item de alimentação estruturada (por refeição) para o DOCX */
 export interface AlimentacaoStructuredItem {
   nome: string;
   data: RefeicaoDataDocx | string;
@@ -64,589 +69,1252 @@ export interface SolutionsDataForDocx {
   ltb: any;
   mentalidade: any;
   alimentacao: any[];
-  /** Quando presente, o DOCX usa refeições principais + substituições por refeição */
   alimentacao_data?: AlimentacaoStructuredItem[] | null;
   suplementacao: any;
   exercicios: any[];
   habitos: any;
 }
 
-/** Parágrafo normal (fonte 12 pt, espaçamento legível) */
-function p(text: string): Paragraph {
-  return new Paragraph({
-    children: [new TextRun({ text, size: FONT_SIZE_BODY })],
-    spacing: { after: 140, line: LINE_SPACING },
-  });
-}
+// ═══════════════════════════════════════════════════════════════
+// LAYOUT CONSTANTS (US Letter, DXA units)
+// ═══════════════════════════════════════════════════════════════
 
-/** Título principal (nível 1, 16 pt) */
-function h1(text: string): Paragraph {
-  return new Paragraph({
-    heading: HeadingLevel.HEADING_1,
-    children: [new TextRun({ text, bold: true, size: FONT_SIZE_H1 })],
-    spacing: { before: 280, after: 140 },
-  });
-}
+/** 1 inch = 1440 DXA (twentieths of a point × 20) */
+const INCH = 1440;
 
-/** Seção (nível 2, 14 pt) */
-function h2(text: string): Paragraph {
-  return new Paragraph({
-    heading: HeadingLevel.HEADING_2,
-    children: [new TextRun({ text, bold: true, size: FONT_SIZE_H2 })],
-    spacing: { before: 240, after: 120 },
-  });
-}
+const PAGE = {
+  width: 12240, // 8.5″
+  height: 15840, // 11″
+  marginTop: INCH,
+  marginBottom: INCH,
+  marginLeft: INCH,
+  marginRight: INCH,
+} as const;
 
-/** Subseção (nível 3, 13 pt) */
-function h3(text: string): Paragraph {
-  return new Paragraph({
-    heading: HeadingLevel.HEADING_3,
-    children: [new TextRun({ text, bold: true, size: FONT_SIZE_H3 })],
-    spacing: { before: 200, after: 100 },
-  });
-}
+/** Largura útil de conteúdo */
+const CONTENT_WIDTH = PAGE.width - PAGE.marginLeft - PAGE.marginRight; // 9360
 
-/** Subtítulo em negrito (13 pt, sem nível de heading) */
-function boldSubtitle(text: string): Paragraph {
-  return new Paragraph({
-    children: [new TextRun({ text, bold: true, size: FONT_SIZE_SUBTITLE })],
-    spacing: { before: 140, after: 80 },
-    indent: { left: 200 },
-  });
-}
+// ═══════════════════════════════════════════════════════════════
+// DESIGN TOKENS
+// ═══════════════════════════════════════════════════════════════
 
-/** Label em negrito + valor (12 pt, legível) */
-function labelVal(label: string, value: string): Paragraph {
-  return new Paragraph({
-    children: [
-      new TextRun({ text: `${label}: `, bold: true, size: FONT_SIZE_BODY }),
-      new TextRun({ text: value, size: FONT_SIZE_BODY }),
-    ],
-    spacing: { after: 100, line: LINE_SPACING },
-    indent: { left: 400 },
-  });
-}
+const FONT = {
+  primary: "Arial", // universalmente suportada
+  mono: "Consolas",
+} as const;
 
-/** Item de lista com marcador (12 pt) */
-function bullet(text: string): Paragraph {
-  return new Paragraph({
-    children: [new TextRun({ text: `• ${text}`, size: FONT_SIZE_BODY })],
-    spacing: { after: 80, line: LINE_SPACING },
-    indent: { left: 400 },
-  });
-}
+/** Tamanhos em half-points (24 = 12pt) */
+const SIZE = {
+  xs: 18, // 9pt
+  sm: 20, // 10pt
+  base: 22, // 11pt
+  md: 24, // 12pt
+  lg: 28, // 14pt
+  xl: 32, // 16pt
+  xxl: 40, // 20pt
+  hero: 52, // 26pt
+} as const;
 
-function emptyLine(): Paragraph {
-  return new Paragraph({ children: [], spacing: { after: 100 } });
-}
+const COLOR = {
+  // Texto
+  text: "1F2937",
+  secondary: "4B5563",
+  muted: "9CA3AF",
+  white: "FFFFFF",
 
-/** Célula de tabela com texto (12 pt; opcional negrito) */
-function tableCell(text: string, bold = false): TableCell {
-  return new TableCell({
-    children: [
-      new Paragraph({
-        children: [new TextRun({ text, bold, size: FONT_SIZE_BODY })],
-        spacing: { after: 60 },
-      }),
-    ],
-    margins: { top: 80, bottom: 80, left: 100, right: 100 },
-  });
-}
+  // Superfícies
+  bg: "FFFFFF",
+  surface: "F9FAFB",
+  surfaceAlt: "F3F4F6",
+  border: "E5E7EB",
+  borderLight: "F3F4F6",
 
-/** Célula de cabeçalho de tabela (negrito + fundo cinza claro) */
-function tableHeaderCell(text: string): TableCell {
-  return new TableCell({
-    children: [
-      new Paragraph({
-        children: [new TextRun({ text, bold: true, size: FONT_SIZE_BODY })],
-        spacing: { after: 60 },
-      }),
-    ],
-    shading: TABLE_HEADER_SHADING,
-    margins: { top: 80, bottom: 80, left: 100, right: 100 },
-  });
-}
+  // Accent (paleta profissional saúde)
+  primary: "0F766E", // teal-700
+  primaryLight: "CCFBF1", // teal-100
+  primaryDark: "134E4A", // teal-900
 
-/** Opções de bordas para tabelas (visual profissional) */
-const TABLE_BORDERS = {
-  top: TABLE_BORDER,
-  bottom: TABLE_BORDER,
-  left: TABLE_BORDER,
-  right: TABLE_BORDER,
-  insideHorizontal: TABLE_BORDER,
-  insideVertical: TABLE_BORDER,
+  // Section accents
+  mental: "1E3A5F", // azul profundo
+  mentalLight: "DBEAFE",
+  food: "065F46", // verde escuro
+  foodLight: "D1FAE5",
+  supp: "5B21B6", // roxo
+  suppLight: "EDE9FE",
+  train: "9A3412", // laranja escuro
+  trainLight: "FEF3C7",
+  habits: "0F766E", // teal
+  habitsLight: "CCFBF1",
+
+  // Utilidade
+  danger: "DC2626",
+  warning: "D97706",
+} as const;
+
+const SPACING = {
+  xs: 60,
+  sm: 100,
+  md: 160,
+  lg: 240,
+  xl: 360,
+  xxl: 480,
+} as const;
+
+const LINE_SPACING = 276; // ~1.15
+
+// ═══════════════════════════════════════════════════════════════
+// BORDERS
+// ═══════════════════════════════════════════════════════════════
+
+const B_NONE = { style: BorderStyle.NONE as const, size: 0, color: "FFFFFF" };
+const B_SOFT = { style: BorderStyle.SINGLE as const, size: 4, color: COLOR.border };
+const B_ACCENT = (color: string) => ({ style: BorderStyle.SINGLE as const, size: 12, color });
+
+const BORDERS_NONE = { top: B_NONE, bottom: B_NONE, left: B_NONE, right: B_NONE, insideHorizontal: B_NONE, insideVertical: B_NONE };
+const BORDERS_TABLE = {
+  top: B_SOFT,
+  bottom: B_SOFT,
+  left: B_SOFT,
+  right: B_SOFT,
+  insideHorizontal: B_SOFT,
+  insideVertical: B_SOFT,
 };
 
-/** Agrupa itens de alimentação por refeição (_meal) */
-function groupAlimentacaoByMeal(items: any[]): Map<string, any[]> {
-  const map = new Map<string, any[]>();
-  const order = ['Café da manhã', 'Almoço', 'Café da tarde', 'Jantar'];
-  order.forEach((meal) => map.set(meal, []));
-  items.forEach((item) => {
-    const meal = item._meal || 'Outros';
-    if (!map.has(meal)) map.set(meal, []);
-    map.get(meal)!.push(item);
-  });
-  // Manter ordem: Café da manhã, Almoço, Café da tarde, Jantar, depois o resto
-  const ordered = new Map<string, any[]>();
-  order.forEach((meal) => {
-    const list = map.get(meal);
-    if (list && list.length > 0) ordered.set(meal, list);
-  });
-  map.forEach((list, meal) => {
-    if (!ordered.has(meal) && list.length > 0) ordered.set(meal, list);
-  });
-  return ordered;
+// ═══════════════════════════════════════════════════════════════
+// DATA HELPERS
+// ═══════════════════════════════════════════════════════════════
+
+const SKIP_KEYS = new Set([
+  "id", "threadid", "thread_id", "consulta_id", "patient_id",
+  "paciente_id", "created_at", "updated_at", "user_id", "doctor_id",
+  "status", "ativo", "active", "enabled", "disabled",
+  "version", "versao", "tipo", "type", "source", "origem",
+]);
+
+function shouldSkipKey(key: string) {
+  return SKIP_KEYS.has(String(key).toLowerCase());
 }
 
-/** Converte chave snake_case em rótulo legível e amigável ao paciente */
+const HUMANIZE_MAP: Record<string, string> = {
+  padrao: "Padrão", categorias: "Categorias", prioridade: "Prioridade",
+  areas_impacto: "Áreas de impacto", periodo: "Período",
+  contexto_provavel: "Contexto provável", manifestacoes_atuais: "Manifestações atuais",
+  orientacoes_transformacao: "Orientações de Transformação",
+  objetivo: "Objetivo", dosagem: "Dosagem", horario: "Horário",
+  inicio: "Início", termino: "Término", alertas_importantes: "Alertas importantes",
+  nome_treino: "Nome treino", treino_atual: "Treino atual",
+  proximo_treino: "Próximo treino", ultimo_treino: "Último treino",
+};
+
 function humanize(key: string): string {
-  const map: Record<string, string> = {
-    padrao: 'Padrão',
-    'areas impacto': 'Áreas de impacto',
-    'origem estimada': 'Origem estimada',
-    'contexto provavel': 'Contexto provável',
-    'conexoes padroes': 'Conexões com outros padrões',
-    'raiz de': 'Raiz de',
-    tipo_de_alimentos: 'Tipo de alimento',
-    proporcao_fruta: 'Proporção de frutas',
-    nome_exercicio: 'Exercício',
-    tipo_treino: 'Tipo de treino',
-    grupo_muscular: 'Grupo muscular',
-    repeticoes: 'Repetições',
-    descanso: 'Descanso entre séries',
-    observacoes: 'Observações',
-    objetivo_principal: 'Objetivo principal',
-    realidade_caso: 'Realidade do caso',
-    resumo_executivo: 'Resumo executivo',
-    higiene_sono: 'Higiene do sono',
-    ref1_g: 'Café da manhã (gramas)',
-    ref1_kcal: 'Café da manhã (kcal)',
-    ref2_g: 'Almoço (gramas)',
-    ref2_kcal: 'Almoço (kcal)',
-    ref3_g: 'Café da tarde (gramas)',
-    ref3_kcal: 'Café da tarde (kcal)',
-    ref4_g: 'Jantar (gramas)',
-    ref4_kcal: 'Jantar (kcal)',
-  };
-  const lower = key.toLowerCase().replace(/\s+/g, '_');
-  if (map[lower] != null) return map[lower];
-  if (map[key] != null) return map[key];
-  return key
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, (c) => c.toUpperCase())
-    .replace(/Padrao/g, 'Padrão');
+  const k = String(key).trim().toLowerCase();
+  if (HUMANIZE_MAP[k]) return HUMANIZE_MAP[k];
+  return String(key).replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()).replace(/Padrao/g, "Padrão");
 }
 
-/** Chaves que não devem aparecer no documento (internas/sistema) */
-const SKIP_KEYS = ['id', 'threadid', 'thread_id', 'consulta_id', 'patient_id', 'paciente_id', 'created_at', 'updated_at', 'user_id', 'doctor_id'];
-function shouldSkipKey(key: string): boolean {
-  return SKIP_KEYS.includes(key.toLowerCase());
-}
-
-/** Formata um valor para texto legível (sem JSON bruto) */
-function valueToReadable(value: unknown): string {
-  if (value == null) return '—';
-  if (typeof value === 'string') return value;
-  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
-  if (Array.isArray(value)) return value.map((v) => (typeof v === 'object' && v !== null ? valueToReadable(v) : String(v))).join(', ');
-  if (typeof value === 'object') {
-    const entries = Object.entries(value as Record<string, unknown>)
-      .filter(([, v]) => v != null && v !== '')
+function valueToReadable(value: any): string {
+  if (value == null) return "—";
+  if (typeof value === "boolean") return value ? "Sim" : "—";
+  if (typeof value === "string") return value.trim() || "—";
+  if (typeof value === "number") return String(value);
+  if (Array.isArray(value)) {
+    const list = value.map((v) => valueToReadable(v)).filter((s) => s !== "—");
+    return list.length ? list.join(", ") : "—";
+  }
+  if (typeof value === "object") {
+    const entries = Object.entries(value)
+      .filter(([k, v]) => !shouldSkipKey(k) && v != null && v !== false && String(v).trim() !== "")
       .map(([k, v]) => `${humanize(k)}: ${valueToReadable(v)}`);
-    return entries.join(' • ');
+    return entries.length ? entries.join(" · ") : "—";
   }
   return String(value);
 }
 
-/** Adiciona ao array de filhos os parágrafos que formatam um objeto de "padrão" de forma legível */
-function appendPadraoSection(children: Paragraph[], key: string, obj: Record<string, unknown>): void {
-  const padraoNum = key.replace(/\D/g, '') || '?';
-  children.push(h3(`Padrão ${padraoNum}`));
-  if (obj.padrao != null) children.push(labelVal('Padrão', String(obj.padrao)));
-  if (obj.categorias != null) {
-    const arr = Array.isArray(obj.categorias) ? obj.categorias : [obj.categorias];
-    children.push(labelVal('Categorias', arr.map(String).join(', ')));
-  }
-  if (obj.prioridade != null) children.push(labelVal('Prioridade', String(obj.prioridade)));
-  if (obj.areas_impacto != null || (obj as any)['areas impacto'] != null) {
-    const arr = Array.isArray(obj.areas_impacto) ? obj.areas_impacto : Array.isArray((obj as any)['areas impacto']) ? (obj as any)['areas impacto'] : [];
-    children.push(labelVal('Áreas de impacto', arr.map(String).join(', ')));
-  }
-  const origem = obj.origem_estimada ?? (obj as any)['origem estimada'];
-  if (origem != null && typeof origem === 'object') {
-    const o = origem as Record<string, unknown>;
-    if (o.periodo != null) children.push(labelVal('Período', String(o.periodo)));
-    if (o.contexto_provavel != null || (o as any)['contexto provavel'] != null) {
-      const ctx = o.contexto_provavel ?? (o as any)['contexto provavel'];
-      children.push(labelVal('Contexto provável', String(ctx)));
-    }
-  }
-  const conexoes = obj.conexoes_padroes ?? (obj as any)['conexoes padroes'];
-  if (conexoes != null && typeof conexoes === 'object') {
-    const raiz = (conexoes as any)['raiz de'];
-    if (Array.isArray(raiz) && raiz.length > 0) {
-      children.push(labelVal('Raiz de', raiz.map(String).join(', ')));
-    }
-  }
-  const padraoDone = ['padrao', 'categorias', 'prioridade', 'areas_impacto', 'areas impacto', 'origem_estimada', 'origem estimada', 'conexoes_padroes', 'conexoes padroes'];
-  Object.entries(obj).forEach(([k, v]) => {
-    if (v == null || v === '' || padraoDone.includes(k) || shouldSkipKey(k)) return;
-    children.push(labelVal(humanize(k), valueToReadable(v)));
-  });
-  children.push(emptyLine());
+function safeParse<T>(raw: unknown, fallback: T): T {
+  if (typeof raw !== "string") return (raw as T) ?? fallback;
+  try { return JSON.parse(raw) as T; } catch { return fallback; }
 }
 
-export function buildSolutionsDocx(solutions: SolutionsDataForDocx): (Paragraph | Table)[] {
+// ═══════════════════════════════════════════════════════════════
+// NUMBERING CONFIG (bullets + numbers nativos)
+// ═══════════════════════════════════════════════════════════════
+
+const NUMBERING_CONFIG = [
+  {
+    reference: "premium-bullets",
+    levels: [
+      {
+        level: 0,
+        format: LevelFormat.BULLET,
+        text: "\u2022",
+        alignment: AlignmentType.LEFT,
+        style: { paragraph: { indent: { left: 720, hanging: 360 } } },
+      },
+      {
+        level: 1,
+        format: LevelFormat.BULLET,
+        text: "\u25E6",
+        alignment: AlignmentType.LEFT,
+        style: { paragraph: { indent: { left: 1080, hanging: 360 } } },
+      },
+    ],
+  },
+  {
+    reference: "premium-numbers",
+    levels: [
+      {
+        level: 0,
+        format: LevelFormat.DECIMAL,
+        text: "%1.",
+        alignment: AlignmentType.LEFT,
+        style: { paragraph: { indent: { left: 720, hanging: 360 } } },
+      },
+    ],
+  },
+];
+
+// ═══════════════════════════════════════════════════════════════
+// PARAGRAPH BUILDERS
+// ═══════════════════════════════════════════════════════════════
+
+function para(text: string, opts?: {
+  bold?: boolean; color?: string; size?: number;
+  after?: number; before?: number; align?: (typeof AlignmentType)[keyof typeof AlignmentType];
+  italic?: boolean; font?: string;
+}) {
+  return new Paragraph({
+    alignment: opts?.align,
+    children: [
+      new TextRun({
+        text,
+        bold: opts?.bold ?? false,
+        italics: opts?.italic ?? false,
+        color: opts?.color ?? COLOR.text,
+        size: opts?.size ?? SIZE.base,
+        font: opts?.font ?? FONT.primary,
+      }),
+    ],
+    spacing: { before: opts?.before ?? 0, after: opts?.after ?? 120, line: LINE_SPACING },
+  });
+}
+
+function emptyLine(after = 120) {
+  return new Paragraph({ children: [], spacing: { after } });
+}
+
+/** Heading usável no TOC (usa HeadingLevel nativo) */
+function heading1(text: string) {
+  return new Paragraph({
+    heading: HeadingLevel.HEADING_1,
+    children: [new TextRun({ text, bold: true, size: SIZE.xxl, color: COLOR.text, font: FONT.primary })],
+    spacing: { before: SPACING.lg, after: SPACING.md },
+  });
+}
+
+function heading2(text: string) {
+  return new Paragraph({
+    heading: HeadingLevel.HEADING_2,
+    children: [new TextRun({ text, bold: true, size: SIZE.xl, color: COLOR.text, font: FONT.primary })],
+    spacing: { before: SPACING.md, after: SPACING.sm },
+  });
+}
+
+function heading3(text: string) {
+  return new Paragraph({
+    heading: HeadingLevel.HEADING_3,
+    children: [new TextRun({ text, bold: true, size: SIZE.lg, color: COLOR.text, font: FONT.primary })],
+    spacing: { before: SPACING.sm, after: SPACING.xs },
+  });
+}
+
+/** Bullet nativo (não unicode!) */
+function bulletItem(text: string, level = 0) {
+  return new Paragraph({
+    numbering: { reference: "premium-bullets", level },
+    children: [new TextRun({ text, size: SIZE.base, color: COLOR.text, font: FONT.primary })],
+    spacing: { after: 80, line: LINE_SPACING },
+  });
+}
+
+/** Numbered item nativo */
+function numberedItem(text: string) {
+  return new Paragraph({
+    numbering: { reference: "premium-numbers", level: 0 },
+    children: [new TextRun({ text, size: SIZE.base, color: COLOR.text, font: FONT.primary })],
+    spacing: { after: 80, line: LINE_SPACING },
+  });
+}
+
+function labelValue(label: string, value: string) {
+  return new Paragraph({
+    children: [
+      new TextRun({ text: `${label}: `, bold: true, size: SIZE.base, color: COLOR.text, font: FONT.primary }),
+      new TextRun({ text: value || "—", size: SIZE.base, color: COLOR.secondary, font: FONT.primary }),
+    ],
+    spacing: { after: 80, line: LINE_SPACING },
+  });
+}
+
+function caption(text: string) {
+  return new Paragraph({
+    children: [new TextRun({ text, size: SIZE.sm, color: COLOR.muted, italics: true, font: FONT.primary })],
+    spacing: { after: 100, line: LINE_SPACING },
+  });
+}
+
+function divider() {
+  return new Paragraph({
+    children: [],
+    spacing: { before: SPACING.sm, after: SPACING.sm },
+    border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: COLOR.border, space: 1 } },
+  });
+}
+
+function pageBreak() {
+  return new Paragraph({ children: [new PageBreak()] });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TABLE BUILDERS (DXA only, dual widths)
+// ═══════════════════════════════════════════════════════════════
+
+const CELL_MARGINS = { top: 80, bottom: 80, left: 120, right: 120 };
+
+function headerCell(text: string, widthDxa: number) {
+  return new TableCell({
+    width: { size: widthDxa, type: WidthType.DXA },
+    shading: { type: ShadingType.CLEAR, fill: COLOR.surfaceAlt },
+    borders: { top: B_SOFT, bottom: B_SOFT, left: B_SOFT, right: B_SOFT },
+    margins: CELL_MARGINS,
+    children: [
+      new Paragraph({
+        children: [new TextRun({ text, bold: true, size: SIZE.sm, color: COLOR.text, font: FONT.primary })],
+        spacing: { after: 0 },
+      }),
+    ],
+  });
+}
+
+function textCell(text: string, widthDxa: number, opts?: { bold?: boolean; color?: string }) {
+  return new TableCell({
+    width: { size: widthDxa, type: WidthType.DXA },
+    borders: { top: B_SOFT, bottom: B_SOFT, left: B_SOFT, right: B_SOFT },
+    margins: CELL_MARGINS,
+    children: [
+      new Paragraph({
+        children: [
+          new TextRun({
+            text: text || "—",
+            bold: opts?.bold ?? false,
+            size: SIZE.base,
+            color: opts?.color ?? COLOR.text,
+            font: FONT.primary,
+          }),
+        ],
+        spacing: { after: 0 },
+      }),
+    ],
+  });
+}
+
+// ─── Section Band (faixa colorida de seção) ───
+
+function sectionBand(title: string, fill: string, subtitle?: string) {
+  const content: Paragraph[] = [
+    new Paragraph({
+      children: [new TextRun({ text: title, bold: true, color: COLOR.white, size: SIZE.xl, font: FONT.primary })],
+      spacing: { after: subtitle ? 40 : 0 },
+    }),
+  ];
+  if (subtitle) {
+    content.push(
+      new Paragraph({
+        children: [new TextRun({ text: subtitle, color: "D1D5DB", size: SIZE.sm, font: FONT.primary })],
+        spacing: { after: 0 },
+      })
+    );
+  }
+
+  return new Table({
+    width: { size: CONTENT_WIDTH, type: WidthType.DXA },
+    columnWidths: [CONTENT_WIDTH],
+    borders: BORDERS_NONE,
+    rows: [
+      new TableRow({
+        children: [
+          new TableCell({
+            width: { size: CONTENT_WIDTH, type: WidthType.DXA },
+            shading: { type: ShadingType.CLEAR, fill },
+            margins: { top: 200, bottom: 200, left: 280, right: 280 },
+            borders: { top: B_NONE, bottom: B_NONE, left: B_NONE, right: B_NONE },
+            children: content,
+          }),
+        ],
+      }),
+    ],
+  });
+}
+
+// ─── Info Card (caixa com accent bar lateral) ───
+
+function infoCard(
+  title: string,
+  body: (Paragraph | Table)[],
+  opts?: { accentColor?: string; fill?: string }
+) {
+  const accent = opts?.accentColor ?? COLOR.primary;
+  const fill = opts?.fill ?? COLOR.surface;
+
+  return new Table({
+    width: { size: CONTENT_WIDTH, type: WidthType.DXA },
+    columnWidths: [CONTENT_WIDTH],
+    borders: BORDERS_NONE,
+    rows: [
+      new TableRow({
+        children: [
+          new TableCell({
+            width: { size: CONTENT_WIDTH, type: WidthType.DXA },
+            shading: { type: ShadingType.CLEAR, fill },
+            borders: {
+              top: B_SOFT,
+              bottom: B_SOFT,
+              right: B_SOFT,
+              left: B_ACCENT(accent), // accent bar esquerda
+            },
+            margins: { top: 160, bottom: 160, left: 260, right: 260 },
+            children: [
+              new Paragraph({
+                children: [new TextRun({ text: title, bold: true, size: SIZE.lg, color: COLOR.text, font: FONT.primary })],
+                spacing: { after: SPACING.sm },
+              }),
+              ...body,
+            ],
+          }),
+        ],
+      }),
+    ],
+  });
+}
+
+// ─── Highlight Box (para dicas/avisos) ───
+
+function highlightBox(text: string, opts?: { fill?: string; borderColor?: string; icon?: string }) {
+  const fill = opts?.fill ?? COLOR.primaryLight;
+  const bc = opts?.borderColor ?? COLOR.primary;
+  const displayText = opts?.icon ? `${opts.icon}  ${text}` : text;
+
+  return new Table({
+    width: { size: CONTENT_WIDTH, type: WidthType.DXA },
+    columnWidths: [CONTENT_WIDTH],
+    borders: BORDERS_NONE,
+    rows: [
+      new TableRow({
+        children: [
+          new TableCell({
+            width: { size: CONTENT_WIDTH, type: WidthType.DXA },
+            shading: { type: ShadingType.CLEAR, fill },
+            borders: {
+              top: { style: BorderStyle.SINGLE, size: 4, color: bc },
+              bottom: { style: BorderStyle.SINGLE, size: 4, color: bc },
+              left: { style: BorderStyle.SINGLE, size: 12, color: bc },
+              right: { style: BorderStyle.SINGLE, size: 4, color: bc },
+            },
+            margins: { top: 120, bottom: 120, left: 220, right: 220 },
+            children: [
+              new Paragraph({
+                children: [new TextRun({ text: displayText, size: SIZE.sm, color: COLOR.text, font: FONT.primary })],
+                spacing: { after: 0 },
+              }),
+            ],
+          }),
+        ],
+      }),
+    ],
+  });
+}
+
+// ─── Tag Line (categorias, prioridade) ───
+
+function tagLine(label: string, value: any, opts?: { color?: string }) {
+  const display = typeof value === "string" ? value : valueToReadable(value);
+  return new Paragraph({
+    children: [
+      new TextRun({ text: `${label}:  `, bold: true, size: SIZE.sm, color: COLOR.secondary, font: FONT.primary }),
+      new TextRun({ text: display || "—", size: SIZE.sm, color: opts?.color ?? COLOR.text, font: FONT.primary }),
+    ],
+    spacing: { after: 60 },
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MENTALIDADE: Orientações → Steps
+// ═══════════════════════════════════════════════════════════════
+
+type Step = { nome?: string; passo?: string; como?: string; oQue?: string; porque?: string };
+
+function parseOrientacoes(raw: string): Step[] {
+  if (!raw?.trim()) return [];
+  const blocks = raw
+    .split(/\s*,\s*Nome:\s*/g)
+    .map((b, i) => (i === 0 ? b : `Nome: ${b}`))
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const steps: Step[] = [];
+  for (const b of blocks) {
+    const nome = (b.match(/Nome:\s*([^•]+)/)?.[1] ?? "").trim();
+    const passo = (b.match(/Passo:\s*([^•]+)/)?.[1] ?? "").trim();
+    const como = (b.match(/Como Fazer:\s*([^•]+)/)?.[1] ?? "").trim();
+    const oQue = (b.match(/O Que Fazer:\s*([^•]+)/)?.[1] ?? "").trim();
+    const porque = (b.match(/Porque Funciona:\s*(.+)$/)?.[1] ?? "").trim();
+    if (nome || passo || como || oQue || porque) steps.push({ nome, passo, como, oQue, porque });
+  }
+  return steps;
+}
+
+function renderSteps(steps: Step[], accentColor: string): (Paragraph | Table)[] {
+  const blocks: (Paragraph | Table)[] = [];
+  steps.forEach((s, idx) => {
+    const n = s.passo || String(idx + 1);
+    const body: (Paragraph | Table)[] = [];
+    if (s.como) body.push(bulletItem(`Como fazer: ${s.como}`));
+    if (s.oQue) body.push(bulletItem(`O que fazer: ${s.oQue}`));
+    if (s.porque) body.push(bulletItem(`Por que funciona: ${s.porque}`));
+
+    blocks.push(
+      infoCard(`Passo ${n}${s.nome ? ` — ${s.nome}` : ""}`, body, { accentColor, fill: COLOR.bg })
+    );
+    blocks.push(emptyLine(100));
+  });
+  return blocks;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ALIMENTAÇÃO: Tabelas estruturadas
+// ═══════════════════════════════════════════════════════════════
+
+function mealTablePrincipal(principal: RefeicaoPrincipalItemDocx[]) {
+  const colWidths = [4200, 3000, 2160]; // soma = 9360
+  const header = new TableRow({
+    children: [headerCell("Alimento", colWidths[0]), headerCell("Categoria", colWidths[1]), headerCell("Porção", colWidths[2])],
+  });
+  const rows = principal.map((it) =>
+    new TableRow({
+      children: [
+        textCell(String(it.alimento || "—"), colWidths[0]),
+        textCell(String(it.categoria || "—"), colWidths[1]),
+        textCell(it.gramas != null ? `${it.gramas}g` : "—", colWidths[2]),
+      ],
+    })
+  );
+  return new Table({
+    width: { size: CONTENT_WIDTH, type: WidthType.DXA },
+    columnWidths: colWidths,
+    borders: BORDERS_TABLE,
+    rows: [header, ...rows],
+  });
+}
+
+function mealTableSubs(items: SubstituicaoItemDocx[]) {
+  const colWidths = [6500, 2860]; // soma = 9360
+  const header = new TableRow({
+    children: [headerCell("Alimento substituto", colWidths[0]), headerCell("Porção", colWidths[1])],
+  });
+  const rows = items.map((it) =>
+    new TableRow({
+      children: [
+        textCell(String(it.alimento || "—"), colWidths[0]),
+        textCell(it.gramas != null ? `${it.gramas}g` : "—", colWidths[1]),
+      ],
+    })
+  );
+  return new Table({
+    width: { size: CONTENT_WIDTH, type: WidthType.DXA },
+    columnWidths: colWidths,
+    borders: BORDERS_TABLE,
+    rows: [header, ...rows],
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SUPLEMENTAÇÃO
+// ═══════════════════════════════════════════════════════════════
+
+function renderSupplementItem(item: any, fallbackTitle: string, accentColor: string) {
+  const title = String(item?.nome || fallbackTitle).trim();
+  const lines: Paragraph[] = [];
+
+  if (item?.objetivo) lines.push(labelValue("Objetivo", valueToReadable(item.objetivo)));
+  if (item?.dosagem) lines.push(labelValue("Dosagem", valueToReadable(item.dosagem)));
+  if (item?.horario) lines.push(labelValue("Horário", valueToReadable(item.horario)));
+  if (item?.inicio) lines.push(labelValue("Início", valueToReadable(item.inicio)));
+  if (item?.termino) lines.push(labelValue("Término", valueToReadable(item.termino)));
+
+  const skip = new Set(["nome", "objetivo", "dosagem", "horario", "inicio", "termino"]);
+  const extra = Object.entries(item || {})
+    .filter(([k, v]) => !skip.has(String(k)) && !shouldSkipKey(String(k)) && v != null && String(v).trim() !== "")
+    .map(([k, v]) => labelValue(humanize(k), valueToReadable(v)));
+
+  return infoCard(title, [...lines, ...(extra.length ? [emptyLine(40), ...extra] : [])], {
+    accentColor,
+    fill: COLOR.bg,
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// EXERCÍCIOS: Agrupar & Dedup
+// ═══════════════════════════════════════════════════════════════
+
+function normalizeExercise(ex: any) {
+  return {
+    nomeTreino: String(ex?.["Nome Treino"] ?? ex?.nome_treino ?? ex?.nomeTreino ?? "").trim() || "Treino",
+    nome: String(ex?.nome_exercicio ?? ex?.["Nome Exercicio"] ?? ex?.["Exercício"] ?? ex?.nome ?? "").trim() || "Exercício",
+    tipo: valueToReadable(ex?.tipo_treino ?? ex?.["Tipo de treino"] ?? ex?.tipo),
+    grupo: valueToReadable(ex?.grupo_muscular ?? ex?.["Grupo muscular"] ?? ex?.grupo),
+    series: valueToReadable(ex?.series ?? ex?.["Séries"]),
+    repeticoes: valueToReadable(ex?.repeticoes ?? ex?.["Repetições"]),
+    descanso: valueToReadable(ex?.descanso ?? ex?.["Descanso entre séries"]),
+    observacoes: valueToReadable(ex?.observacoes ?? ex?.["Observações"]),
+    alertas: ex?.alertas_importantes ?? ex?.["Alertas Importantes"] ?? null,
+  };
+}
+
+function groupExercises(exercicios: any[]) {
+  const map = new Map<string, any[]>();
+  const seen = new Set<string>();
+  for (const raw of exercicios) {
+    const ex = normalizeExercise(raw);
+    const key = `${ex.nomeTreino}|${ex.nome}`.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    if (!map.has(ex.nomeTreino)) map.set(ex.nomeTreino, []);
+    map.get(ex.nomeTreino)!.push(raw);
+  }
+  return map;
+}
+
+function renderTrainingBlock(treinoName: string, items: any[]): (Paragraph | Table)[] {
+  const blocks: (Paragraph | Table)[] = [];
+
+  // Tabela resumo
+  const colWidths = [2400, 1800, 1400, 1400, 2360]; // soma = 9360
+  const header = new TableRow({
+    children: [
+      headerCell("Exercício", colWidths[0]),
+      headerCell("Grupo", colWidths[1]),
+      headerCell("Séries", colWidths[2]),
+      headerCell("Reps", colWidths[3]),
+      headerCell("Descanso", colWidths[4]),
+    ],
+  });
+
+  const dataRows = items.map((raw) => {
+    const ex = normalizeExercise(raw);
+    return new TableRow({
+      children: [
+        textCell(ex.nome, colWidths[0], { bold: true }),
+        textCell(ex.grupo, colWidths[1]),
+        textCell(ex.series, colWidths[2]),
+        textCell(ex.repeticoes, colWidths[3]),
+        textCell(ex.descanso, colWidths[4]),
+      ],
+    });
+  });
+
+  blocks.push(heading3(treinoName));
+  blocks.push(
+    new Table({
+      width: { size: CONTENT_WIDTH, type: WidthType.DXA },
+      columnWidths: colWidths,
+      borders: BORDERS_TABLE,
+      rows: [header, ...dataRows],
+    })
+  );
+  blocks.push(emptyLine(SPACING.sm));
+
+  // Cards detalhados
+  for (const raw of items) {
+    const ex = normalizeExercise(raw);
+    const body: (Paragraph | Table)[] = [];
+    body.push(labelValue("Tipo de treino", ex.tipo));
+    body.push(labelValue("Grupo muscular", ex.grupo));
+    body.push(labelValue("Séries x Reps", `${ex.series} x ${ex.repeticoes}`));
+    body.push(labelValue("Descanso", ex.descanso));
+    if (ex.observacoes && ex.observacoes !== "—") body.push(labelValue("Observações", ex.observacoes));
+
+    const alerts = ex.alertas;
+    if (alerts && Array.isArray(alerts) && alerts.length) {
+      body.push(emptyLine(60));
+      body.push(para("Alertas importantes", { bold: true, color: COLOR.danger, size: SIZE.sm }));
+      alerts.forEach((a: any) => body.push(bulletItem(valueToReadable(a))));
+    }
+
+    blocks.push(
+      infoCard(ex.nome, body, { accentColor: COLOR.train, fill: COLOR.bg })
+    );
+    blocks.push(emptyLine(100));
+  }
+
+  return blocks;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MENTALIDADE: Padrões
+// ═══════════════════════════════════════════════════════════════
+
+function buildPadrao(key: string, obj: Record<string, any>): (Paragraph | Table)[] {
   const children: (Paragraph | Table)[] = [];
+  const padraoNum = key.replace(/\D/g, "") || "?";
+  const padraoNome = valueToReadable(obj?.padrao).replace(/^—$/, "");
 
-  children.push(h1('Suas Soluções de Saúde'));
-  children.push(p('Este documento reúne as orientações e o plano definidos na sua consulta. Use-o como guia no dia a dia. Em caso de dúvidas, converse com seu médico.'));
-  children.push(emptyLine());
+  const categorias = valueToReadable(obj?.categorias);
 
-  // --- Mentalidade / Livro da Vida ---
-  if (solutions.mentalidade && typeof solutions.mentalidade === 'object') {
-    const d = solutions.mentalidade as Record<string, unknown>;
-    children.push(h2('Livro da Vida – Transformação Mental e Emocional'));
-    if (d.objetivo_principal != null || d.realidade_caso != null) {
-      children.push(labelVal('Objetivo Principal', String(d.objetivo_principal || 'Não especificado')));
-      children.push(labelVal('Realidade do Caso', String(d.realidade_caso || 'Não especificada')));
-      if (d.fase1_duracao) {
-        children.push(h3('Fase 1 - Estabilização'));
-        children.push(labelVal('Duração', String(d.fase1_duracao)));
-        if (d.fase1_objetivo) children.push(labelVal('Objetivo', String(d.fase1_objetivo)));
-      }
-      if (d.psicoterapia_modalidade) {
-        children.push(h3('Psicoterapia'));
-        children.push(labelVal('Modalidade', String(d.psicoterapia_modalidade)));
-        if (d.psicoterapia_frequencia) children.push(labelVal('Frequência', String(d.psicoterapia_frequencia)));
-        if (d.psicoterapia_duracao_sessao) children.push(labelVal('Duração da Sessão', String(d.psicoterapia_duracao_sessao)));
-      }
-      if (d.cronograma_mental_12_meses) {
-        children.push(h3('Cronograma de 12 Meses'));
-        children.push(p(String(d.cronograma_mental_12_meses)));
-      }
+  const areas = valueToReadable(obj?.areas_impacto ?? obj?.["areas impacto"]);
+
+  const periodo = valueToReadable(obj?.periodo ?? obj?.origem_estimada?.periodo);
+  const contexto = valueToReadable(obj?.contexto_provavel ?? obj?.origem_estimada?.contexto_provavel ?? obj?.["contexto provavel"]);
+  const manifest = obj?.manifestacoes_atuais ?? obj?.["Manifestacoes Atuais"] ?? null;
+  const orientRaw = obj?.orientacoes_transformacao ?? obj?.["Orientacoes Transformacao"] ?? obj?.["Orientações Transformacao"] ?? obj?.orientacoes ?? null;
+
+  const body: (Paragraph | Table)[] = [];
+  body.push(tagLine("Categorias", categorias));
+  body.push(tagLine("Prioridade", obj?.prioridade));
+  body.push(tagLine("Áreas de impacto", areas));
+  body.push(emptyLine(60));
+  body.push(labelValue("Período", periodo));
+  body.push(labelValue("Contexto provável", contexto));
+
+  if (manifest) {
+    body.push(emptyLine(60));
+    body.push(para("Manifestações atuais", { bold: true, size: SIZE.sm, color: COLOR.mental }));
+    if (Array.isArray(manifest)) {
+      manifest.forEach((m: any) => body.push(bulletItem(valueToReadable(m))));
     } else {
-      // Formato gateway: Resumo Executivo e Padrão 01, 02, etc. em texto legível (nunca JSON bruto)
-      if (d.resumo_executivo != null && String(d.resumo_executivo).trim()) {
-        children.push(h3('Resumo Executivo'));
-        children.push(p(String(d.resumo_executivo).trim()));
-        children.push(emptyLine());
-      }
-      const padraoKeys = Object.keys(d).filter((k) => /^padrao_\d+$/i.test(k)).sort();
-      for (const key of padraoKeys) {
-        const val = d[key];
-        if (val != null && typeof val === 'object' && !Array.isArray(val)) {
-          appendPadraoSection(children, key, val as Record<string, unknown>);
+      const text = valueToReadable(manifest);
+      const parts = text.split(/\s*,\s*/).filter(Boolean);
+      if (parts.length >= 3) parts.forEach((p) => body.push(bulletItem(p)));
+      else body.push(para(text));
+    }
+  }
+
+  children.push(
+    infoCard(
+      `Padrão ${padraoNum}${padraoNome ? ` — ${padraoNome}` : ""}`,
+      body,
+      { accentColor: COLOR.mental, fill: COLOR.mentalLight }
+    )
+  );
+
+  // Orientações (Steps) — pode vir como string, array de strings ou array de objetos
+  const orientSteps: Step[] = [];
+
+  if (orientRaw != null) {
+    if (Array.isArray(orientRaw)) {
+      // Array de objetos com campos como nome, passo, como_fazer, etc.
+      for (const [idx, item] of orientRaw.entries()) {
+        if (typeof item === "string") {
+          orientSteps.push({ nome: item, passo: String(idx + 1) });
+        } else if (typeof item === "object" && item !== null) {
+          orientSteps.push({
+            nome: String(item.nome ?? item.Nome ?? "").trim(),
+            passo: String(item.passo ?? item.Passo ?? idx + 1).trim(),
+            como: String(item.como_fazer ?? item["Como Fazer"] ?? item.como ?? "").trim(),
+            oQue: String(item.o_que_fazer ?? item["O Que Fazer"] ?? item.oQue ?? "").trim(),
+            porque: String(item.porque_funciona ?? item["Porque Funciona"] ?? item.porque ?? "").trim(),
+          });
         }
       }
-      // Outros campos (higiene_sono, etc.) como label + valor legível (oculta chaves internas)
-      Object.entries(d).forEach(([key, value]) => {
-        if (value == null || value === '' || typeof value === 'function') return;
-        if (key === 'resumo_executivo' || /^padrao_\d+$/i.test(key) || shouldSkipKey(key)) return;
-        const label = humanize(key);
-        if (typeof value === 'object' && !Array.isArray(value)) {
-          Object.entries(value as Record<string, unknown>).forEach(([k2, v2]) => {
-            if (v2 == null || v2 === '') return;
-            children.push(labelVal(`${label} – ${humanize(k2)}`, valueToReadable(v2)));
-          });
-        } else {
-          children.push(labelVal(label, valueToReadable(value)));
-        }
-      });
+    } else if (typeof orientRaw === "string" && orientRaw.trim()) {
+      orientSteps.push(...parseOrientacoes(orientRaw));
     }
-    children.push(emptyLine());
   }
 
-  // --- Alimentação (refeições principais + substituições por refeição, ou fallback para lista plana) ---
-  const hasStructuredAlimentacao = solutions.alimentacao_data && Array.isArray(solutions.alimentacao_data) && solutions.alimentacao_data.length > 0;
-
-  if (hasStructuredAlimentacao) {
-    children.push(h2('Plano Alimentar'));
-    children.push(p('Abaixo estão as refeições principais e as substituições sugeridas por refeição. Ajuste conforme a orientação do seu médico ou nutricionista.'));
-    children.push(emptyLine());
-
-    for (const refeicao of solutions.alimentacao_data!) {
-      let dadosRefeicao: RefeicaoDataDocx = typeof refeicao.data === 'string'
-        ? (() => { try { return JSON.parse(refeicao.data) as RefeicaoDataDocx; } catch { return {}; } })()
-        : (refeicao.data || {});
-
-      const principal = Array.isArray(dadosRefeicao.principal) ? dadosRefeicao.principal : [];
-      const substituicoes = dadosRefeicao.substituicoes && typeof dadosRefeicao.substituicoes === 'object' ? dadosRefeicao.substituicoes : {};
-
-      const temPrincipal = principal.length > 0;
-      const temSubstituicoes = Object.keys(substituicoes).length > 0;
-      if (!temPrincipal && !temSubstituicoes) continue;
-
-      children.push(h3(refeicao.nome));
-
-      if (temPrincipal) {
-        children.push(boldSubtitle('Refeições principais'));
-        const headerRow = new TableRow({
-          children: [
-            tableHeaderCell('Alimento'),
-            tableHeaderCell('Categoria'),
-            tableHeaderCell('Porção (g)'),
-          ],
-        });
-        const dataRows = principal.map((item: RefeicaoPrincipalItemDocx) => {
-          const porcao = item.gramas != null ? `${item.gramas}g` : '—';
-          return new TableRow({
-            children: [
-              tableCell(String(item.alimento || '—')),
-              tableCell(String(item.categoria || '—')),
-              tableCell(porcao),
-            ],
-          });
-        });
-        children.push(
-          new Table({
-            rows: [headerRow, ...dataRows],
-            width: { size: 100, type: 'pct' as const },
-            borders: TABLE_BORDERS,
-          })
-        );
-        children.push(emptyLine());
-      }
-
-      if (temSubstituicoes) {
-        for (const [categoria, itens] of Object.entries(substituicoes)) {
-          if (!Array.isArray(itens) || itens.length === 0) continue;
-          const labelCategoria = categoria.trim() || 'Substituições';
-          children.push(boldSubtitle(`Substituições: ${labelCategoria}`));
-          const headerRow = new TableRow({
-            children: [
-              tableHeaderCell('Alimento'),
-              tableHeaderCell('Porção (g)'),
-            ],
-          });
-          const dataRows = itens.map((item: SubstituicaoItemDocx) => {
-            const porcao = item.gramas != null ? `${item.gramas}g` : '—';
-            return new TableRow({
-              children: [
-                tableCell(String(item.alimento || '—')),
-                tableCell(porcao),
-              ],
-            });
-          });
-          children.push(
-            new Table({
-              rows: [headerRow, ...dataRows],
-              width: { size: 100, type: 'pct' as const },
-              borders: TABLE_BORDERS,
-            })
-          );
-          children.push(emptyLine());
-        }
-      }
-    }
-  } else if (solutions.alimentacao && Array.isArray(solutions.alimentacao) && solutions.alimentacao.length > 0) {
-    children.push(h2('Plano Alimentar'));
-    children.push(p('Abaixo estão os alimentos e porções sugeridas, separados por refeição. Ajuste conforme a orientação do seu médico ou nutricionista.'));
-    children.push(emptyLine());
-    const byMeal = groupAlimentacaoByMeal(solutions.alimentacao);
-    byMeal.forEach((items, mealName) => {
-      children.push(h3(mealName));
-      const hasProporcao = items.some((i: any) => i.proporcao_fruta != null && i.proporcao_fruta !== '');
-      const headerCells = [
-        tableHeaderCell('Alimento'),
-        tableHeaderCell('Tipo'),
-        tableHeaderCell('Porção (g)'),
-        tableHeaderCell('Energia (kcal)'),
-      ];
-      if (hasProporcao) headerCells.push(tableHeaderCell('Proporção frutas'));
-      const headerRow = new TableRow({ children: headerCells });
-      const dataRows = items.map((item: any) => {
-        const porcao = item.ref1_g ?? item.ref2_g ?? item.ref3_g ?? item.ref4_g ?? item.gramatura ?? '—';
-        const kcal = item.ref1_kcal ?? item.ref2_kcal ?? item.ref3_kcal ?? item.ref4_kcal ?? item.kcal ?? '—';
-        const porcaoStr = porcao === '—' ? '—' : String(porcao).endsWith('g') ? String(porcao) : `${porcao}g`;
-        const cells = [
-          tableCell(String(item.alimento || '—')),
-          tableCell(String(item.tipo_de_alimentos ?? item.tipo ?? '—')),
-          tableCell(porcaoStr),
-          tableCell(String(kcal)),
-        ];
-        if (hasProporcao) cells.push(tableCell(item.proporcao_fruta != null ? String(item.proporcao_fruta) : '—'));
-        return new TableRow({ children: cells });
-      });
-      children.push(
-        new Table({
-          rows: [headerRow, ...dataRows],
-          width: { size: 100, type: 'pct' as const },
-          borders: TABLE_BORDERS,
-        })
-      );
-      children.push(emptyLine());
-    });
+  if (orientSteps.length) {
+    children.push(emptyLine(100));
+    children.push(para("Orientações de Transformação", { bold: true, size: SIZE.md, color: COLOR.mental }));
+    children.push(emptyLine(60));
+    children.push(...renderSteps(orientSteps, COLOR.mental));
+  } else if (orientRaw != null && valueToReadable(orientRaw) !== "—") {
+    // Fallback: texto livre que não fez parse
+    children.push(emptyLine(100));
+    children.push(infoCard("Orientações de Transformação", [para(valueToReadable(orientRaw))], { accentColor: COLOR.mental }));
   }
 
-  // --- Suplementação ---
-  if (solutions.suplementacao && typeof solutions.suplementacao === 'object') {
-    const d = solutions.suplementacao as Record<string, any>;
-    children.push(h2('Protocolo de Suplementação'));
-    children.push(p('Siga as orientações de dosagem e horário. Em caso de dúvida ou efeito adverso, consulte seu médico.'));
-    children.push(emptyLine());
-    const hasCategories = Array.isArray(d.suplementos) || Array.isArray(d.fitoterapicos) || Array.isArray(d.homeopatia) || Array.isArray(d.florais_bach);
-    if (hasCategories) {
-      const categories = [
-        { key: 'suplementos', label: 'Suplementos' },
-        { key: 'fitoterapicos', label: 'Fitoterápicos' },
-        { key: 'homeopatia', label: 'Homeopatia' },
-        { key: 'florais_bach', label: 'Florais de Bach' }
-      ];
-      for (const { key, label } of categories) {
-        const items = d[key];
-        if (!Array.isArray(items) || items.length === 0) continue;
-        children.push(h3(label));
-        items.forEach((item: any, i: number) => {
-          children.push(h3(item.nome || `Item ${i + 1}`));
-          if (item.objetivo != null) children.push(labelVal('Objetivo', String(item.objetivo)));
-          if (item.dosagem != null) children.push(labelVal('Dosagem', String(item.dosagem)));
-          if (item.horario != null) children.push(labelVal('Horário', String(item.horario)));
-          if (item.inicio != null) children.push(labelVal('Início', String(item.inicio)));
-          if (item.termino != null) children.push(labelVal('Término', String(item.termino)));
-          Object.entries(item).forEach(([k, v]) => {
-            if (v == null || v === '' || ['nome', 'objetivo', 'dosagem', 'horario', 'inicio', 'termino'].includes(k) || shouldSkipKey(k)) return;
-            children.push(labelVal(humanize(k), valueToReadable(v)));
-          });
-          children.push(emptyLine());
-        });
-      }
-    } else {
-      children.push(labelVal('Objetivo principal', String(d.objetivo_principal || 'Não especificado')));
-      children.push(labelVal('Realidade', String(d.filosofia_realidade || '—')));
-      children.push(labelVal('Princípio', String(d.filosofia_principio || '—')));
-      children.push(labelVal('Duração', String(d.filosofia_duracao || '—')));
-      if (d.protocolo_mes1_2_lista) {
-        children.push(h3('Protocolo – Meses 1 e 2'));
-        children.push(p(valueToReadable(d.protocolo_mes1_2_lista)));
-        if (d.protocolo_mes1_2_justificativa) children.push(labelVal('Justificativa', String(d.protocolo_mes1_2_justificativa)));
-      }
-      if (d.protocolo_mes3_6_lista) {
-        children.push(h3('Protocolo – Meses 3 a 6'));
-        children.push(p(valueToReadable(d.protocolo_mes3_6_lista)));
-        if (d.protocolo_mes3_6_justificativa) children.push(labelVal('Justificativa', String(d.protocolo_mes3_6_justificativa)));
-      }
-    }
-    children.push(emptyLine());
+  // Extras
+  const taken = new Set([
+    "padrao", "categorias", "prioridade", "areas_impacto", "areas impacto", "periodo",
+    "contexto_provavel", "origem_estimada", "manifestacoes_atuais", "Manifestacoes Atuais",
+    "orientacoes_transformacao", "Orientacoes Transformacao", "Orientações Transformacao",
+    "orientacoes", "conexoes_padroes", "conexoes padroes",
+  ]);
+
+  const extras = Object.entries(obj)
+    .filter(([k, v]) => !taken.has(k) && !shouldSkipKey(k) && v != null && String(v).trim() !== "")
+    .map(([k, v]) => labelValue(humanize(k), valueToReadable(v)));
+
+  if (extras.length) {
+    children.push(emptyLine(100));
+    children.push(infoCard("Notas adicionais", extras, { accentColor: COLOR.muted }));
   }
 
-  // --- Exercícios ---
-  if (solutions.exercicios && Array.isArray(solutions.exercicios) && solutions.exercicios.length > 0) {
-    children.push(h2('Programa de Exercícios'));
-    children.push(p('Siga a ordem e as séries indicadas. Respeite o descanso entre séries para melhores resultados.'));
-    children.push(emptyLine());
-    solutions.exercicios.forEach((exercicio: any, index: number) => {
-      children.push(h3(exercicio.nome_exercicio || `Exercício ${index + 1}`));
-      children.push(labelVal('Tipo de treino', String(exercicio.tipo_treino || '—')));
-      children.push(labelVal('Grupo muscular', String(exercicio.grupo_muscular || '—')));
-      children.push(labelVal('Séries', String(exercicio.series || '—')));
-      children.push(labelVal('Repetições', String(exercicio.repeticoes || '—')));
-      children.push(labelVal('Descanso entre séries', String(exercicio.descanso || '—')));
-      if (exercicio.observacoes != null && String(exercicio.observacoes).trim()) children.push(labelVal('Observações', String(exercicio.observacoes).trim()));
-      Object.entries(exercicio).forEach(([k, v]) => {
-        if (v == null || v === '' || ['nome_exercicio', 'tipo_treino', 'grupo_muscular', 'series', 'repeticoes', 'descanso', 'observacoes'].includes(k) || shouldSkipKey(k)) return;
-        children.push(labelVal(humanize(k), valueToReadable(v)));
-      });
-      children.push(emptyLine());
-    });
-  }
-
-  // --- Hábitos ---
-  if (solutions.habitos && typeof solutions.habitos === 'object') {
-    children.push(h2('Hábitos de Vida'));
-    children.push(p('Pequenas mudanças no dia a dia fazem diferença. Escolha um ou dois itens para começar.'));
-    children.push(emptyLine());
-    const h = solutions.habitos;
-    if (typeof h === 'object' && !Array.isArray(h)) {
-      Object.entries(h).forEach(([key, value]) => {
-        if (value == null || value === '' || shouldSkipKey(key)) return;
-        children.push(labelVal(humanize(key), valueToReadable(value)));
-      });
-    } else if (Array.isArray(h)) {
-      h.forEach((item) => children.push(bullet(valueToReadable(item))));
-    } else {
-      children.push(p(valueToReadable(h)));
-    }
-    children.push(emptyLine());
-  }
-
-  if (children.length <= 2) {
-    children.push(p('Ainda não há soluções registradas para esta consulta. Quando o plano for preenchido, você poderá baixar o documento aqui.'));
-  } else {
-    children.push(emptyLine());
-    children.push(p('Em caso de dúvidas ou para ajustar seu plano, entre em contato com seu médico. Cuide-se.'));
-  }
-
+  children.push(emptyLine(SPACING.md));
   return children;
 }
 
-/**
- * Garante que solutions tem todos os campos esperados (evita undefined no build do doc).
- * Preserva alimentacao_data quando presente (formato gateway: refeições principais + substituições).
- */
+// ═══════════════════════════════════════════════════════════════
+// DOCUMENT BUILDER
+// ═══════════════════════════════════════════════════════════════
+
+export function buildSolutionsDocxPremiumV3(solutions: SolutionsDataForDocx): Document {
+  const children: (Paragraph | Table)[] = [];
+
+  // ──── Capa ────
+  children.push(emptyLine(SPACING.xxl));
+  children.push(
+    para("SUAS SOLUÇÕES DE SAÚDE", {
+      bold: true,
+      size: SIZE.hero,
+      color: COLOR.primary,
+      align: AlignmentType.CENTER,
+      after: SPACING.sm,
+    })
+  );
+  children.push(divider());
+  children.push(
+    para(
+      "Este documento reúne as orientações e o plano definidos na sua consulta. Use-o como guia no dia a dia. Em caso de dúvidas, converse com seu médico.",
+      { color: COLOR.secondary, size: SIZE.md, align: AlignmentType.CENTER, after: SPACING.md }
+    )
+  );
+  children.push(emptyLine(SPACING.lg));
+
+  // ──── Sumário (TOC) ────
+  children.push(heading2("Sumário"));
+  children.push(
+    new TableOfContents("Sumário", {
+      hyperlink: true,
+      headingStyleRange: "1-3",
+    })
+  );
+  children.push(caption("Atualize o sumário no Word: clique com botão direito > Atualizar campo."));
+  children.push(pageBreak());
+
+  // ════════════════════════════════════════════════════════════
+  // MENTALIDADE / LIVRO DA VIDA
+  // ════════════════════════════════════════════════════════════
+  if (solutions.mentalidade && typeof solutions.mentalidade === "object") {
+    children.push(sectionBand("Livro da Vida — Transformação Mental e Emocional", COLOR.mental, "Clareza de padrões, passos práticos e acompanhamento"));
+    children.push(emptyLine(SPACING.md));
+    children.push(heading1("Livro da Vida — Transformação Mental e Emocional"));
+
+    const d = solutions.mentalidade as Record<string, any>;
+
+    if (d.resumo_executivo && valueToReadable(d.resumo_executivo) !== "—") {
+      children.push(
+        infoCard("Resumo Executivo", [para(valueToReadable(d.resumo_executivo))], {
+          accentColor: COLOR.mental,
+          fill: COLOR.mentalLight,
+        })
+      );
+      children.push(emptyLine(SPACING.md));
+    }
+
+    const padraoKeys = Object.keys(d)
+      .filter((k) => /^padrao_\d+$/i.test(k))
+      .sort((a, b) => (Number(a.replace(/\D/g, "")) || 0) - (Number(b.replace(/\D/g, "")) || 0));
+
+    for (const key of padraoKeys) {
+      const val = d[key];
+      if (val && typeof val === "object" && !Array.isArray(val)) {
+        children.push(...buildPadrao(key, val as Record<string, any>));
+      }
+    }
+
+    // Outros campos
+    const others = Object.entries(d).filter(([k, v]) => {
+      if (k === "resumo_executivo" || /^padrao_\d+$/i.test(k) || shouldSkipKey(k)) return false;
+      return v != null && valueToReadable(v) !== "—";
+    });
+
+    if (others.length) {
+      children.push(heading3("Outras orientações"));
+      for (const [k, v] of others) {
+        children.push(infoCard(humanize(k), [para(valueToReadable(v))], { accentColor: COLOR.mental }));
+        children.push(emptyLine(100));
+      }
+    }
+
+    children.push(pageBreak());
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // ALIMENTAÇÃO
+  // ════════════════════════════════════════════════════════════
+  const hasStructured = Array.isArray(solutions.alimentacao_data) && solutions.alimentacao_data.length > 0;
+
+  if (hasStructured) {
+    children.push(sectionBand("Plano Alimentar", COLOR.food, "Refeições principais + substituições por categoria"));
+    children.push(emptyLine(SPACING.md));
+    children.push(heading1("Plano Alimentar"));
+
+    children.push(
+      highlightBox(
+        "Siga as porções como referência diária. Use as substituições quando necessário. Ajuste qualquer ponto apenas com orientação do seu médico/nutricionista.",
+        { fill: COLOR.foodLight, borderColor: COLOR.food }
+      )
+    );
+    children.push(emptyLine(SPACING.md));
+
+    for (const refeicao of solutions.alimentacao_data!) {
+      const dados = safeParse<RefeicaoDataDocx>(refeicao.data, {});
+      const principal = Array.isArray(dados.principal) ? dados.principal : [];
+      const subs = dados.substituicoes && typeof dados.substituicoes === "object" ? dados.substituicoes : {};
+
+      const body: (Paragraph | Table)[] = [];
+
+      if (principal.length) {
+        body.push(para("Refeição principal", { bold: true, size: SIZE.sm, color: COLOR.food }));
+        body.push(mealTablePrincipal(principal));
+        body.push(emptyLine(100));
+      }
+
+      const subCats = Object.entries(subs).filter(([, v]) => Array.isArray(v) && v.length);
+      for (const [cat, items] of subCats) {
+        body.push(para(`Substituições — ${cat}`, { bold: true, size: SIZE.sm, color: COLOR.secondary }));
+        body.push(mealTableSubs(items as SubstituicaoItemDocx[]));
+        body.push(emptyLine(100));
+      }
+
+      if (body.length) {
+        children.push(heading3(refeicao.nome));
+        children.push(
+          infoCard(refeicao.nome, body, { accentColor: COLOR.food, fill: COLOR.bg })
+        );
+        children.push(emptyLine(SPACING.md));
+      }
+    }
+
+    children.push(pageBreak());
+  } else if (Array.isArray(solutions.alimentacao) && solutions.alimentacao.length) {
+    children.push(sectionBand("Plano Alimentar", COLOR.food, "Lista geral por refeição"));
+    children.push(emptyLine(SPACING.md));
+    children.push(heading1("Plano Alimentar"));
+
+    children.push(
+      highlightBox(
+        "Seu plano veio em formato de lista. Para uma versão mais detalhada, solicite o formato estruturado por refeição.",
+        { fill: COLOR.foodLight, borderColor: COLOR.food }
+      )
+    );
+    children.push(emptyLine(SPACING.md));
+
+    const map = new Map<string, any[]>();
+    for (const it of solutions.alimentacao) {
+      const meal = String(it?._meal ?? "Outros").trim();
+      if (!map.has(meal)) map.set(meal, []);
+      map.get(meal)!.push(it);
+    }
+
+    for (const [meal, items] of map.entries()) {
+      const colWidths = [3000, 2160, 2100, 2100]; // soma = 9360
+      const header = new TableRow({
+        children: [
+          headerCell("Alimento", colWidths[0]),
+          headerCell("Tipo", colWidths[1]),
+          headerCell("Porção (g)", colWidths[2]),
+          headerCell("Energia (kcal)", colWidths[3]),
+        ],
+      });
+
+      const rows = items.map((item: any) => {
+        const porcao = item.ref1_g ?? item.ref2_g ?? item.ref3_g ?? item.ref4_g ?? item.gramatura ?? "—";
+        const kcal = item.ref1_kcal ?? item.ref2_kcal ?? item.ref3_kcal ?? item.ref4_kcal ?? item.kcal ?? "—";
+        const porcaoStr = porcao === "—" ? "—" : String(porcao).endsWith("g") ? String(porcao) : `${porcao}g`;
+        return new TableRow({
+          children: [
+            textCell(String(item.alimento ?? "—"), colWidths[0]),
+            textCell(String(item.tipo_de_alimentos ?? item.tipo ?? "—"), colWidths[1]),
+            textCell(porcaoStr, colWidths[2]),
+            textCell(String(kcal), colWidths[3]),
+          ],
+        });
+      });
+
+      children.push(heading3(meal));
+      children.push(
+        new Table({
+          width: { size: CONTENT_WIDTH, type: WidthType.DXA },
+          columnWidths: colWidths,
+          borders: BORDERS_TABLE,
+          rows: [header, ...rows],
+        })
+      );
+      children.push(emptyLine(SPACING.md));
+    }
+
+    children.push(pageBreak());
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // SUPLEMENTAÇÃO
+  // ════════════════════════════════════════════════════════════
+  if (solutions.suplementacao && typeof solutions.suplementacao === "object") {
+    children.push(sectionBand("Protocolo de Suplementação", COLOR.supp, "Dose, horários e objetivos"));
+    children.push(emptyLine(SPACING.md));
+    children.push(heading1("Protocolo de Suplementação"));
+
+    children.push(
+      highlightBox(
+        "Se houver qualquer reação adversa, suspenda e contate seu médico. Evite alterar dose/horário sem orientação. Siga o período de início/término e reavaliação.",
+        { fill: COLOR.suppLight, borderColor: COLOR.supp }
+      )
+    );
+    children.push(emptyLine(SPACING.md));
+
+    const d = solutions.suplementacao as Record<string, any>;
+    const categories = [
+      { key: "suplementos", label: "Suplementos" },
+      { key: "fitoterapicos", label: "Fitoterápicos" },
+      { key: "homeopatia", label: "Homeopatia" },
+      { key: "florais_bach", label: "Florais de Bach" },
+    ];
+
+    let anyCategory = false;
+
+    for (const { key, label } of categories) {
+      const items = d[key];
+      if (!Array.isArray(items) || !items.length) continue;
+      anyCategory = true;
+
+      children.push(heading3(label));
+      items.forEach((item: any, i: number) => {
+        children.push(renderSupplementItem(item, `${label} ${i + 1}`, COLOR.supp));
+        children.push(emptyLine(100));
+      });
+    }
+
+    if (!anyCategory) {
+      const pairs = Object.entries(d)
+        .filter(([k, v]) => !shouldSkipKey(k) && v != null && String(v).trim() !== "")
+        .map(([k, v]) => labelValue(humanize(k), valueToReadable(v)));
+
+      children.push(
+        infoCard("Detalhes", pairs.length ? pairs : [para("Sem itens detalhados disponíveis.")], {
+          accentColor: COLOR.supp,
+        })
+      );
+    }
+
+    children.push(pageBreak());
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // EXERCÍCIOS
+  // ════════════════════════════════════════════════════════════
+  if (Array.isArray(solutions.exercicios) && solutions.exercicios.length) {
+    children.push(sectionBand("Programa de Exercícios", COLOR.train, "Treinos agrupados + resumo + detalhes por exercício"));
+    children.push(emptyLine(SPACING.md));
+    children.push(heading1("Programa de Exercícios"));
+
+    children.push(
+      highlightBox(
+        "Respeite descansos e priorize técnica (não carga). Se sentir dor aguda, interrompa imediatamente. Hidratação e consistência são mais importantes que intensidade.",
+        { fill: COLOR.trainLight, borderColor: COLOR.train }
+      )
+    );
+    children.push(emptyLine(SPACING.md));
+
+    const grouped = groupExercises(solutions.exercicios);
+    for (const [treinoName, items] of grouped.entries()) {
+      children.push(...renderTrainingBlock(treinoName, items));
+      children.push(emptyLine(SPACING.md));
+    }
+
+    children.push(pageBreak());
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // HÁBITOS
+  // ════════════════════════════════════════════════════════════
+  if (solutions.habitos != null) {
+    children.push(sectionBand("Hábitos de Vida", COLOR.habits, "Pequenas mudanças que sustentam o plano"));
+    children.push(emptyLine(SPACING.md));
+    children.push(heading1("Hábitos de Vida"));
+
+    const h = solutions.habitos;
+
+    if (Array.isArray(h)) {
+      const body = h.map((x: any) => bulletItem(valueToReadable(x)));
+      children.push(infoCard("Seus hábitos recomendados", body, { accentColor: COLOR.habits, fill: COLOR.habitsLight }));
+    } else if (typeof h === "object") {
+      const lines = Object.entries(h)
+        .filter(([k, v]) => !shouldSkipKey(k) && v != null && String(v).trim() !== "")
+        .map(([k, v]) => labelValue(humanize(k), valueToReadable(v)));
+      children.push(
+        infoCard("Hábitos", lines.length ? lines : [para("Sem hábitos informados.")], {
+          accentColor: COLOR.habits,
+          fill: COLOR.habitsLight,
+        })
+      );
+    } else {
+      children.push(infoCard("Hábitos", [para(valueToReadable(h))], { accentColor: COLOR.habits }));
+    }
+
+    children.push(emptyLine(SPACING.lg));
+  }
+
+  // ──── Encerramento ────
+  children.push(divider());
+  children.push(emptyLine(SPACING.sm));
+  children.push(
+    highlightBox(
+      "Em caso de dúvidas ou para ajustar seu plano, entre em contato com seu médico. Este documento é um guia de apoio e não substitui avaliação clínica individual.",
+      { fill: COLOR.primaryLight, borderColor: COLOR.primary }
+    )
+  );
+
+  // ──── Montar Document ────
+  const doc = new Document({
+    styles: {
+      default: {
+        document: {
+          run: { font: FONT.primary, size: SIZE.base, color: COLOR.text },
+        },
+      },
+      paragraphStyles: [
+        {
+          id: "Heading1",
+          name: "Heading 1",
+          basedOn: "Normal",
+          next: "Normal",
+          quickFormat: true,
+          run: { size: SIZE.xxl, bold: true, font: FONT.primary, color: COLOR.text },
+          paragraph: { spacing: { before: SPACING.lg, after: SPACING.md }, outlineLevel: 0 },
+        },
+        {
+          id: "Heading2",
+          name: "Heading 2",
+          basedOn: "Normal",
+          next: "Normal",
+          quickFormat: true,
+          run: { size: SIZE.xl, bold: true, font: FONT.primary, color: COLOR.text },
+          paragraph: { spacing: { before: SPACING.md, after: SPACING.sm }, outlineLevel: 1 },
+        },
+        {
+          id: "Heading3",
+          name: "Heading 3",
+          basedOn: "Normal",
+          next: "Normal",
+          quickFormat: true,
+          run: { size: SIZE.lg, bold: true, font: FONT.primary, color: COLOR.text },
+          paragraph: { spacing: { before: SPACING.sm, after: SPACING.xs }, outlineLevel: 2 },
+        },
+      ],
+    },
+    numbering: { config: NUMBERING_CONFIG as any },
+    sections: [
+      {
+        properties: {
+          page: {
+            size: { width: PAGE.width, height: PAGE.height },
+            margin: {
+              top: PAGE.marginTop,
+              right: PAGE.marginRight,
+              bottom: PAGE.marginBottom,
+              left: PAGE.marginLeft,
+              header: 720, // 0.5″
+              footer: 720,
+              gutter: 0,
+            },
+          },
+        },
+        headers: {
+          default: new Header({
+            children: [
+              new Paragraph({
+                children: [
+                  new TextRun({ text: "Soluções de Saúde", size: SIZE.xs, color: COLOR.muted, font: FONT.primary }),
+                ],
+                alignment: AlignmentType.RIGHT,
+                border: { bottom: { style: BorderStyle.SINGLE, size: 2, color: COLOR.border, space: 1 } },
+                spacing: { after: 0 },
+              }),
+            ],
+          }),
+        },
+        footers: {
+          default: new Footer({
+            children: [
+              new Paragraph({
+                children: [
+                  new TextRun({ text: "Documento confidencial", size: SIZE.xs, color: COLOR.muted, font: FONT.primary }),
+                  new TextRun({ text: "\t", size: SIZE.xs }),
+                  new TextRun({ text: "Página ", size: SIZE.xs, color: COLOR.muted, font: FONT.primary }),
+                  new TextRun({ children: [PageNumber.CURRENT], size: SIZE.xs, color: COLOR.muted, font: FONT.primary }),
+                ],
+                tabStops: [{ type: TabStopType.RIGHT, position: TabStopPosition.MAX }],
+                border: { top: { style: BorderStyle.SINGLE, size: 2, color: COLOR.border, space: 1 } },
+                spacing: { before: 60 },
+              }),
+            ],
+          }),
+        },
+        children,
+      },
+    ],
+  });
+
+  return doc;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// NORMALIZATION & DOWNLOAD
+// ═══════════════════════════════════════════════════════════════
+
 function normalizeSolutions(solutions: Partial<SolutionsDataForDocx> | null): SolutionsDataForDocx {
-  if (!solutions || typeof solutions !== 'object') {
+  if (!solutions || typeof solutions !== "object") {
     return { ltb: null, mentalidade: null, alimentacao: [], alimentacao_data: null, suplementacao: null, exercicios: [], habitos: null };
   }
-  const data = solutions as Partial<SolutionsDataForDocx> & { alimentacao_data?: AlimentacaoStructuredItem[] | null };
   return {
     ltb: solutions.ltb ?? null,
     mentalidade: solutions.mentalidade ?? null,
     alimentacao: Array.isArray(solutions.alimentacao) ? solutions.alimentacao : [],
-    alimentacao_data: data.alimentacao_data != null && Array.isArray(data.alimentacao_data) ? data.alimentacao_data : null,
+    alimentacao_data: Array.isArray((solutions as any).alimentacao_data) ? (solutions as any).alimentacao_data : null,
     suplementacao: solutions.suplementacao ?? null,
     exercicios: Array.isArray(solutions.exercicios) ? solutions.exercicios : [],
     habitos: solutions.habitos ?? null,
   };
 }
 
-/**
- * Gera o DOCX e dispara o download no navegador.
- */
-export async function downloadSolutionsDocx(
+/** Gera o DOCX e dispara download no browser */
+export async function downloadSolutionsDocxPremium(
   solutions: SolutionsDataForDocx | Partial<SolutionsDataForDocx> | null,
-  filename: string = 'solucoes-consulta.docx'
+  filename: string = "solucoes-consulta-premium.docx"
 ): Promise<void> {
   const normalized = normalizeSolutions(solutions);
-  const paragraphs = buildSolutionsDocx(normalized);
-
-  const marginTwips = convertInchesToTwip(PAGE_MARGIN_INCH);
-  const headerFooterTwips = convertInchesToTwip(0.5);
-
-  const doc = new Document({
-    sections: [
-      {
-        properties: {
-          page: {
-            margin: {
-              top: marginTwips,
-              right: marginTwips,
-              bottom: marginTwips,
-              left: marginTwips,
-              header: headerFooterTwips,
-              footer: headerFooterTwips,
-              gutter: 0,
-            },
-          },
-        },
-        children: paragraphs,
-      },
-    ],
-  });
+  const doc = buildSolutionsDocxPremiumV3(normalized);
 
   let blob: Blob;
   try {
     blob = await Packer.toBlob(doc);
   } catch (e) {
-    console.error('Erro ao gerar DOCX (Packer.toBlob):', e);
-    throw new Error('Falha ao gerar o documento. Tente novamente.');
+    console.error("Erro ao gerar DOCX (Packer.toBlob):", e);
+    throw new Error("Falha ao gerar o documento. Tente novamente.");
   }
 
-  const fileSaver = await import('file-saver');
-  const saveAs = fileSaver.saveAs ?? (fileSaver as { default?: typeof fileSaver.saveAs }).default;
-  if (typeof saveAs !== 'function') {
-    throw new Error('Download não disponível neste navegador.');
+  const fileSaver = await import("file-saver");
+  const saveAs = (fileSaver as any).saveAs ?? (fileSaver as any).default;
+  if (typeof saveAs !== "function") {
+    throw new Error("Download não disponível neste navegador.");
   }
   saveAs(blob, filename);
+}
+
+/** Gera o DOCX como Buffer (para uso server-side) */
+export async function generateSolutionsDocxBuffer(
+  solutions: SolutionsDataForDocx | Partial<SolutionsDataForDocx> | null
+): Promise<Buffer> {
+  const normalized = normalizeSolutions(solutions);
+  const doc = buildSolutionsDocxPremiumV3(normalized);
+  return await Packer.toBuffer(doc);
 }
