@@ -6328,17 +6328,11 @@ function ConsultasPageContent() {
       // Disparar webhook apenas se precisar gerar (não se já existe)
       if (shouldGenerate) {
         try {
-          const webhookEndpoints = getWebhookEndpoints();
-          const webhookHeaders = getWebhookHeaders();
-
-          await fetch(webhookEndpoints.edicaoLivroDaVida, {
-            method: 'POST',
-            headers: webhookHeaders,
-            body: JSON.stringify({
-              consultaId: consultaDetails.id,
-              medicoId: consultaDetails.doctor_id,
-              pacienteId: consultaDetails.patient_id
-            }),
+          // Usar proxy do backend para evitar CORS
+          await gatewayClient.post('/webhooks/edicao-livro-da-vida', {
+            consultaId: consultaDetails.id,
+            medicoId: consultaDetails.doctor_id,
+            pacienteId: consultaDetails.patient_id
           });
           console.log('✅ Webhook de solução disparado com sucesso');
         } catch (webhookError) {

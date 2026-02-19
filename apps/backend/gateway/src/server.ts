@@ -36,6 +36,7 @@ import aiRoutes from './routes/ai';
 
 // Rotas de Proxy
 import proxyRoutes from './routes/proxy';
+import webhookRoutes from './routes/webhook';
 
 // Middlewares de segurança
 import { corsMiddleware, getCorsOrigins } from './middleware/cors';
@@ -134,6 +135,7 @@ app.use(generalRateLimiter);
 // Vamos colocar o proxy /api aqui para redirecionar para microserviços
 
 app.use('/api', proxyRoutes);
+app.use('/webhooks', webhookRoutes);
 
 // ===== LOCAL ROUTES =====
 
