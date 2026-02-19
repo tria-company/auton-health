@@ -171,6 +171,7 @@ app.get('/anamnese-inicial', authenticateToken, getAnamneseInicial);
 app.use('/anamnese', anamneseRoutes);
 app.use('/diagnostico', diagnosticoRoutes);
 app.use('/', solucoesRoutes);
+app.use('/api', solucoesRoutes);
 app.use('/agenda', agendaRoutes);
 app.use('/admin', adminRoutes);
 app.use('/exames', examesRoutes);

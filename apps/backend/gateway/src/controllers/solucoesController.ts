@@ -339,6 +339,105 @@ export async function updateSolucaoSuplementacaoField(req: AuthenticatedRequest,
   }
 }
 
+/** Categorias válidas de suplementação */
+const SUPLEMENTACAO_CATEGORIES = ['suplementos', 'fitoterapicos', 'homeopatia', 'florais_bach'] as const;
+
+/** Item padrão para novo suplemento */
+const DEFAULT_SUPLEMENTACAO_ITEM = {
+  nome: '',
+  objetivo: '',
+  dosagem: '',
+  horario: '',
+  inicio: '',
+  termino: ''
+};
+
+/**
+ * POST /solucao-suplementacao/:consultaId/add-item
+ * Adiciona um novo item manualmente em uma categoria de suplementação.
+ * Body: { category: 'suplementos'|'fitoterapicos'|'homeopatia'|'florais_bach', item?: Partial<{ nome, objetivo, dosagem, horario, inicio, termino }> }
+ */
+export async function addSolucaoSuplementacaoItem(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: 'Não autorizado' });
+    }
+
+    const { consultaId } = req.params;
+    const { category, item: itemPayload } = req.body;
+
+    if (!category || !SUPLEMENTACAO_CATEGORIES.includes(category)) {
+      return res.status(400).json({
+        success: false,
+        error: 'category é obrigatória e deve ser: suplementos, fitoterapicos, homeopatia ou florais_bach'
+      });
+    }
+
+    const newItem = { ...DEFAULT_SUPLEMENTACAO_ITEM, ...(itemPayload || {}) };
+
+    const { data: existing, error: fetchError } = await supabase
+      .from('s_suplementacao2')
+      .select('*')
+      .eq('consulta_id', consultaId)
+      .maybeSingle();
+
+    if (fetchError) {
+      console.error('[addSolucaoSuplementacaoItem] ❌ Erro ao buscar:', fetchError);
+      throw fetchError;
+    }
+
+    if (existing) {
+      const categoryArray = existing[category] || [];
+      const parsedArray = categoryArray.map((raw: string) => {
+        try { return JSON.parse(raw); } catch { return raw; }
+      });
+      parsedArray.push(newItem);
+      const updatedArray = parsedArray.map((obj: any) => JSON.stringify(obj));
+
+      const { data, error: updateError } = await supabase
+        .from('s_suplementacao2')
+        .update({ [category]: updatedArray })
+        .eq('consulta_id', consultaId)
+        .select()
+        .single();
+
+      if (updateError) {
+        console.error('[addSolucaoSuplementacaoItem] ❌ Erro ao atualizar:', updateError);
+        throw updateError;
+      }
+      console.log('[addSolucaoSuplementacaoItem] ✅ Item adicionado na categoria existente');
+      return res.json({ success: true, solucao: data });
+    }
+
+    const initialArrays: Record<string, string[]> = {
+      suplementos: [],
+      fitoterapicos: [],
+      homeopatia: [],
+      florais_bach: []
+    };
+    initialArrays[category] = [JSON.stringify(newItem)];
+
+    const { data, error: insertError } = await supabase
+      .from('s_suplementacao2')
+      .insert({
+        consulta_id: consultaId,
+        ...initialArrays
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      console.error('[addSolucaoSuplementacaoItem] ❌ Erro ao inserir:', insertError);
+      throw insertError;
+    }
+    console.log('[addSolucaoSuplementacaoItem] ✅ Registro criado com novo item');
+    return res.json({ success: true, solucao: data });
+  } catch (error) {
+    console.error('Erro ao adicionar item de suplementação:', error);
+    return res.status(500).json({ success: false, error: 'Erro ao adicionar item' });
+  }
+}
+
 /**
  * GET /alimentacao/:consultaId
  * Tabela s_refeicao usa paciente (uuid), não consulta_id

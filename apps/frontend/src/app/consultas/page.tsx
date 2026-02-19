@@ -3393,8 +3393,25 @@ function SuplemementacaoSection({
 
   const [loading, setLoading] = useState(true);
   const [loadingDetails, setLoadingDetails] = useState(false);
+  const [addingCategory, setAddingCategory] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const handleAddItem = async (category: 'suplementos' | 'fitoterapicos' | 'homeopatia' | 'florais_bach') => {
+    try {
+      setAddingCategory(category);
+      setError(null);
+      const response = await gatewayClient.post(`/solucao-suplementacao/${consultaId}/add-item`, { category });
+      if (!response.success) {
+        throw new Error((response as { error?: string }).error || 'Erro ao adicionar item');
+      }
+      await loadSuplementacaoData();
+    } catch (err) {
+      console.error('Erro ao adicionar item:', err);
+      showError(err instanceof Error ? err.message : 'Erro ao adicionar item', 'Erro');
+    } finally {
+      setAddingCategory(null);
+    }
+  };
 
   // Carregar dados ao montar o componente
   useEffect(() => {
@@ -3485,19 +3502,11 @@ function SuplemementacaoSection({
     );
   }
 
-  // Se não houver dados, mostrar mensagem
-  if (!suplementacaoData) {
-    return (
-      <div className="anamnese-sections">
-        <p style={{ color: '#666', fontStyle: 'italic' }}>
-          Nenhum dado de suplementação encontrado para esta consulta.
-        </p>
-      </div>
-    );
-  }
-
-  const handleAIEdit = (fieldPath: string, label: string) => {
-    console.log('Edição com IA:', fieldPath, label);
+  const effectiveSuplementacaoData = suplementacaoData ?? {
+    suplementos: [] as SuplementacaoItem[],
+    fitoterapicos: [] as SuplementacaoItem[],
+    homeopatia: [] as SuplementacaoItem[],
+    florais_bach: [] as SuplementacaoItem[]
   };
 
   const formatValueForDataField = (value: any): string => {
@@ -3511,16 +3520,42 @@ function SuplemementacaoSection({
     return String(value);
   };
 
+  const isAddingCategory = (cat: string) => addingCategory === cat;
+
   // Função para renderizar categoria usando DataField
   const renderCategoryTable = (
     title: string,
     category: 'suplementos' | 'fitoterapicos' | 'homeopatia' | 'florais_bach',
     items: SuplementacaoItem[]
   ) => {
+    const addButton = (
+      <button
+        type="button"
+        onClick={() => handleAddItem(category)}
+        disabled={!!addingCategory}
+        className="suplementacao-add-item-btn"
+        style={{
+          marginTop: '8px',
+          padding: '4px 0',
+          fontSize: '13px',
+          fontWeight: 500,
+          background: 'none',
+          color: 'var(--text-secondary, #6b7280)',
+          border: 'none',
+          cursor: addingCategory ? 'not-allowed' : 'pointer',
+          opacity: isAddingCategory(category) ? 0.6 : 1,
+          textDecoration: 'none'
+        }}
+      >
+        {isAddingCategory(category) ? 'Adicionando…' : '+ Adicionar item'}
+      </button>
+    );
+
     if (items.length === 0) {
       return (
         <CollapsibleSection title={title} defaultOpen={true}>
           <p style={{ color: '#666', fontStyle: 'italic', padding: '20px' }}>Nenhum item cadastrado</p>
+          {addButton}
         </CollapsibleSection>
       );
     }
@@ -3550,7 +3585,6 @@ function SuplemementacaoSection({
                       await loadSuplementacaoData();
                     }
                   }}
-                  onAIEdit={handleAIEdit}
                 />
                 <DataField
                   label="Objetivo"
@@ -3568,7 +3602,6 @@ function SuplemementacaoSection({
                       await loadSuplementacaoData();
                     }
                   }}
-                  onAIEdit={handleAIEdit}
                 />
                 <DataField
                   label="Dosagem"
@@ -3586,7 +3619,6 @@ function SuplemementacaoSection({
                       await loadSuplementacaoData();
                     }
                   }}
-                  onAIEdit={handleAIEdit}
                 />
                 <DataField
                   label="Horário"
@@ -3604,7 +3636,6 @@ function SuplemementacaoSection({
                       await loadSuplementacaoData();
                     }
                   }}
-                  onAIEdit={handleAIEdit}
                 />
                 <DataField
                   label="Início"
@@ -3622,7 +3653,6 @@ function SuplemementacaoSection({
                       await loadSuplementacaoData();
                     }
                   }}
-                  onAIEdit={handleAIEdit}
                 />
                 <DataField
                   label="Término"
@@ -3640,11 +3670,11 @@ function SuplemementacaoSection({
                       await loadSuplementacaoData();
                     }
                   }}
-                  onAIEdit={handleAIEdit}
                 />
               </div>
             </div>
           ))}
+          {addButton}
         </div>
       </CollapsibleSection>
     );
@@ -3652,10 +3682,10 @@ function SuplemementacaoSection({
 
   return (
     <div className="anamnese-sections">
-      {renderCategoryTable("1. Suplementos", "suplementos", suplementacaoData.suplementos)}
-      {renderCategoryTable("2. Fitoterápicos", "fitoterapicos", suplementacaoData.fitoterapicos)}
-      {renderCategoryTable("3. Homeopatia", "homeopatia", suplementacaoData.homeopatia)}
-      {renderCategoryTable("4. Florais de Bach", "florais_bach", suplementacaoData.florais_bach)}
+      {renderCategoryTable("1. Suplementos", "suplementos", effectiveSuplementacaoData.suplementos)}
+      {renderCategoryTable("2. Fitoterápicos", "fitoterapicos", effectiveSuplementacaoData.fitoterapicos)}
+      {renderCategoryTable("3. Homeopatia", "homeopatia", effectiveSuplementacaoData.homeopatia)}
+      {renderCategoryTable("4. Florais de Bach", "florais_bach", effectiveSuplementacaoData.florais_bach)}
     </div>
   );
 }

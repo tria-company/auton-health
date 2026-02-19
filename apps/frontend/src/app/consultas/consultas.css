@@ -2153,6 +2153,18 @@
   grid-column: 1 / -1; /* Ocupa todas as colunas */
 }
 
+.suplementacao-add-item-btn:hover:not(:disabled) {
+  color: var(--text-primary, #374151);
+}
+
+.dark .suplementacao-add-item-btn {
+  color: #9ca3af;
+}
+
+.dark .suplementacao-add-item-btn:hover:not(:disabled) {
+  color: #e5e7eb;
+}
+
 @media (max-width: 1400px) {
   .anamnese-subsection {
     grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));

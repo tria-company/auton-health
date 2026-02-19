@@ -1,10 +1,11 @@
 import { Router } from 'express';
 import { authenticateToken } from '../middleware/auth';
-import { 
+import {
   getSolucaoMentalidade,
   updateSolucaoMentalidadeField,
   getSolucaoSuplementacao,
   updateSolucaoSuplementacaoField,
+  addSolucaoSuplementacaoItem,
   getAlimentacao,
   updateAlimentacaoField,
   getAtividadeFisica,
@@ -25,6 +26,7 @@ router.post('/solucao-mentalidade/:consultaId/update-field', authenticateToken, 
  */
 router.get('/solucao-suplementacao/:consultaId', authenticateToken, getSolucaoSuplementacao);
 router.post('/solucao-suplementacao/:consultaId/update-field', authenticateToken, updateSolucaoSuplementacaoField);
+router.post('/solucao-suplementacao/:consultaId/add-item', authenticateToken, addSolucaoSuplementacaoItem);
 
 /**
  * Alimentação
