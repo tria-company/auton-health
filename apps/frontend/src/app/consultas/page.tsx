@@ -3241,8 +3241,8 @@ function MentalidadeSection({
         <div className="anamnese-subsection">
           <h4>Orientações de Transformação</h4>
           {padrao.orientacoes_transformacao?.map((orientacao, idx) => (
-            <div key={idx} className="anamnese-subsection" style={{ marginBottom: '20px', padding: '15px', background: '#f5f5f5', borderRadius: '4px' }}>
-              <h5 style={{ marginBottom: '10px' }}>{orientacao.nome} (Passo {orientacao.passo})</h5>
+            <div key={idx} className="anamnese-subsection mentalidade-step-card">
+              <h5>{orientacao.nome} (Passo {orientacao.passo})</h5>
               <DataField
                 label="Nome"
                 value={formatValueForDataField(orientacao.nome)}
@@ -3856,97 +3856,41 @@ function AlimentacaoSection({
           </p>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '20px' }}>
+        <div className="alimentacao-refeicoes-grid">
           {mealsToRender.map((meal: any, index: number) => {
             const principalItems = meal.data?.principal || [];
             const substituicoes = meal.data?.substituicoes || {};
             const hasSubstituicoes = Object.keys(substituicoes).length > 0;
 
             return (
-              <div key={meal.id || index} style={{
-                backgroundColor: '#ffffff',
-                borderRadius: '12px',
-                border: '1px solid #e5e7eb',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-                overflow: 'hidden',
-                display: 'flex',
-                flexDirection: 'column'
-              }}>
-                {/* Header da Refeição */}
-                <div style={{
-                  padding: '16px',
-                  backgroundColor: '#f8fafc',
-                  borderBottom: '1px solid #e5e7eb',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}>
-                  <div style={{
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '8px',
-                    backgroundColor: '#dbeafe',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#2563eb'
-                  }}>
+              <div key={meal.id || index} className="alimentacao-meal-card">
+                <div className="alimentacao-meal-header">
+                  <div className="alimentacao-meal-icon">
                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2" /><path d="M7 2v20" /><path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7" /></svg>
                   </div>
-                  <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#1e293b' }}>
-                    {meal.nome || `Refeição ${index + 1}`}
-                  </h3>
+                  <h3>{meal.nome || `Refeição ${index + 1}`}</h3>
                 </div>
 
-                <div style={{ padding: '16px', flex: 1 }}>
-                  {/* Seção Principal */}
+                <div className="alimentacao-meal-body">
                   <div style={{ marginBottom: '20px' }}>
-                    <h4 style={{
-                      marginBottom: '12px',
-                      fontSize: '13px',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em',
-                      color: '#64748b',
-                      fontWeight: 700,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px'
-                    }}>
+                    <h4 className="alimentacao-section-title">
                       <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#22c55e' }}></span>
                       Prato Principal
                     </h4>
 
                     {principalItems.length === 0 ? (
-                      <p style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: '14px' }}>Nenhum item principal.</p>
+                      <p className="alimentacao-empty-msg">Nenhum item principal.</p>
                     ) : (
                       <div style={{ display: 'grid', gap: '10px' }}>
                         {principalItems.map((item: any, idx: number) => (
-                          <div key={idx} style={{
-                            padding: '12px',
-                            backgroundColor: '#f0fdf4',
-                            borderRadius: '8px',
-                            border: '1px solid #dcfce7',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '8px'
-                          }}>
+                          <div key={idx} className="alimentacao-principal-item">
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                              <span style={{ fontWeight: 600, color: '#14532d', fontSize: '14px' }}>{item.alimento}</span>
+                              <span className="nome">{item.alimento}</span>
                               {item.categoria && (
-                                <span style={{
-                                  fontSize: '11px',
-                                  padding: '2px 6px',
-                                  borderRadius: '4px',
-                                  backgroundColor: '#ffffff',
-                                  color: '#166534',
-                                  border: '1px solid #bbf7d0',
-                                  fontWeight: 500
-                                }}>
-                                  {item.categoria}
-                                </span>
+                                <span className="badge">{item.categoria}</span>
                               )}
                             </div>
-                            <div style={{ display: 'flex', gap: '12px', fontSize: '12px', color: '#15803d' }}>
+                            <div className="meta">
                               {item.gramas && (
                                 <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                   ⚖️ {Number(item.gramas).toFixed(0)}g
@@ -3964,22 +3908,9 @@ function AlimentacaoSection({
                     )}
                   </div>
 
-                  {/* Seção Substituições */}
                   {hasSubstituicoes && (
                     <div>
-                      <h4 style={{
-                        marginBottom: '12px',
-                        fontSize: '13px',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em',
-                        color: '#64748b',
-                        fontWeight: 700,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        borderTop: '1px solid #f1f5f9',
-                        paddingTop: '16px'
-                      }}>
+                      <h4 className="alimentacao-section-title substituicoes">
                         <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#6366f1' }}></span>
                         Substituições
                       </h4>
@@ -3988,42 +3919,18 @@ function AlimentacaoSection({
                         {Object.entries(substituicoes).map(([category, items]: [string, any], catIdx) => (
                           (items && items.length > 0) && (
                             <div key={catIdx}>
-                              <h5 style={{
-                                fontSize: '12px',
-                                color: '#475569',
-                                fontWeight: 600,
-                                marginBottom: '8px',
-                                paddingLeft: '4px',
-                                borderLeft: '2px solid #cbd5e1'
-                              }}>
-                                {category}
-                              </h5>
+                              <h5 className="alimentacao-sub-cat">{category}</h5>
                               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '8px' }}>
                                 {items.slice(0, 4).map((subItem: any, subIdx: number) => (
-                                  <div key={subIdx} style={{
-                                    padding: '8px',
-                                    backgroundColor: '#f8fafc',
-                                    borderRadius: '6px',
-                                    border: '1px solid #e2e8f0',
-                                    fontSize: '12px'
-                                  }}>
-                                    <div style={{ fontWeight: 600, color: '#334155', marginBottom: '2px', lineHeight: '1.2' }}>
-                                      {subItem.alimento}
-                                    </div>
-                                    <div style={{ color: '#64748b', fontSize: '11px' }}>
+                                  <div key={subIdx} className="alimentacao-sub-item">
+                                    <div className="nome">{subItem.alimento}</div>
+                                    <div className="gramas">
                                       {subItem.gramas ? `${Number(subItem.gramas).toFixed(0)}g` : 'Livre'}
                                     </div>
                                   </div>
                                 ))}
                                 {items.length > 4 && (
-                                  <div style={{
-                                    fontSize: '11px',
-                                    color: '#64748b',
-                                    fontStyle: 'italic',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    padding: '4px'
-                                  }}>
+                                  <div className="alimentacao-more-opcoes">
                                     + {items.length - 4} opções...
                                   </div>
                                 )}
@@ -7074,28 +6981,12 @@ function ConsultasPageContent() {
             <h1 className="consultas-title">Selecionar Solução</h1>
           </div>
 
-          <div style={{
-            padding: '40px 20px',
-            maxWidth: '1200px',
-            margin: '0 auto'
-          }}>
-            <div style={{
-              textAlign: 'center',
-              marginBottom: '40px'
-            }}>
-              <h2 style={{
-                fontSize: '28px',
-                fontWeight: '700',
-                color: '#1f2937',
-                marginBottom: '12px'
-              }}>
+          <div className="selecionar-solucao-content">
+            <div className="selecionar-solucao-header">
+              <h2 className="selecionar-solucao-title">
                 Escolha uma das soluções para continuar:
               </h2>
-              <p style={{
-                fontSize: '16px',
-                color: '#6b7280',
-                margin: 0
-              }}>
+              <p className="selecionar-solucao-subtitle">
                 Selecione a solução que deseja implementar para este paciente.
               </p>
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
@@ -7112,15 +7003,10 @@ function ConsultasPageContent() {
               </div>
             </div>
 
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-              gap: '24px',
-              marginTop: '40px'
-            }}>
+            <div className="selecionar-solucao-grid">
               {/* Livro da Vida */}
               <div
-                className="solucao-card"
+                className="solucao-card solucao-card-select solucao-card-mentalidade"
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -7132,31 +7018,8 @@ function ConsultasPageContent() {
                   e.preventDefault();
                 }}
                 style={{
-                  background: 'white',
-                  borderRadius: '12px',
-                  padding: '32px',
-                  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.07)',
-                  border: '2px solid #e5e7eb',
                   cursor: isSaving ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.2s ease',
-                  opacity: isSaving ? 0.6 : 1,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  textAlign: 'center',
-                  userSelect: 'none'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isSaving) {
-                    e.currentTarget.style.borderColor = '#3b82f6';
-                    e.currentTarget.style.boxShadow = '0 8px 16px rgba(59, 130, 246, 0.15)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isSaving) {
-                    e.currentTarget.style.borderColor = '#e5e7eb';
-                    e.currentTarget.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.07)';
-                  }
+                  opacity: isSaving ? 0.6 : 1
                 }}
               >
                 <div className="solucao-icon" style={{
@@ -7173,23 +7036,13 @@ function ConsultasPageContent() {
                     <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"></path>
                   </svg>
                 </div>
-                <h3 style={{
-                  fontSize: '20px',
-                  fontWeight: '600',
-                  color: '#1f2937',
-                  marginBottom: '8px',
-                  margin: 0
-                }}>Livro da Vida</h3>
-                <p style={{
-                  fontSize: '14px',
-                  color: '#6b7280',
-                  margin: 0
-                }}>Transformação Mental e Emocional</p>
+                <h3>Livro da Vida</h3>
+                <p>Transformação Mental e Emocional</p>
               </div>
 
               {/* Alimentação */}
               <div
-                className="solucao-card"
+                className="solucao-card solucao-card-select solucao-card-alimentacao"
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -7201,31 +7054,8 @@ function ConsultasPageContent() {
                   e.preventDefault();
                 }}
                 style={{
-                  background: 'white',
-                  borderRadius: '12px',
-                  padding: '32px',
-                  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.07)',
-                  border: '2px solid #e5e7eb',
                   cursor: isSaving ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.2s ease',
-                  opacity: isSaving ? 0.6 : 1,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  textAlign: 'center',
-                  userSelect: 'none'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isSaving) {
-                    e.currentTarget.style.borderColor = '#10b981';
-                    e.currentTarget.style.boxShadow = '0 8px 16px rgba(16, 185, 129, 0.15)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isSaving) {
-                    e.currentTarget.style.borderColor = '#e5e7eb';
-                    e.currentTarget.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.07)';
-                  }
+                  opacity: isSaving ? 0.6 : 1
                 }}
               >
                 <div className="solucao-icon" style={{
@@ -7244,23 +7074,13 @@ function ConsultasPageContent() {
                     <line x1="12" y1="14" x2="12" y2="14.01"></line>
                   </svg>
                 </div>
-                <h3 style={{
-                  fontSize: '20px',
-                  fontWeight: '600',
-                  color: '#1f2937',
-                  marginBottom: '8px',
-                  margin: 0
-                }}>Alimentação</h3>
-                <p style={{
-                  fontSize: '14px',
-                  color: '#6b7280',
-                  margin: 0
-                }}>Plano Nutricional Personalizado</p>
+                <h3>Alimentação</h3>
+                <p>Plano Nutricional Personalizado</p>
               </div>
 
               {/* Suplementação */}
               <div
-                className="solucao-card"
+                className="solucao-card solucao-card-select solucao-card-suplementacao"
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -7272,31 +7092,8 @@ function ConsultasPageContent() {
                   e.preventDefault();
                 }}
                 style={{
-                  background: 'white',
-                  borderRadius: '12px',
-                  padding: '32px',
-                  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.07)',
-                  border: '2px solid #e5e7eb',
                   cursor: isSaving ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.2s ease',
-                  opacity: isSaving ? 0.6 : 1,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  textAlign: 'center',
-                  userSelect: 'none'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isSaving) {
-                    e.currentTarget.style.borderColor = '#8b5cf6';
-                    e.currentTarget.style.boxShadow = '0 8px 16px rgba(139, 92, 246, 0.15)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isSaving) {
-                    e.currentTarget.style.borderColor = '#e5e7eb';
-                    e.currentTarget.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.07)';
-                  }
+                  opacity: isSaving ? 0.6 : 1
                 }}
               >
                 <div className="solucao-icon" style={{
@@ -7315,23 +7112,13 @@ function ConsultasPageContent() {
                     <line x1="12" y1="14" x2="12" y2="14.01"></line>
                   </svg>
                 </div>
-                <h3 style={{
-                  fontSize: '20px',
-                  fontWeight: '600',
-                  color: '#1f2937',
-                  marginBottom: '8px',
-                  margin: 0
-                }}>Suplementação</h3>
-                <p style={{
-                  fontSize: '14px',
-                  color: '#6b7280',
-                  margin: 0
-                }}>Protocolo de Suplementos</p>
+                <h3>Suplementação</h3>
+                <p>Protocolo de Suplementos</p>
               </div>
 
               {/* Atividade Física */}
               <div
-                className="solucao-card"
+                className="solucao-card solucao-card-select solucao-card-atividade"
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -7343,31 +7130,8 @@ function ConsultasPageContent() {
                   e.preventDefault();
                 }}
                 style={{
-                  background: 'white',
-                  borderRadius: '12px',
-                  padding: '32px',
-                  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.07)',
-                  border: '2px solid #e5e7eb',
                   cursor: isSaving ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.2s ease',
-                  opacity: isSaving ? 0.6 : 1,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  textAlign: 'center',
-                  userSelect: 'none'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isSaving) {
-                    e.currentTarget.style.borderColor = '#f59e0b';
-                    e.currentTarget.style.boxShadow = '0 8px 16px rgba(245, 158, 11, 0.15)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isSaving) {
-                    e.currentTarget.style.borderColor = '#e5e7eb';
-                    e.currentTarget.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.07)';
-                  }
+                  opacity: isSaving ? 0.6 : 1
                 }}
               >
                 <div className="solucao-icon" style={{
@@ -7387,18 +7151,8 @@ function ConsultasPageContent() {
                     <path d="M8 16.5h8"></path>
                   </svg>
                 </div>
-                <h3 style={{
-                  fontSize: '20px',
-                  fontWeight: '600',
-                  color: '#1f2937',
-                  marginBottom: '8px',
-                  margin: 0
-                }}>Atividade Física</h3>
-                <p style={{
-                  fontSize: '14px',
-                  color: '#6b7280',
-                  margin: 0
-                }}>Programa de Exercícios</p>
+                <h3>Atividade Física</h3>
+                <p>Programa de Exercícios</p>
               </div>
             </div>
           </div>
@@ -8413,28 +8167,12 @@ function ConsultasPageContent() {
             <h1 className="consultas-title">Selecionar Solução</h1>
           </div>
 
-          <div style={{
-            padding: '40px 20px',
-            maxWidth: '1200px',
-            margin: '0 auto'
-          }}>
-            <div style={{
-              textAlign: 'center',
-              marginBottom: '40px'
-            }}>
-              <h2 style={{
-                fontSize: '28px',
-                fontWeight: '700',
-                color: '#1f2937',
-                marginBottom: '12px'
-              }}>
+          <div className="selecionar-solucao-content">
+            <div className="selecionar-solucao-header">
+              <h2 className="selecionar-solucao-title">
                 Escolha uma das soluções para continuar:
               </h2>
-              <p style={{
-                fontSize: '16px',
-                color: '#6b7280',
-                margin: 0
-              }}>
+              <p className="selecionar-solucao-subtitle">
                 Selecione a solução que deseja implementar para este paciente.
               </p>
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
@@ -8451,15 +8189,10 @@ function ConsultasPageContent() {
               </div>
             </div>
 
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-              gap: '24px',
-              marginTop: '40px'
-            }}>
+            <div className="selecionar-solucao-grid">
               {/* Livro da Vida */}
               <div
-                className="solucao-card"
+                className="solucao-card solucao-card-select solucao-card-mentalidade"
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -8471,31 +8204,8 @@ function ConsultasPageContent() {
                   e.preventDefault();
                 }}
                 style={{
-                  background: 'white',
-                  borderRadius: '12px',
-                  padding: '32px',
-                  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.07)',
-                  border: '2px solid #e5e7eb',
                   cursor: isSaving ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.2s ease',
-                  opacity: isSaving ? 0.6 : 1,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  textAlign: 'center',
-                  userSelect: 'none'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isSaving) {
-                    e.currentTarget.style.borderColor = '#3b82f6';
-                    e.currentTarget.style.boxShadow = '0 8px 16px rgba(59, 130, 246, 0.15)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isSaving) {
-                    e.currentTarget.style.borderColor = '#e5e7eb';
-                    e.currentTarget.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.07)';
-                  }
+                  opacity: isSaving ? 0.6 : 1
                 }}
               >
                 <div className="solucao-icon" style={{
@@ -8512,18 +8222,8 @@ function ConsultasPageContent() {
                     <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"></path>
                   </svg>
                 </div>
-                <h3 style={{
-                  fontSize: '20px',
-                  fontWeight: '600',
-                  color: '#1f2937',
-                  marginBottom: '8px',
-                  margin: 0
-                }}>Livro da Vida</h3>
-                <p style={{
-                  fontSize: '14px',
-                  color: '#6b7280',
-                  margin: 0
-                }}>Transformação Mental e Emocional</p>
+                <h3>Livro da Vida</h3>
+                <p>Transformação Mental e Emocional</p>
               </div>
 
               {/* Alimentação */}
