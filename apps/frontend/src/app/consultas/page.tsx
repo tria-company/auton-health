@@ -6069,6 +6069,8 @@ function ConsultasPageContent() {
     // Limpar state
     setConsultaDetails(null);
     setSelectedSection(null);
+    // Navegar de volta para a lista sem parâmetros
+    router.push('/consultas');
   };
 
   // Função para editar consulta
