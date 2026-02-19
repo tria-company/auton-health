@@ -1438,23 +1438,27 @@ export function ConsultationRoom({
 
           // ✅ CORREÇÃO: Buscar ID da consulta pelo Slug (roomId) se não estiver definido
           if (roomId && !currentConsultationId) {
-            console.log('🔍 Buscando ID da consulta pelo Slug:', roomId);
+            console.log('🔍 Buscando ID da consulta pelo Slug na tabela call_sessions:', roomId);
             try {
-              // 1. Tentar matching exato com coluna room_id
-              console.log(`🔍 [DEBUG] Tentando room_id = '${roomId}'`);
-              const { data: consultData, error: consultError } = await supabase
-                .from('consultations')
-                .select('id')
+              // 1. Buscar na tabela call_sessions usando o slug (room_id)
+              const { data: sessionData, error: sessionError } = await supabase
+                .from('call_sessions')
+                .select('consultation_id')
                 .eq('room_id', roomId)
                 .maybeSingle();
 
-              if (consultData?.id) {
-                console.log('✅ ID da consulta recuperado pelo room_id:', consultData.id);
-                setCurrentConsultationId(consultData.id);
-              } else {
-                console.warn('⚠️ [DEBUG] ID não encontrado por room_id. Tentando videocall_url...');
+              if (sessionError) {
+                console.error('❌ Erro ao buscar sessão:', sessionError);
+              }
 
-                // 2. Fallback: Tentar videocall_url, video_url ou meeting_url
+              if (sessionData?.consultation_id) {
+                console.log('✅ ID da consulta recuperado via call_sessions:', sessionData.consultation_id);
+                setCurrentConsultationId(sessionData.consultation_id);
+              } else {
+                console.warn('⚠️ [DEBUG] Sessão não encontrada ou sem consultation_id para o room_id:', roomId);
+
+                // Manter fallback por videocall_url caso a migration não tenha rodado ou seja legado
+                console.log('🔍 Tentando fallback por videocall_url...');
                 const { data: urlData, error: urlError } = await supabase
                   .from('consultations')
                   .select('id')
@@ -1463,19 +1467,16 @@ export function ConsultationRoom({
                   .maybeSingle();
 
                 if (urlData?.id) {
-                  console.log('✅ ID recuperado via URL da sala (fallback multi-coluna):', urlData.id);
+                  console.log('✅ ID recuperado via URL da sala (fallback):', urlData.id);
                   setCurrentConsultationId(urlData.id);
                 } else {
-                  console.error('❌ Não foi possível encontrar ID da consulta. Verifique se o slug está correto ou se a coluna é diferente.');
-                  console.log('Dados do erro (se houver):', { consultError, urlError });
+                  console.error('❌ Não foi possível encontrar ID da consulta.');
                 }
               }
             } catch (err) {
-              console.error('❌ Erro ao buscar ID da consulta por slug:', err);
+              console.error('❌ Erro ao buscar ID da consulta:', err);
             }
           }
-
-
 
 
 

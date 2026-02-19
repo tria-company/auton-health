@@ -11,6 +11,17 @@ import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 
 /**
+ * Configuração de filtros de redução de ruído
+ */
+interface NoiseReductionConfig {
+    enabled: boolean;
+    highpassFreq: number;  // Hz - Remove ruído de baixa frequência (default: 200)
+    lowpassFreq: number;   // Hz - Remove ruído de alta frequência (default: 3400)
+    noiseFactor: number;   // 0-30 - Fator de redução de ruído adaptativo (default: 5)
+    volumeBoost: number;   // Multiplicador de volume após filtragem (default: 1.5)
+}
+
+/**
  * Serviço de integração com Azure OpenAI Whisper API
  * Para transcrição de áudio em consultas presenciais
  */
@@ -22,6 +33,15 @@ class WhisperService {
 
     // Cache de transcrições (opcional - evitar reprocessamento)
     private transcriptionCache = new Map<string, string>();
+
+    // 🎚️ Configuração de filtros de redução de ruído
+    private noiseReductionConfig: NoiseReductionConfig = {
+        enabled: true,
+        highpassFreq: 200,   // Remove ruído abaixo de 200Hz (hum, ventiladores)
+        lowpassFreq: 3400,   // Remove ruído acima de 3.4kHz (ruído branco, chiado)
+        noiseFactor: 5,      // Nível moderado de redução (ajustar conforme feedback)
+        volumeBoost: 1.5     // Amplifica áudio limpo após filtragem
+    };
 
     constructor() {
         this.azureEndpoint = aiConfig.azure.endpoint;
@@ -83,6 +103,64 @@ class WhisperService {
     }
 
     /**
+     * 🎚️ Aplica filtros de redução de ruído usando FFmpeg
+     * Remove ruídos de baixa e alta frequência, aplica redução adaptativa de ruído
+     * e normaliza o volume do áudio antes de enviar para transcrição.
+     * 
+     * @param inputPath - Caminho do arquivo de áudio original
+     * @param outputPath - Caminho para salvar o áudio filtrado
+     * @returns Promise que resolve quando a filtragem estiver completa
+     */
+    private async applyNoiseReduction(inputPath: string, outputPath: string): Promise<void> {
+        if (!this.noiseReductionConfig.enabled) {
+            // Se filtros desabilitados, apenas copiar arquivo
+            fs.copyFileSync(inputPath, outputPath);
+            return;
+        }
+
+        return new Promise((resolve, reject) => {
+            const filters: string[] = [];
+
+            // 1. High-pass filter: Remove ruído de baixa frequência (ventiladores, hum)
+            filters.push(`highpass=f=${this.noiseReductionConfig.highpassFreq}`);
+
+            // 2. Low-pass filter: Remove ruído de alta frequência (chiado, ruído branco)
+            filters.push(`lowpass=f=${this.noiseReductionConfig.lowpassFreq}`);
+
+            // 3. Adaptive noise reduction: Reduz ruído de fundo dinamicamente
+            filters.push(`anlmdn=s=${this.noiseReductionConfig.noiseFactor}:p=0.002`);
+
+            // 4. Volume boost: Amplifica áudio limpo após filtragem
+            filters.push(`volume=${this.noiseReductionConfig.volumeBoost}`);
+
+            console.log(`🎚️ [WHISPER] Aplicando filtros de ruído: ${filters.join(', ')}`);
+
+            ffmpeg(inputPath)
+                .audioFilters(filters)
+                .toFormat('wav')
+                .audioCodec('pcm_s16le')
+                .audioChannels(1)
+                .audioFrequency(16000)
+                .on('end', () => {
+                    console.log(`✅ [WHISPER] Filtros de ruído aplicados com sucesso`);
+                    resolve();
+                })
+                .on('error', (err) => {
+                    console.error(`❌ [WHISPER] Erro ao aplicar filtros de ruído:`, err);
+                    // Em caso de erro, copiar arquivo original (fallback)
+                    try {
+                        fs.copyFileSync(inputPath, outputPath);
+                        console.warn(`⚠️ [WHISPER] Usando áudio original sem filtros (fallback)`);
+                        resolve();
+                    } catch (copyErr) {
+                        reject(copyErr);
+                    }
+                })
+                .save(outputPath);
+        });
+    }
+
+    /**
      * Transcreve chunk de áudio usando Azure OpenAI Whisper API
      * 
      * @param audioBuffer - Buffer do áudio (webm, mp3, wav, etc)
@@ -115,6 +193,7 @@ class WhisperService {
                 };
             }
 
+
             console.log(`🎤 [WHISPER] Transcrevendo áudio ${speaker} (${audioBuffer.length} bytes) via Azure...`);
 
             // Detectar formato do áudio baseado nos magic bytes
@@ -124,10 +203,25 @@ class WhisperService {
             // Criar arquivo temporário com extensão correta
             const tempDir = os.tmpdir();
             tempFilePath = path.join(tempDir, `whisper_${speaker}_${Date.now()}.${audioFormat}`);
+            const cleanedFilePath = path.join(tempDir, `whisper_${speaker}_${Date.now()}_cleaned.wav`);
 
             // Escrever buffer no arquivo temporário
             fs.writeFileSync(tempFilePath, audioBuffer);
             console.log(`💾 [WHISPER] Arquivo ${audioFormat} criado: ${tempFilePath} (${audioBuffer.length} bytes)`);
+
+            // 🎚️ NOVO: Aplicar filtros de redução de ruído antes de transcrever
+            let audioFileToTranscribe = tempFilePath;
+            if (this.noiseReductionConfig.enabled) {
+                try {
+                    await this.applyNoiseReduction(tempFilePath, cleanedFilePath);
+                    audioFileToTranscribe = cleanedFilePath;
+                    console.log(`🎚️ [WHISPER] Usando áudio com filtros de ruído aplicados`);
+                } catch (filterError) {
+                    console.warn(`⚠️ [WHISPER] Falha ao aplicar filtros, usando áudio original:`, filterError);
+                    // Fallback: usar áudio original se filtragem falhar
+                    audioFileToTranscribe = tempFilePath;
+                }
+            }
 
             // Azure Whisper API - chamada HTTP direta
             const azureUrl = `${this.azureEndpoint}/openai/deployments/${this.azureDeployment}/audio/transcriptions?api-version=${this.azureApiVersion}`;
@@ -137,9 +231,9 @@ class WhisperService {
             const nodeFetch = (await import('node-fetch')).default;
 
             const formData = new FormData();
-            formData.append('file', fs.createReadStream(tempFilePath), {
-                filename: `audio.${audioFormat}`,
-                contentType: `audio/${audioFormat}`
+            formData.append('file', fs.createReadStream(audioFileToTranscribe), {
+                filename: 'audio.wav',
+                contentType: 'audio/wav'
             });
             formData.append('language', language);
             formData.append('response_format', 'json');
@@ -297,13 +391,24 @@ class WhisperService {
 
             throw error;
         } finally {
-            // Limpar arquivo temporário
+            // Limpar arquivo temporário original
             if (tempFilePath && fs.existsSync(tempFilePath)) {
                 try {
                     fs.unlinkSync(tempFilePath);
-                    console.log(`🗑️ [WHISPER] Arquivo temporário removido`);
+                    console.log(`🗑️ [WHISPER] Arquivo temporário original removido`);
                 } catch (cleanupError) {
-                    console.warn(`⚠️ [WHISPER] Erro ao remover arquivo temporário:`, cleanupError);
+                    console.warn(`⚠️ [WHISPER] Erro ao remover arquivo temporário original:`, cleanupError);
+                }
+            }
+
+            // Limpar arquivo temporário filtrado 
+            const cleanedFilePath = tempFilePath ? tempFilePath.replace(/\.\w+$/, '_cleaned.wav') : null;
+            if (cleanedFilePath && fs.existsSync(cleanedFilePath)) {
+                try {
+                    fs.unlinkSync(cleanedFilePath);
+                    console.log(`🗑️ [WHISPER] Arquivo temporário filtrado removido`);
+                } catch (cleanupError) {
+                    console.warn(`⚠️ [WHISPER] Erro ao remover arquivo temporário filtrado:`, cleanupError);
                 }
             }
         }
