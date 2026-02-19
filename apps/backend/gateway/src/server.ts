@@ -135,7 +135,6 @@ app.use(generalRateLimiter);
 // Vamos colocar o proxy /api aqui para redirecionar para microserviços
 
 app.use('/api', proxyRoutes);
-app.use('/webhooks', webhookRoutes);
 
 // ===== LOCAL ROUTES =====
 
@@ -151,6 +150,7 @@ app.use('/api/audit', auditRoutes);
 app.use('/api/clinic', clinicRoutes);
 app.use('/api', twilioRoutes);
 app.use('/whatsapp', whatsappRoutes);
+app.use('/webhooks', webhookRoutes);
 
 // Rotas migradas do Frontend (Monolito legado que ainda vive no Gateway por enquanto)
 // Handler específico para OPTIONS /dashboard antes de registrar as rotas
