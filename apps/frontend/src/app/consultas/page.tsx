@@ -1722,7 +1722,12 @@ function DiagnosticoSection({
           origem: 'MANUAL',
           fieldPath,
           texto: newValue,
-          consultaId
+          consultaId,
+          paciente_id: consultaDetails?.patient_id || null,
+          user_id: user?.id || null,
+          msg_edicao: null, // Edição manual não tem prompt de IA
+          table: fieldPath.split('.')[0] || 'd_diagnostico_principal',
+          query: null
         });
       } catch (webhookError) {
         console.warn('Aviso: Webhook não pôde ser notificado, mas dados foram salvos:', webhookError);
@@ -3773,7 +3778,12 @@ function AlimentacaoSection({
             fieldPath,
             texto: newValue,
             consultaId,
-            solucao_etapa: 'ALIMENTACAO'
+            solucao_etapa: 'ALIMENTACAO',
+            paciente_id: consultaDetails?.patient_id || null,
+            user_id: user?.id || null,
+            msg_edicao: null,
+            table: 's_gramaturas_alimentares',
+            query: null
           }),
         });
       } catch (webhookError) {
@@ -5886,7 +5896,12 @@ function ConsultasPageContent() {
             fieldPath: 's_exercicios_fisicos',
             texto: 'Múltiplas alterações salvas',
             consultaId,
-            solucao_etapa: 'ATIVIDADE_FISICA'
+            solucao_etapa: 'ATIVIDADE_FISICA',
+            paciente_id: consultaDetails?.patient_id || null,
+            user_id: user?.id || null,
+            msg_edicao: null,
+            table: 's_exercicios_fisicos',
+            query: null
           }
         });
       } catch (webhookError) {
