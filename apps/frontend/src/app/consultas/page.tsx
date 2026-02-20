@@ -5131,21 +5131,18 @@ function ConsultasPageContent() {
 
     try {
       // Determinar qual endpoint usar baseado no fieldPath
-      const isDiagnostico = selectedField.fieldPath.startsWith('diagnostico_principal') ||
-        selectedField.fieldPath.startsWith('estado_geral') ||
-        selectedField.fieldPath.startsWith('estado_mental') ||
-        selectedField.fieldPath.startsWith('estado_fisiologico') ||
-        selectedField.fieldPath.startsWith('integracao_diagnostica') ||
-        selectedField.fieldPath.startsWith('habitos_vida');
+      const isDiagnostico = selectedField.fieldPath.startsWith('d_') ||
+        selectedField.fieldPath.startsWith('diagnostico_principal');
 
       // ✅ FIX: Verificar TODAS as etapas de solução para usar o webhook correto
-      const isSolucaoMentalidade = selectedField.fieldPath.startsWith('mentalidade_data') ||
-        selectedField.fieldPath.startsWith('livro_vida');
-      const isSolucaoSuplemementacao = selectedField.fieldPath.startsWith('suplementacao_data') ||
+      const isSolucaoMentalidade = selectedField.fieldPath.startsWith('s_agente_mentalidade') ||
+        selectedField.fieldPath.startsWith('mentalidade_data');
+      const isSolucaoSuplemementacao = selectedField.fieldPath.startsWith('s_agente_suplementacao') ||
         selectedField.fieldPath.startsWith('suplementacao');
-      const isSolucaoAlimentacao = selectedField.fieldPath.startsWith('alimentacao_data') ||
+      const isSolucaoAlimentacao = selectedField.fieldPath.startsWith('s_agente_alimentacao') ||
         selectedField.fieldPath.startsWith('alimentacao');
-      const isSolucaoAtividadeFisica = selectedField.fieldPath.startsWith('atividade_fisica') ||
+      const isSolucaoAtividadeFisica = selectedField.fieldPath.startsWith('s_exercicios_fisicos') ||
+        selectedField.fieldPath.startsWith('atividade_fisica') ||
         selectedField.fieldPath.startsWith('exercicio');
 
       // Qualquer campo de solução usa o webhook de edição de solução
@@ -5170,6 +5167,11 @@ function ConsultasPageContent() {
         fieldPath: selectedField.fieldPath,
         texto: messageText,
         consultaId: effectiveConsultaId,
+        paciente_id: consultaDetails?.patient_id || null,
+        user_id: user?.id || null,
+        msg_edicao: messageText,
+        table: selectedField.fieldPath.split('.')[0],
+        query: null
       };
 
       // Adicionar solucao_etapa se for etapa de solução e corrigir fieldPath com nome da tabela
@@ -5280,21 +5282,20 @@ function ConsultasPageContent() {
       setTimeout(async () => {
         try {
           // Se for um campo de diagnóstico, recarregar dados de diagnóstico
-          const isDiagnostico = selectedField.fieldPath.startsWith('diagnostico_principal') ||
-            selectedField.fieldPath.startsWith('estado_geral') ||
-            selectedField.fieldPath.startsWith('estado_mental') ||
-            selectedField.fieldPath.startsWith('estado_fisiologico') ||
-            selectedField.fieldPath.startsWith('integracao_diagnostica') ||
-            selectedField.fieldPath.startsWith('habitos_vida');
+          const isDiagnostico = selectedField.fieldPath.startsWith('d_') ||
+            selectedField.fieldPath.startsWith('diagnostico_principal');
 
-          // Verificação para Soluções (usando as mesmas variáveis definidas acima)
-          const isSolucaoMentalidade = selectedField.fieldPath.startsWith('mentalidade_data') ||
-            selectedField.fieldPath.startsWith('s_agente_mentalidade_2') ||
+          // Verificação para Soluções
+          const isSolucaoMentalidade = selectedField.fieldPath.startsWith('s_agente_mentalidade') ||
+            selectedField.fieldPath.startsWith('mentalidade_data') ||
             selectedField.fieldPath.startsWith('livro_vida');
 
           const isSolucao = isSolucaoMentalidade ||
+            selectedField.fieldPath.startsWith('s_agente_suplementacao') ||
             selectedField.fieldPath.startsWith('suplementacao') ||
+            selectedField.fieldPath.startsWith('s_agente_alimentacao') ||
             selectedField.fieldPath.startsWith('alimentacao') ||
+            selectedField.fieldPath.startsWith('s_exercicios_fisicos') ||
             selectedField.fieldPath.startsWith('atividade_fisica') ||
             selectedField.fieldPath.startsWith('exercicio');
 
