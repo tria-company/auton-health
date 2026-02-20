@@ -18,7 +18,7 @@ router.post('/edicao-livro-da-vida', async (req, res) => {
             pacienteId
         };
 
-        const webhookUrl = `${WEBHOOK_BASE_URL}/webhook/usi-solucao-livro-vida-v2`;
+        const webhookUrl = `${WEBHOOK_BASE_URL}/webhook/usi-solucao-v2`;
 
         console.log(`🔄 [WEBHOOK PROXY] Forwarding to: ${webhookUrl}`);
 
