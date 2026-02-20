@@ -18,6 +18,7 @@ import { gatewayClient } from '@/lib/gatewayClient';
 import { supabase } from '@/lib/supabase';
 import { downloadSolutionsDocxPremium } from '@/lib/solutionsToDocx';
 import { fetchSolutionsFromGateway } from '@/lib/fetchSolutions';
+import { useAuth } from '@/hooks/useAuth';
 import './consultas.css';
 import '../../components/solutions/solutions.css';
 
@@ -612,11 +613,11 @@ function AnamneseSection({
       // Obter dados da resposta da API
       console.log('📦 Dados retornados pela API:', result);
 
-      // 2. Fazer requisição para o webhook
+      // 2. Fazer requisição para o webhook (não bloqueante)
       const webhookEndpoints = getWebhookEndpoints();
       const webhookHeaders = getWebhookHeaders();
 
-      const webhookResponse = await fetch(webhookEndpoints.edicaoAnamnese, {
+      fetch(webhookEndpoints.edicaoAnamnese, {
         method: 'POST',
         headers: webhookHeaders,
         body: JSON.stringify({
@@ -625,15 +626,14 @@ function AnamneseSection({
           consultaId,
           origem: 'manual',
         }),
+      }).catch(err => {
+        console.warn('Webhook falhou, mas campo foi salvo no Gateway', err);
       });
 
-      if (!webhookResponse.ok) {
-        console.warn('Webhook falhou, mas campo foi salvo no Gateway');
-      }
-
       // 3. Atualizar o estado local usando os dados da API
-      if (result.success && result.data) {
-        console.log('🔄 Atualizando interface com dados da API:', result.data);
+      const responseData = result.anamnese || result.data || result.diagnostico || result.solucao;
+      if (result.success && responseData) {
+        console.log('🔄 Atualizando interface com dados da API:', responseData);
 
         // Determinar qual seção da anamnese atualizar baseado no fieldPath
         const pathParts = fieldPath.split('.');
@@ -658,7 +658,7 @@ function AnamneseSection({
           // Atualizar a seção específica com os dados completos da API
           setAnamneseData(prev => ({
             ...prev!,
-            [stateKey]: result.data
+            [stateKey]: responseData
           }));
           console.log('✅ Interface atualizada com dados da API');
         } else if (tableName === 'a_sintese_analitica') {
@@ -1642,7 +1642,8 @@ function DiagnosticoSection({
   onFieldSelect,
   onSendMessage,
   onChatInputChange,
-  activeTab
+  activeTab,
+  consultaDetails
 }: {
   consultaId: string;
   selectedField: { fieldPath: string; label: string } | null;
@@ -1653,7 +1654,9 @@ function DiagnosticoSection({
   onSendMessage: () => void;
   onChatInputChange: (value: string) => void;
   activeTab?: string;
+  consultaDetails?: any;
 }) {
+  const { user } = useAuth();
   const [diagnosticoData, setDiagnosticoData] = useState<any>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -1717,7 +1720,7 @@ function DiagnosticoSection({
       try {
         const webhookEndpoints = getWebhookEndpoints();
 
-        await gatewayClient.post('/ai/edit', {
+        gatewayClient.post('/ai/edit', {
           webhookUrl: webhookEndpoints.edicaoDiagnostico,
           origem: 'MANUAL',
           fieldPath,
@@ -1728,9 +1731,11 @@ function DiagnosticoSection({
           msg_edicao: null, // Edição manual não tem prompt de IA
           table: fieldPath.split('.')[0] || 'd_diagnostico_principal',
           query: null
+        }).catch(webhookError => {
+          console.warn('Aviso: Webhook não pôde ser notificado, mas dados foram salvos:', webhookError);
         });
       } catch (webhookError) {
-        console.warn('Aviso: Webhook não pôde ser notificado, mas dados foram salvos:', webhookError);
+        console.warn('Aviso: Erro ao preparar webhook:', webhookError);
       }
 
       // Recarregar dados após salvar
@@ -3765,12 +3770,12 @@ function AlimentacaoSection({
 
       if (!response.success) throw new Error(response.error || 'Erro ao atualizar campo no Supabase');
 
-      // Depois, notificar o webhook
+      // Depois, notificar o webhook (não bloqueante)
       try {
         const webhookEndpoints = getWebhookEndpoints();
         const webhookHeaders = getWebhookHeaders();
 
-        await fetch(webhookEndpoints.edicaoSolucao, {
+        fetch(webhookEndpoints.edicaoSolucao, {
           method: 'POST',
           headers: webhookHeaders,
           body: JSON.stringify({
@@ -3779,15 +3784,17 @@ function AlimentacaoSection({
             texto: newValue,
             consultaId,
             solucao_etapa: 'ALIMENTACAO',
-            paciente_id: consultaDetails?.patient_id || null,
-            user_id: user?.id || null,
+            paciente_id: null,
+            user_id: null,
             msg_edicao: null,
             table: 's_gramaturas_alimentares',
             query: null
           }),
+        }).catch(webhookError => {
+          console.warn('Aviso: Webhook não pôde ser notificado, mas dados foram salvos:', webhookError);
         });
       } catch (webhookError) {
-        console.warn('Aviso: Webhook não pôde ser notificado, mas dados foram salvos:', webhookError);
+        console.warn('Aviso: Erro ao preparar webhook:', webhookError);
       }
 
       // Recarregar dados após salvar
@@ -4699,6 +4706,7 @@ function ConsultasPageContent() {
   const consultaId = searchParams.get('consulta_id');
   const sectionParam = searchParams.get('section');
   const { showError, showSuccess, showWarning } = useNotifications();
+  const { user } = useAuth();
 
   const [consultations, setConsultations] = useState<Consultation[]>([]);
   const [loading, setLoading] = useState(false);
@@ -8783,6 +8791,7 @@ function ConsultasPageContent() {
                       onSendMessage={handleSendAIMessage}
                       onChatInputChange={setChatInput}
                       activeTab={activeDiagnosticoTab}
+                      consultaDetails={consultaDetails}
                     />
                   </div>
                 </div>
