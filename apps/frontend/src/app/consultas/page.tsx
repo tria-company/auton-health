@@ -5131,8 +5131,10 @@ function ConsultasPageContent() {
 
     try {
       // Determinar qual endpoint usar baseado no fieldPath
+      console.log('🔍 [DEBUG] handleSendAIMessage try block started');
       const isDiagnostico = selectedField.fieldPath.startsWith('d_') ||
         selectedField.fieldPath.startsWith('diagnostico_principal');
+      console.log('🔍 [DEBUG] isDiagnostico:', isDiagnostico);
 
       // ✅ FIX: Verificar TODAS as etapas de solução para usar o webhook correto
       const isSolucaoMentalidade = selectedField.fieldPath.startsWith('s_agente_mentalidade') ||
@@ -5145,11 +5147,12 @@ function ConsultasPageContent() {
         selectedField.fieldPath.startsWith('atividade_fisica') ||
         selectedField.fieldPath.startsWith('exercicio');
 
-      // Qualquer campo de solução usa o webhook de edição de solução
       const isSolucao = isSolucaoMentalidade || isSolucaoSuplemementacao ||
         isSolucaoAlimentacao || isSolucaoAtividadeFisica;
+      console.log('🔍 [DEBUG] isSolucao:', isSolucao);
 
       const webhookEndpoints = getWebhookEndpoints();
+      console.log('🔍 [DEBUG] webhookEndpoints loaded');
       const webhookHeaders = getWebhookHeaders();
 
       // Cada tipo de edição vai para seu webhook específico:
@@ -5162,16 +5165,17 @@ function ConsultasPageContent() {
           ? webhookEndpoints.edicaoDiagnostico
           : webhookEndpoints.edicaoAnamnese; // Inclui tela de Análise (a_sintese_analitica.*)
 
-      const requestBody: any = {
+      const requestBody: Pick<Consultation, never> & Record<string, any> = {
         origem: 'IA',
         fieldPath: selectedField.fieldPath,
         texto: messageText,
-        consultaId: effectiveConsultaId,
+        consultaId: effectiveConsultaId, // Mantido para compatibilidade
+        consulta_id: effectiveConsultaId, // Formato esperado pelo webhook
         paciente_id: consultaDetails?.patient_id || null,
         user_id: user?.id || null,
-        msg_edicao: messageText,
-        table: selectedField.fieldPath.split('.')[0],
-        query: null
+        msg_edicao: messageText, // O webhook mapeia isso como null se não for compatível, mas enviamos como string
+        table: selectedField.fieldPath.split('.')[0] || null,
+        query: ''
       };
 
       // Adicionar solucao_etapa se for etapa de solução e corrigir fieldPath com nome da tabela
@@ -5189,6 +5193,8 @@ function ConsultasPageContent() {
 
       console.log('✅ [FIXED] Enviando para webhook:', requestBody);
       console.log('🔗 [FIXED] URL:', webhookUrl);
+      console.log('👤 [DEBUG] User:', user);
+      console.log('🏥 [DEBUG] ConsultaDetails:', consultaDetails);
 
       // Faz requisição para nossa API interna (que chama o webhook)
       console.log('📤 Fazendo requisição para /ai/edit...');
