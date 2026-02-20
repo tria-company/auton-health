@@ -98,7 +98,7 @@ export async function updateAnamneseField(req: AuthenticatedRequest, res: Respon
     }
 
     const { consultaId } = req.params;
-    const updateData = req.body;
+    const { fieldPath, value } = req.body;
 
     // Lista de tabelas válidas de anamnese
     const validTables = [
@@ -114,20 +114,42 @@ export async function updateAnamneseField(req: AuthenticatedRequest, res: Respon
       'a_reino_miasma'
     ];
 
-    // Parsear o body para extrair tabela e campo
-    // Formato esperado: { "tabela.campo": "valor" }
-    const keys = Object.keys(updateData);
-    if (keys.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'Nenhum campo para atualizar'
-      });
-    }
+    let tableName: string;
+    let fieldName: string;
+    let fieldValue: any;
 
-    const firstKey = keys[0];
-    const [tableName, ...fieldParts] = firstKey.split('.');
-    const fieldName = fieldParts.join('.');
-    const fieldValue = updateData[firstKey];
+    if (fieldPath) {
+      const parts = fieldPath.split('.');
+      if (parts.length >= 2) {
+        tableName = parts[0];
+        fieldName = parts.slice(1).join('.');
+        fieldValue = value !== undefined ? value : req.body[fieldPath];
+      } else {
+        return res.status(400).json({ success: false, error: 'Formato de fieldPath inválido' });
+      }
+    } else {
+      // Parsear o body para extrair tabela e campo (formato legado)
+      // Formato esperado: { "tabela.campo": "valor" }
+      const updateData = req.body;
+      const keys = Object.keys(updateData);
+      if (keys.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'Nenhum campo para atualizar'
+        });
+      }
+
+      const firstKey = keys[0];
+      const keyParts = firstKey.split('.');
+
+      if (keyParts.length >= 2) {
+        tableName = keyParts[0];
+        fieldName = keyParts.slice(1).join('.');
+        fieldValue = updateData[firstKey];
+      } else {
+        return res.status(400).json({ success: false, error: 'Formato de chave inválido' });
+      }
+    }
 
     console.log('[updateAnamneseField] Tabela:', tableName);
     console.log('[updateAnamneseField] Campo:', fieldName);

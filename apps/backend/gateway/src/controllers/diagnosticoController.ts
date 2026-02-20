@@ -81,25 +81,78 @@ export async function updateDiagnosticoField(req: AuthenticatedRequest, res: Res
     }
 
     const { consultaId } = req.params;
-    const updateData = req.body;
+    const { fieldPath, value } = req.body;
+
+    if (!fieldPath) {
+      return res.status(400).json({
+        success: false,
+        error: 'fieldPath é obrigatório'
+      });
+    }
+
+    const parts = fieldPath.split('.');
+
+    // Suportar tanto o formato legado (direto do req.body) quanto o novo ({ fieldPath, value })
+    let tableName: string;
+    let fieldName: string;
+    let fieldValue: any;
+
+    if (parts.length >= 2) {
+      tableName = parts[0];
+      fieldName = parts.slice(1).join('.');
+      fieldValue = value !== undefined ? value : req.body[fieldPath];
+    } else {
+      // Formato legado onde o body é { "tabela.campo": "valor" } ou não possui schema
+      const keys = Object.keys(req.body);
+      if (keys.length === 0) {
+        return res.status(400).json({ success: false, error: 'Nenhum campo para atualizar' });
+      }
+
+      const firstKey = keys.find(k => k !== 'fieldPath' && k !== 'value') || keys[0];
+      const keyParts = firstKey.split('.');
+
+      if (keyParts.length >= 2) {
+        tableName = keyParts[0];
+        fieldName = keyParts.slice(1).join('.');
+        fieldValue = req.body[firstKey];
+      } else {
+        return res.status(400).json({ success: false, error: 'Formato de fieldPath inválido' });
+      }
+    }
+
+    // Lista de tabelas válidas de diagnóstico
+    const validTables = [
+      'd_diagnostico_principal',
+      'd_estado_geral',
+      'd_estado_fisiologico',
+      'd_estado_mental',
+      'd_agente_integracao_diagnostica',
+      'd_agente_habitos_vida_sistemica'
+    ];
+
+    if (!validTables.includes(tableName)) {
+      return res.status(400).json({
+        success: false,
+        error: `Tabela inválida: ${tableName}`
+      });
+    }
 
     // Verificar se já existe registro
     const { data: existing } = await supabase
-      .from('a_diagnostico')
-      .select('id')
-      .eq('consultation_id', consultaId)
+      .from(tableName)
+      .select('consulta_id')
+      .eq('consulta_id', consultaId)
       .maybeSingle();
 
     let result;
     if (existing) {
       // Atualizar
       const { data, error } = await supabase
-        .from('a_diagnostico')
+        .from(tableName)
         .update({
-          ...updateData,
-          updated_at: new Date().toISOString()
+          [fieldName]: fieldValue
         })
-        .eq('consultation_id', consultaId)
+        .eq('consulta_id', consultaId)
         .select()
         .single();
 
@@ -108,10 +161,10 @@ export async function updateDiagnosticoField(req: AuthenticatedRequest, res: Res
     } else {
       // Criar
       const { data, error } = await supabase
-        .from('a_diagnostico')
+        .from(tableName)
         .insert({
-          consultation_id: consultaId,
-          ...updateData
+          consulta_id: consultaId,
+          [fieldName]: fieldValue
         })
         .select()
         .single();
