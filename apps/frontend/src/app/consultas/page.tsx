@@ -5175,7 +5175,7 @@ function ConsultasPageContent() {
         user_id: user?.id || null,
         msg_edicao: messageText, // O webhook mapeia isso como null se não for compatível, mas enviamos como string
         table: selectedField.fieldPath.split('.')[0] || null,
-        query: ''
+        query: null
       };
 
       // Adicionar solucao_etapa se for etapa de solução e corrigir fieldPath com nome da tabela
