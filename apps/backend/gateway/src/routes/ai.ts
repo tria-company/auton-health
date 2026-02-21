@@ -51,9 +51,10 @@ router.post('/edit', async (req, res) => {
         }
 
         if (!response.ok) {
+            console.error('❌ [AI] Webhook falhou com status:', response.status, 'Body:', responseText);
             return res.status(response.status).json({
                 success: false,
-                error: `Webhook error: ${response.status}`,
+                error: `Webhook error ${response.status}: ${typeof data === 'string' ? data : JSON.stringify(data)}`,
                 details: data
             });
         }
