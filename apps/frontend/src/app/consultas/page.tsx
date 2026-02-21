@@ -1726,7 +1726,7 @@ function DiagnosticoSection({
           fieldPath,
           texto: newValue,
           consultaId,
-          paciente_id: consultaDetails?.patient_id || null,
+          paciente_id: consultaDetails?.patient_id || (consultaDetails as any)?.paciente_id || null,
           user_id: user?.id || null,
           msg_edicao: null, // Edição manual não tem prompt de IA
           table: fieldPath.split('.')[0] || 'd_diagnostico_principal',
@@ -5171,7 +5171,7 @@ function ConsultasPageContent() {
         texto: messageText,
         consultaId: effectiveConsultaId, // Mantido para compatibilidade
         consulta_id: effectiveConsultaId, // Formato esperado pelo webhook
-        paciente_id: consultaDetails?.patient_id || null,
+        paciente_id: consultaDetails?.patient_id || (consultaDetails as any)?.paciente_id || null,
         user_id: user?.id || null,
         msg_edicao: messageText, // O webhook mapeia isso como null se não for compatível, mas enviamos como string
         table: selectedField.fieldPath.split('.')[0] || null,
