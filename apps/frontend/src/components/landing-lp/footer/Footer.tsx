@@ -24,7 +24,7 @@ export default function Footer() {
             transition={{ duration: 0.6 }}
           >
             <h2 className="text-white text-[24px] lg:text-[28px] font-bold mb-2">
-              Authon Health
+              Auton Health Ltda
             </h2>
             <p className="text-white/75 text-[14px] lg:text-[15px] max-w-[400px] leading-relaxed">
               Tecnologia de ponta para medicina integrativa de elite
@@ -74,7 +74,7 @@ export default function Footer() {
 
             {/* Phone */}
             <a 
-              href="https://wa.me/5511999999999"
+              href="https://wa.me/5521971760439"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-2.5 text-white/80 hover:text-white transition-all duration-200 group"
@@ -95,13 +95,13 @@ export default function Footer() {
                 />
               </svg>
               <span className="text-[14px] group-hover:underline">
-                (11) 99999-9999
+                (21) 97176-0439
               </span>
             </a>
           </motion.div>
         </div>
 
-        {/* Copyright */}
+        {/* Copyright e CNPJ */}
         <motion.div 
           className="border-t border-white/10 pt-6 lg:pt-8 text-center"
           initial={{ opacity: 0 }}
@@ -110,7 +110,10 @@ export default function Footer() {
           transition={{ duration: 0.6, delay: 0.4 }}
         >
           <p className="text-white/60 text-[13px] lg:text-[14px]">
-            © 2028 Authon Health. Todos os direitos reservados.
+            © 2028 Auton Health Ltda. Todos os direitos reservados.
+          </p>
+          <p className="text-white/50 text-[12px] lg:text-[13px] mt-2">
+            Empresa regularmente inscrita. CNPJ: 64.493.228/0001-43
           </p>
         </motion.div>
       </div>

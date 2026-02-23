@@ -114,12 +114,12 @@ export default function CTASection() {
             </a>
             <span className="hidden sm:inline">|</span>
             <a 
-              href="https://wa.me/5511999999999" 
+              href="https://wa.me/5521971760439" 
               className="hover:text-[#1a365d] transition-colors"
               target="_blank"
               rel="noopener noreferrer"
             >
-              WhatsApp: (11) 99999-9999
+              WhatsApp: (21) 97176-0439
             </a>
           </div>
         </div>
