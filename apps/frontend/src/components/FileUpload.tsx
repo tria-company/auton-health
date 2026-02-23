@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
-import { Upload, X, File, CheckCircle, AlertCircle } from 'lucide-react';
+import { Upload, X, FileText, CheckCircle, AlertCircle } from 'lucide-react';
 
 export interface UploadedFile {
   file: File;
@@ -147,191 +147,89 @@ export default function FileUpload({
 
   const getStatusIcon = (status: UploadedFile['status']) => {
     switch (status) {
-      case 'completed':
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
-      case 'error':
-        return <AlertCircle className="h-4 w-4 text-red-500" />;
-      default:
-        return <File className="h-4 w-4 text-gray-500" />;
+      case 'completed': return <CheckCircle size={16} />;
+      case 'error':     return <AlertCircle size={16} />;
+      default:          return <FileText size={16} />;
     }
   };
 
   return (
     <div className="w-full">
       {/* Área de Drop */}
-      <div 
-        className={`file-upload-dropzone ${isDragOver ? 'drag-over' : ''} ${disabled ? 'disabled' : ''}`}
+      <div
+        className={`fu-dropzone${isDragOver ? ' dragover' : ''}${disabled ? ' disabled' : ''}`}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
-        onClick={() => !disabled && document.getElementById('file-input')?.click()}
-        style={{ cursor: disabled ? 'not-allowed' : 'pointer' }}
       >
-        <Upload className="file-upload-icon" />
-        <div>
-          <h3 className="file-upload-title">
-            Upload de Arquivos
-          </h3>
-          <p className="file-upload-subtitle">
-            Arraste e solte os arquivos aqui ou clique para selecionar
-          </p>
-          <p className="file-upload-constraints">
-            Máximo {maxFiles} arquivos, {maxSizePerFile}MB cada
-          </p>
+        {/* Ícone central */}
+        <div className="fu-icon-wrapper">
+          <FileText className="fu-icon-file" />
+          <div className="fu-icon-badge">
+            <Upload size={12} />
+          </div>
         </div>
-        <input
-          id="file-input"
-          type="file"
-          multiple
-          accept={acceptedTypes.join(',')}
-          onChange={handleFileInput}
-          className="hidden"
-          disabled={disabled}
-        />
+
+        {/* Texto */}
+        <p className="fu-dropzone-text">
+          Arraste e solte aqui ou{' '}
+          <label className="fu-choose-link">
+            Escolher arquivo
+            <input
+              type="file"
+              multiple
+              accept={acceptedTypes.join(',')}
+              onChange={handleFileInput}
+              style={{ display: 'none' }}
+              disabled={disabled}
+            />
+          </label>
+        </p>
+
+        {/* Meta info */}
+        <div className="fu-dropzone-meta">
+          <span>Formatos: PDF, DOC, DOCX, JPG, PNG</span>
+          <span>Máx {maxSizePerFile}MB cada</span>
+        </div>
       </div>
 
       {/* Lista de Arquivos */}
       {files.length > 0 && (
-        <div className="file-list">
-          <h4 className="file-list-title">
-            Arquivos Selecionados ({files.length})
-          </h4>
+        <div className="fu-file-list">
+          <p className="fu-file-list-title">Arquivos selecionados ({files.length})</p>
           {files.map((file) => (
-            <div key={file.id} className="file-item" style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '12px 16px',
-              marginBottom: '8px',
-              backgroundColor: '#f9fafb',
-              border: '1px solid #e5e7eb',
-              borderRadius: '8px',
-              transition: 'all 0.2s ease'
-            }}>
-              <div className="file-item-info" style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                flex: 1,
-                minWidth: 0
-              }}>
-                <div className={`file-item-icon ${file.status}`} style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '8px',
-                  backgroundColor: file.status === 'completed' ? '#d1fae5' : file.status === 'error' ? '#fee2e2' : '#f3f4f6',
-                  flexShrink: 0
-                }}>
-                  {getStatusIcon(file.status)}
-                </div>
-                <div className="file-item-details" style={{
-                  flex: 1,
-                  minWidth: 0,
-                  overflow: 'hidden'
-                }}>
-                  <p className="file-item-name" style={{
-                    margin: 0,
-                    fontSize: '14px',
-                    fontWeight: 500,
-                    color: '#111827',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
-                  }}>
-                    {file.file.name}
-                  </p>
-                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginTop: '4px' }}>
-                    <p className="file-item-size" style={{
-                      margin: 0,
-                      fontSize: '12px',
-                      color: '#6b7280'
-                    }}>
-                      {formatFileSize(file.file.size)}
-                    </p>
-                    {file.status === 'uploading' && (
-                      <span style={{
-                        fontSize: '12px',
-                        color: '#3b82f6',
-                        fontWeight: 500
-                      }}>
-                        {file.progress}%
-                      </span>
-                    )}
-                  </div>
-                  {file.error && (
-                    <p className="file-item-error" style={{
-                      margin: '4px 0 0 0',
-                      fontSize: '12px',
-                      color: '#dc2626'
-                    }}>
-                      {file.error}
-                    </p>
+            <div key={file.id} className="fu-file-item">
+              <div className={`fu-file-icon ${file.status}`}>
+                {getStatusIcon(file.status)}
+              </div>
+
+              <div className="fu-file-details">
+                <p className="fu-file-name">{file.file.name}</p>
+                <div className="fu-file-meta">
+                  <span className="fu-file-size">{formatFileSize(file.file.size)}</span>
+                  {file.status === 'uploading' && (
+                    <>
+                      <div className="fu-file-progress-bar-wrap">
+                        <div
+                          className="fu-file-progress-bar"
+                          style={{ width: `${file.progress}%` }}
+                        />
+                      </div>
+                      <span className="fu-file-progress-pct">{file.progress}%</span>
+                    </>
                   )}
                 </div>
+                {file.error && <p className="fu-file-error">{file.error}</p>}
               </div>
-              <div className="file-item-actions" style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                flexShrink: 0
-              }}>
-                {file.status === 'uploading' && (
-                  <div className="file-item-progress" style={{
-                    width: '100px',
-                    height: '4px',
-                    backgroundColor: '#e5e7eb',
-                    borderRadius: '2px',
-                    overflow: 'hidden'
-                  }}>
-                    <div 
-                      className="file-item-progress-bar"
-                      style={{ 
-                        width: `${file.progress}%`,
-                        height: '100%',
-                        backgroundColor: '#3b82f6',
-                        transition: 'width 0.3s ease'
-                      }}
-                    />
-                  </div>
-                )}
-                <button
-                  type="button"
-                  className="file-item-remove"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    removeFile(file.id);
-                  }}
-                  disabled={file.status === 'uploading'}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    backgroundColor: file.status === 'uploading' ? '#f3f4f6' : '#fee2e2',
-                    color: file.status === 'uploading' ? '#9ca3af' : '#dc2626',
-                    cursor: file.status === 'uploading' ? 'not-allowed' : 'pointer',
-                    transition: 'all 0.2s ease'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (file.status !== 'uploading') {
-                      e.currentTarget.style.backgroundColor = '#fecaca';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (file.status !== 'uploading') {
-                      e.currentTarget.style.backgroundColor = '#fee2e2';
-                    }
-                  }}
-                >
-                  <X size={16} />
-                </button>
-              </div>
+
+              <button
+                type="button"
+                className="fu-file-remove"
+                onClick={(e) => { e.stopPropagation(); removeFile(file.id); }}
+                disabled={file.status === 'uploading'}
+              >
+                <X size={14} />
+              </button>
             </div>
           ))}
         </div>

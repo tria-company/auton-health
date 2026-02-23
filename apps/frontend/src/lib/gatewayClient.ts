@@ -27,13 +27,33 @@ function getSupabaseClient() {
 }
 
 /**
- * Obtém o token de autenticação da sessão atual
+ * Obtém o token de autenticação da sessão atual.
+ * Faz refresh automático se o token estiver expirado ou prestes a expirar (< 60s).
  */
 async function getAuthToken(): Promise<string | null> {
   try {
     const supabase = getSupabaseClient();
     const { data: { session } } = await supabase.auth.getSession();
-    return session?.access_token || null;
+
+    if (!session?.access_token) return null;
+
+    // Verificar expiração do token (JWT tem campo 'exp' em segundos)
+    try {
+      const payload = JSON.parse(atob(session.access_token.split('.')[1]));
+      const expiresInMs = payload.exp * 1000 - Date.now();
+
+      // Se expira em menos de 60 segundos, forçar refresh
+      if (expiresInMs < 60_000) {
+        const { data: refreshed, error } = await supabase.auth.refreshSession();
+        if (!error && refreshed.session?.access_token) {
+          return refreshed.session.access_token;
+        }
+      }
+    } catch {
+      // Se falhar o parse do JWT, usa o token como está
+    }
+
+    return session.access_token;
   } catch (error) {
     console.error('[gatewayClient] Erro ao obter token:', error);
     return null;
