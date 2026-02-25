@@ -588,6 +588,17 @@ export async function createScheduledConsultation(req: AuthenticatedRequest, res
       });
     }
 
+    // ✅ Determinar "from" baseado na URL de origem
+    let consultationFrom: string | null = null;
+    const origin = (req.headers.origin || req.headers.referer || '') as string;
+    if (origin.includes('medcall-ai-frontend-v2.vercel.app')) {
+      consultationFrom = 'medcall';
+    } else if (origin.includes('autonhealth.com.br')) {
+      consultationFrom = 'auton';
+    } else if (origin.includes('localhost')) {
+      consultationFrom = 'localhost';
+    }
+
     // ✅ Sem conflitos, criar agendamento
     const { data: newConsultation, error: createError } = await supabase
       .from('consultations')
@@ -599,6 +610,7 @@ export async function createScheduledConsultation(req: AuthenticatedRequest, res
         consulta_inicio: startTime.toISOString(),
         consulta_fim: endTime.toISOString(),
         doctor_id: doctorId,
+        from: consultationFrom,
         created_at: new Date().toISOString()
       })
       .select()

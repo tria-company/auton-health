@@ -34,6 +34,7 @@ interface ConsultaAdmin {
   created_at: string;
   medico_email: string | null;
   medico_name: string | null;
+  from: string | null;
   room_id: string | null;
   session_status: string | null;
   webrtc_active: boolean;
@@ -272,6 +273,7 @@ export default function ConsultasAdminPage() {
                 <th>Email do Médico</th>
                 <th>Paciente</th>
                 <th>Status</th>
+                <th>Origem</th>
                 <th>WebRTC</th>
                 <th>Início</th>
                 <th>Room ID</th>
@@ -313,6 +315,15 @@ export default function ConsultasAdminPage() {
                       <span className="session-status">
                         (Sessão: {consulta.session_status})
                       </span>
+                    )}
+                  </td>
+                  <td className="td-from">
+                    {consulta.from ? (
+                      <span className={`from-badge from-${consulta.from}`}>
+                        {{ medcall: 'MedCall', auton: 'Auton Health', localhost: 'Localhost' }[consulta.from] || consulta.from}
+                      </span>
+                    ) : (
+                      <span className="from-badge from-unknown">-</span>
                     )}
                   </td>
                   <td className="td-webrtc">

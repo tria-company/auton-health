@@ -544,6 +544,17 @@ export function CreateConsultationRoom({
           throw new Error('Médico não encontrado. Verifique se sua conta está sincronizada.');
         }
 
+        // ✅ Determinar "from" baseado na URL de origem
+        const origin = window.location.origin;
+        let consultationFrom: string | null = null;
+        if (origin.includes('medcall-ai-frontend-v2.vercel.app')) {
+          consultationFrom = 'medcall';
+        } else if (origin.includes('autonhealth.com.br')) {
+          consultationFrom = 'auton';
+        } else if (origin.includes('localhost')) {
+          consultationFrom = 'localhost';
+        }
+
         // Criar consulta presencial via Supabase
         const { data: consultation, error: insertError } = await supabase
           .from('consultations')
@@ -553,6 +564,7 @@ export function CreateConsultationRoom({
             consultation_type: 'PRESENCIAL',
             status: 'RECORDING',
             doctor_id: medico.id,
+            from: consultationFrom,
           })
           .select()
           .single();

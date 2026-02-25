@@ -498,6 +498,7 @@ export const db = {
     status?: string;
     patient_context?: string;
     env?: string;
+    from?: string | null; // ✅ Origem da plataforma (medcall, auton, localhost)
     clinica_id?: string; // ✅ Campo clinica_id opcional
   }): Promise<any | null> {
     const now = new Date().toISOString();

@@ -222,12 +222,24 @@ export async function createConsultation(consultationData: {
       throw new Error('Médico não encontrado. Verifique se sua conta está sincronizada.');
     }
 
+    // ✅ Determinar "from" baseado na URL de origem
+    let consultationFrom: string | null = null;
+    const origin = window.location.origin;
+    if (origin.includes('medcall-ai-frontend-v2.vercel.app')) {
+      consultationFrom = 'medcall';
+    } else if (origin.includes('autonhealth.com.br')) {
+      consultationFrom = 'auton';
+    } else if (origin.includes('localhost')) {
+      consultationFrom = 'localhost';
+    }
+
     // Criar consulta no Supabase
     const { data: consultation, error: insertError } = await supabase
       .from('consultations')
       .insert({
         ...consultationData,
         doctor_id: medico.id,
+        from: consultationFrom,
       })
       .select()
       .single();

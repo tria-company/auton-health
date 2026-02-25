@@ -53,6 +53,7 @@ interface Consultation {
   patient_context?: string;
   consultation_type: 'PRESENCIAL' | 'TELEMEDICINA';
   status: 'CREATED' | 'RECORDING' | 'PROCESSING' | 'VALIDATION' | 'VALID_ANAMNESE' | 'VALID_DIAGNOSTICO' | 'VALID_SOLUCAO' | 'ERROR' | 'CANCELLED' | 'COMPLETED' | 'AGENDAMENTO';
+  from?: string | null;
   etapa?: 'ANAMNESE' | 'DIAGNOSTICO' | 'SOLUCAO';
   solucao_etapa?: 'MENTALIDADE' | 'ALIMENTACAO' | 'SUPLEMENTACAO' | 'ATIVIDADE_FISICA';
   duration?: number;
@@ -4708,6 +4709,7 @@ function ConsultasPageContent() {
   const { showError, showSuccess, showWarning } = useNotifications();
   const { user } = useAuth();
 
+  const [isAdmin, setIsAdmin] = useState(false);
   const [consultations, setConsultations] = useState<Consultation[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -4731,6 +4733,22 @@ function ConsultasPageContent() {
   const [selectedSection, setSelectedSection] = useState<'ANAMNESE' | 'DIAGNOSTICO' | 'SOLUCOES' | 'EXAMES' | null>(null);
   const [forceShowSolutionSelection, setForceShowSolutionSelection] = useState(false);
   const [downloadingDocx, setDownloadingDocx] = useState(false);
+
+  // Verificar se o usuário é admin
+  useEffect(() => {
+    const checkAdmin = async () => {
+      if (!user?.id) return;
+      try {
+        const { data } = await supabase
+          .from('medicos')
+          .select('admin')
+          .eq('user_auth', user.id)
+          .maybeSingle();
+        setIsAdmin(data?.admin === true);
+      } catch { /* silently fail */ }
+    };
+    checkAdmin();
+  }, [user?.id]);
 
   // Função para voltar para a tela de seleção de soluções
   const handleBackToSolutionSelection = async () => {
@@ -10333,7 +10351,7 @@ function ConsultasPageContent() {
       <div className="consultas-table-container">
         <div className="consultas-table">
           {/* Header da tabela */}
-          <div className="table-header">
+          <div className={`table-header ${isAdmin ? 'has-from-col' : ''}`}>
             <div className="header-cell patient-header">Paciente</div>
             <div className="table-header-divider"></div>
             <div className="header-cell date-header">Data</div>
@@ -10342,6 +10360,8 @@ function ConsultasPageContent() {
             <div className="table-header-divider"></div>
             <div className="header-cell status-header">Status</div>
             <div className="table-header-divider"></div>
+            {isAdmin && <div className="header-cell from-header">Origem</div>}
+            {isAdmin && <div className="table-header-divider"></div>}
             <div className="header-cell actions-header">Ações</div>
           </div>
 
@@ -10357,7 +10377,7 @@ function ConsultasPageContent() {
               consultations.map((consultation) => (
                 <div
                   key={consultation.id}
-                  className="table-row"
+                  className={`table-row ${isAdmin ? 'has-from-col' : ''}`}
                   onClick={() => handleConsultationClick(consultation)}
                   style={{ cursor: 'pointer' }}
                 >
@@ -10425,6 +10445,18 @@ function ConsultasPageContent() {
                       variant={consultation.status === 'RECORDING' || consultation.status === 'PROCESSING' || consultation.status === 'VALIDATION' ? 'outlined' : 'default'}
                     />
                   </div>
+                  {isAdmin && <div className="table-row-divider"></div>}
+                  {isAdmin && (
+                    <div className="table-cell from-cell">
+                      {consultation.from ? (
+                        <span className={`from-badge from-${consultation.from}`}>
+                          {{ medcall: 'MedCall', auton: 'Auton Health', localhost: 'Localhost' }[consultation.from] || consultation.from}
+                        </span>
+                      ) : (
+                        <span className="from-badge from-unknown">-</span>
+                      )}
+                    </div>
+                  )}
                   <div className="table-row-divider"></div>
                   <div className="table-cell actions-cell">
                     <div className="action-buttons">

@@ -411,6 +411,57 @@
   color: var(--text-tertiary);
 }
 
+/* Tags de origem (from) */
+.consultas-admin-page .from-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.6rem;
+  border-radius: 9999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.consultas-admin-page .from-medcall {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.consultas-admin-page .from-auton {
+  background: #fce7f3;
+  color: #be185d;
+}
+
+.consultas-admin-page .from-localhost {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.consultas-admin-page .from-unknown {
+  background: var(--bg-secondary);
+  color: var(--text-tertiary);
+}
+
+/* Dark mode para tags de origem */
+[data-theme="dark"] .consultas-admin-page .from-medcall,
+.dark .consultas-admin-page .from-medcall {
+  background: rgba(59, 130, 246, 0.2);
+  color: #93bbfd;
+}
+
+[data-theme="dark"] .consultas-admin-page .from-auton,
+.dark .consultas-admin-page .from-auton {
+  background: rgba(190, 24, 93, 0.2);
+  color: #f9a8d4;
+}
+
+[data-theme="dark"] .consultas-admin-page .from-localhost,
+.dark .consultas-admin-page .from-localhost {
+  background: rgba(217, 119, 6, 0.2);
+  color: #fcd34d;
+}
+
 @keyframes ca-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.7; }

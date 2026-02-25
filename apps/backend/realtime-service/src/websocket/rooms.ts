@@ -446,6 +446,7 @@ export function setupRoomsWebSocket(io: SocketIOServer): void {
 
                 // ✅ Determinar ambiente baseado na origem do socket
                 let env = 'prod'; // Default production
+                let consultationFrom: string | null = null;
                 try {
                   // Tentar pegar do header origin ou referer
                   const origin = socket.handshake.headers.origin || socket.handshake.headers.referer || '';
@@ -453,7 +454,16 @@ export function setupRoomsWebSocket(io: SocketIOServer): void {
                   if (origin.includes('medcall-ai-homolog.vercel.app') || origin.includes('localhost')) {
                     env = 'homolog';
                   }
-                  console.log(`🌍 [ENV-CHECK] Origin: ${origin} -> Env: ${env}`);
+                  // ✅ Determinar "from" baseado na URL de origem
+                  const originStr = typeof origin === 'string' ? origin : '';
+                  if (originStr.includes('medcall-ai-frontend-v2.vercel.app')) {
+                    consultationFrom = 'medcall';
+                  } else if (originStr.includes('autonhealth.com.br')) {
+                    consultationFrom = 'auton';
+                  } else if (originStr.includes('localhost')) {
+                    consultationFrom = 'localhost';
+                  }
+                  console.log(`🌍 [ENV-CHECK] Origin: ${origin} -> Env: ${env}, From: ${consultationFrom}`);
                 } catch (e) {
                   console.warn('⚠️ [ENV-CHECK] Erro ao determinar ambiente:', e);
                 }
@@ -466,6 +476,7 @@ export function setupRoomsWebSocket(io: SocketIOServer): void {
                   status: 'RECORDING',
                   patient_context: `Consulta ${consultationTypeValue.toLowerCase()} - Sala: ${roomName || 'Sala sem nome'}`,
                   env: env, // ✅ Passando ambiente detectado
+                  from: consultationFrom, // ✅ Origem da plataforma
                   clinica_id: doctor.clinica_id // ✅ Vinculando à clínica do médico
                 });
 

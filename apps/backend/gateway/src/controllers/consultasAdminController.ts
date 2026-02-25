@@ -39,13 +39,7 @@ export const getActiveConsultations = async (req: Request, res: Response) => {
         consultation_id,
         created_at,
         consultations!inner(
-          id,
-          doctor_id,
-          patient_id,
-          status,
-          consulta_inicio,
-          consultation_type,
-          created_at,
+          *,
           medicos!inner(
             name,
             email
@@ -82,6 +76,7 @@ export const getActiveConsultations = async (req: Request, res: Response) => {
         created_at: c.created_at,
         medico_email: c.medicos?.email || null,
         medico_name: c.medicos?.name || null,
+        from: c.from || null,
         room_id: s.room_id,
         session_status: s.status,
         webrtc_active: s.webrtc_active || false,
