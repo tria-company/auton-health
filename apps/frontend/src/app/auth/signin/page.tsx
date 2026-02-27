@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Eye, EyeOff } from 'lucide-react';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth, getSubscriptionMessage } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { LoadingScreen } from '@/components/shared/LoadingScreen';
 import { useTheme } from 'next-themes';
@@ -25,6 +25,8 @@ function SignInContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const reasonPatient = searchParams.get('reason') === 'patient';
+  const subscriptionInactive = searchParams.get('subscription') === 'inactive';
+  const subscriptionEvent = searchParams.get('event');
 
   useEffect(() => {
     setMounted(true);
@@ -132,6 +134,12 @@ function SignInContent() {
           {reasonPatient && (
             <div className="signin-info-message" style={{ background: '#e0f2fe', border: '1px solid #0ea5e9', borderRadius: '8px', padding: '12px 16px', marginBottom: '16px', fontSize: '14px', color: '#0369a1' }}>
               A área do médico é restrita. Como paciente, use o link enviado no seu email para acessar suas informações.
+            </div>
+          )}
+
+          {subscriptionInactive && (
+            <div className="signin-info-message" style={{ background: '#fef2f2', border: '1px solid #ef4444', borderRadius: '8px', padding: '12px 16px', marginBottom: '16px', fontSize: '14px', color: '#dc2626' }}>
+              {getSubscriptionMessage(subscriptionEvent)}
             </div>
           )}
 

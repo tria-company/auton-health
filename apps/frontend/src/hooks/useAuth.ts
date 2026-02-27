@@ -16,6 +16,26 @@ export interface AuthActions {
   resetPassword: (email: string) => Promise<{ error: AuthError | null }>;
 }
 
+export function getSubscriptionMessage(event: string | null): string {
+  switch (event) {
+    case 'PAYMENT_OVERDUE':
+      return 'Seu pagamento está em atraso. Regularize sua situação para continuar acessando a plataforma.';
+    case 'PAYMENT_DELETED':
+      return 'Seu pagamento foi cancelado. Entre em contato com o suporte para mais informações.';
+    case 'PAYMENT_REFUNDED':
+    case 'PAYMENT_REFUND_IN_PROGRESS':
+      return 'Seu pagamento foi estornado. Entre em contato com o suporte para mais informações.';
+    case 'PAYMENT_CHARGEBACK_REQUESTED':
+      return 'Foi solicitado um chargeback na sua assinatura. Entre em contato com o suporte.';
+    case 'SUBSCRIPTION_DELETED':
+      return 'Sua assinatura foi cancelada. Entre em contato com o suporte para reativar.';
+    case 'SUBSCRIPTION_INACTIVE':
+      return 'Sua assinatura está inativa. Entre em contato com o suporte para reativar.';
+    default:
+      return 'Sua assinatura está inativa. Entre em contato com o suporte para reativar o acesso.';
+  }
+}
+
 export function useAuth(): AuthState & AuthActions {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -100,7 +120,7 @@ export function useAuth(): AuthState & AuthActions {
         // ✅ Verificar se o médico foi deletado/bloqueado
         const { data: medico } = await supabase
           .from('medicos')
-          .select('medico_deletado')
+          .select('id, medico_deletado')
           .eq('user_auth', authData.user.id)
           .single();
 
@@ -114,6 +134,28 @@ export function useAuth(): AuthState & AuthActions {
               status: 403
             } as AuthError
           };
+        }
+
+        // ✅ Verificar se a assinatura está ativa
+        if (medico?.id) {
+          const { data: assinatura } = await supabase
+            .from('assinaturas')
+            .select('assinatura_ativa, event')
+            .eq('doctor_id', medico.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+
+          if (assinatura && assinatura.assinatura_ativa === false) {
+            await supabase.auth.signOut();
+            return {
+              error: {
+                message: getSubscriptionMessage(assinatura.event),
+                name: 'AuthError',
+                status: 403
+              } as AuthError
+            };
+          }
         }
       }
 
