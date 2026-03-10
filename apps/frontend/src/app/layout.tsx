@@ -5,7 +5,7 @@ import { SuppressHydrationWarnings } from './suppress-warnings';
 
 export const metadata: Metadata = {
   title: 'Auton Health - Plataforma de Consultas',
-  description: 'Sistema de transcrição e análise de consultas médicas em tempo real',
+  description: '',
   icons: {
     icon: '/favicon.png',
     shortcut: '/favicon.png',
