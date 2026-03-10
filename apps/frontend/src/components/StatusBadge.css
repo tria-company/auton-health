@@ -229,31 +229,40 @@
 }
 
 /* Dark mode support */
-@media (prefers-color-scheme: dark) {
-  .status-success {
-    --status-bg: rgba(16, 185, 129, 0.2);
-    --status-text: #6ee7b7;
-  }
-  
-  .status-warning {
-    --status-bg: rgba(245, 158, 11, 0.2);
-    --status-text: #fbbf24;
-  }
-  
-  .status-danger {
-    --status-bg: rgba(239, 68, 68, 0.2);
-    --status-text: #f87171;
-  }
-  
-  .status-info {
-    --status-bg: rgba(59, 130, 246, 0.2);
-    --status-text: #60a5fa;
-  }
-  
-  .status-neutral {
-    --status-bg: rgba(107, 114, 128, 0.2);
-    --status-text: #d1d5db;
-  }
+.dark .status-success {
+  --status-bg: rgba(16, 185, 129, 0.2);
+  --status-text: #6ee7b7;
+}
+
+.dark .status-warning {
+  --status-bg: rgba(245, 158, 11, 0.2);
+  --status-text: #fbbf24;
+}
+
+.dark .status-danger {
+  --status-bg: rgba(239, 68, 68, 0.2);
+  --status-text: #f87171;
+}
+
+.dark .status-info {
+  --status-bg: rgba(59, 130, 246, 0.2);
+  --status-text: #60a5fa;
+}
+
+.dark .status-neutral {
+  --status-bg: rgba(107, 114, 128, 0.2);
+  --status-text: #d1d5db;
+}
+
+.dark .status-recording {
+  --status-bg: rgba(245, 158, 11, 0.2);
+  --status-text: #fbbf24;
+}
+
+.dark .status-processing {
+  --status-bg: rgba(99, 102, 241, 0.2);
+  --status-text: #a5b4fc;
+  background: linear-gradient(45deg, rgba(99, 102, 241, 0.2), rgba(99, 102, 241, 0.15));
 }
 
 

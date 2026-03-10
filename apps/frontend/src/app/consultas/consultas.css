@@ -517,75 +517,7 @@
   padding: 0;
 }
 
-.status-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  border-radius: 24px;
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: capitalize;
-  letter-spacing: 0.3px;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  position: relative;
-  overflow: hidden;
-}
-
-.status-badge::before {
-  content: '';
-  position: absolute;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  animation: pulse 2s infinite;
-}
-
-.status-confirmed {
-  background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
-  color: #065f46;
-  border: 1px solid rgba(6, 95, 70, 0.1);
-}
-
-.status-confirmed::before {
-  background: #065f46;
-  box-shadow: 0 0 8px rgba(6, 95, 70, 0.5);
-}
-
-.status-pending {
-  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-  color: #92400e;
-  border: 1px solid rgba(146, 64, 14, 0.1);
-}
-
-.status-pending::before {
-  background: #92400e;
-  box-shadow: 0 0 8px rgba(146, 64, 14, 0.5);
-}
-
-.status-cancelled {
-  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
-  color: #991b1b;
-  border: 1px solid rgba(153, 27, 27, 0.1);
-}
-
-.status-cancelled::before {
-  background: #991b1b;
-  box-shadow: 0 0 8px rgba(153, 27, 27, 0.5);
-}
-
-@keyframes pulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
-}
+/* Status badges: usar StatusBadge.css como fonte única */
 
 /* Célula e tags de origem (from) */
 .from-cell {
@@ -1285,84 +1217,7 @@
   font-weight: 500;
 }
 
-.status-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 12px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: capitalize;
-  width: fit-content;
-}
-
-.status-completed {
-  background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
-  color: #065f46;
-  border: 1px solid rgba(6, 95, 70, 0.1);
-}
-
-.status-completed::before {
-  background: #065f46;
-  box-shadow: 0 0 8px rgba(6, 95, 70, 0.5);
-}
-
-.status-recording {
-  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-  color: #92400e;
-  border: 1px solid rgba(146, 64, 14, 0.1);
-}
-
-.status-recording::before {
-  background: #92400e;
-  box-shadow: 0 0 8px rgba(146, 64, 14, 0.5);
-}
-
-.status-processing {
-  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
-  color: #1e40af;
-  border: 1px solid rgba(30, 64, 175, 0.1);
-}
-
-.status-processing::before {
-  background: #1e40af;
-  box-shadow: 0 0 8px rgba(30, 64, 175, 0.5);
-  animation: pulse 1s infinite;
-}
-
-.status-error {
-  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
-  color: #991b1b;
-  border: 1px solid rgba(153, 27, 27, 0.1);
-}
-
-.status-error::before {
-  background: #991b1b;
-  box-shadow: 0 0 8px rgba(153, 27, 27, 0.5);
-}
-
-.status-cancelled {
-  background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
-  color: #6b7280;
-  border: 1px solid rgba(107, 114, 128, 0.1);
-}
-
-.status-cancelled::before {
-  background: #6b7280;
-  box-shadow: 0 0 8px rgba(107, 114, 128, 0.3);
-  animation: none;
-}
-
-.status-created {
-  background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%);
-  color: #4338ca;
-  border: 1px solid rgba(67, 56, 202, 0.1);
-}
-
-.status-created::before {
-  background: #4338ca;
-  box-shadow: 0 0 8px rgba(67, 56, 202, 0.5);
-}
+/* Status badges detalhes: usar StatusBadge.css como fonte única */
 
 .transcription-summary,
 .key-points,
@@ -2724,16 +2579,26 @@
 }
 
 .dark .edit-button {
-  color: #ffffff !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  color: #e5e7eb !important;
 }
 
 .dark .edit-button svg,
 .dark .edit-button .w-4 {
-  stroke: #ffffff !important;
-  color: #ffffff !important;
+  stroke: #e5e7eb !important;
+  color: #e5e7eb !important;
 }
 
 .dark .edit-button:hover {
+  background: rgba(45, 98, 147, 0.25) !important;
+  border-color: #2d6293 !important;
+  color: #ffffff !important;
+}
+
+.dark .edit-button:hover svg,
+.dark .edit-button:hover .w-4 {
+  stroke: #ffffff !important;
   color: #ffffff !important;
 }
 
@@ -3610,6 +3475,67 @@
 
 .dark .actions-icon {
   color: #FFFFFF !important;
+}
+
+/* Dark mode - Filters Section */
+.dark .filters-section .search-input {
+  background-color: #1a1a1a !important;
+  color: #e5e7eb !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+.dark .filters-section .search-input::placeholder {
+  color: #6b7280 !important;
+}
+
+.dark .filters-section .search-input:focus {
+  border-color: #2d6293 !important;
+  box-shadow: 0 0 0 3px rgba(45, 98, 147, 0.3) !important;
+}
+
+.dark .filters-section .status-filter,
+.dark .filters-section select {
+  background-color: #1a1a1a !important;
+  color: #e5e7eb !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+.dark .filters-section .status-filter:focus,
+.dark .filters-section select:focus {
+  border-color: #2d6293 !important;
+  box-shadow: 0 0 0 3px rgba(45, 98, 147, 0.3) !important;
+}
+
+.dark .filters-section .status-filter option,
+.dark .filters-section select option {
+  background-color: #1a1a1a;
+  color: #e5e7eb;
+}
+
+.dark .filters-section input[type="date"] {
+  background-color: #1a1a1a !important;
+  color: #e5e7eb !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+.dark .filters-section input[type="date"]:focus {
+  border-color: #2d6293 !important;
+  box-shadow: 0 0 0 3px rgba(45, 98, 147, 0.3) !important;
+}
+
+.dark .filters-section input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}
+
+.dark .filters-section button {
+  background-color: #1a1a1a !important;
+  color: #9ca3af !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+.dark .filters-section button:hover {
+  background-color: #2a2a2a !important;
+  color: #e5e7eb !important;
 }
 
 /* Type Icon */
@@ -4843,11 +4769,11 @@
 }
 
 .dark .consultation-type {
-  color: #cccccc;
+  color: #e5e7eb !important;
 }
 
 .dark .type-icon {
-  color: #9ca3af;
+  color: #e5e7eb !important;
 }
 
 /* Action Buttons */
@@ -7286,6 +7212,18 @@
   background: rgba(27, 66, 102, 0.05);
   border-color: #153350;
   color: #153350;
+}
+
+.dark .consultation-details-action-button-outline {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #e5e7eb;
+}
+
+.dark .consultation-details-action-button-outline:hover {
+  background: rgba(45, 98, 147, 0.2);
+  border-color: #2d6293;
+  color: #ffffff;
 }
 
 .consultation-details-action-button svg {
