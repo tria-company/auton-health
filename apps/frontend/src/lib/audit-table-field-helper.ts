@@ -43,8 +43,8 @@ export async function auditTableField(params: AuditTableFieldParams): Promise<vo
   } = params;
 
   const auditContext = getAuditContext(request);
-  const dataBefore = existingRecord ? sanitizeData(existingRecord) : null;
-  const dataAfter = updatedRecord ? sanitizeData(updatedRecord) : null;
+  const dataBefore = existingRecord ? sanitizeData(existingRecord) : undefined;
+  const dataAfter = updatedRecord ? sanitizeData(updatedRecord) : undefined;
   const tableRef = `${tableName}.${fieldName}`;
 
   await logAudit({

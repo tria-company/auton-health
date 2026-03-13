@@ -29,7 +29,7 @@ export default function Button({ variant = 'primary', children, className = '', 
         stiffness: 300,
         damping: 20
       }}
-      {...props}
+      {...(props as any)}
     >
       {variant === 'primary' && (
         <motion.span 

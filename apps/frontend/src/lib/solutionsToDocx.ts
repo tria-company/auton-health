@@ -166,9 +166,9 @@ const LINE_SPACING = 276; // ~1.15
 // BORDERS
 // ═══════════════════════════════════════════════════════════════
 
-const B_NONE = { style: BorderStyle.NONE as const, size: 0, color: "FFFFFF" };
-const B_SOFT = { style: BorderStyle.SINGLE as const, size: 4, color: COLOR.border };
-const B_ACCENT = (color: string) => ({ style: BorderStyle.SINGLE as const, size: 12, color });
+const B_NONE = { style: BorderStyle.NONE, size: 0, color: "FFFFFF" };
+const B_SOFT = { style: BorderStyle.SINGLE, size: 4, color: COLOR.border };
+const B_ACCENT = (color: string) => ({ style: BorderStyle.SINGLE, size: 12, color });
 
 const BORDERS_NONE = { top: B_NONE, bottom: B_NONE, left: B_NONE, right: B_NONE, insideHorizontal: B_NONE, insideVertical: B_NONE };
 const BORDERS_TABLE = {
@@ -811,7 +811,7 @@ function buildPadrao(key: string, obj: Record<string, any>): (Paragraph | Table)
   if (orientRaw != null) {
     if (Array.isArray(orientRaw)) {
       // Array de objetos com campos como nome, passo, como_fazer, etc.
-      for (const [idx, item] of orientRaw.entries()) {
+      for (const [idx, item] of Array.from(orientRaw.entries())) {
         if (typeof item === "string") {
           orientSteps.push({ nome: item, passo: String(idx + 1) });
         } else if (typeof item === "object" && item !== null) {
@@ -1015,7 +1015,7 @@ export function buildSolutionsDocxPremiumV3(solutions: SolutionsDataForDocx): Do
       map.get(meal)!.push(it);
     }
 
-    for (const [meal, items] of map.entries()) {
+    for (const [meal, items] of Array.from(map.entries())) {
       const colWidths = [3000, 2160, 2100, 2100]; // soma = 9360
       const header = new TableRow({
         children: [
@@ -1125,7 +1125,7 @@ export function buildSolutionsDocxPremiumV3(solutions: SolutionsDataForDocx): Do
     children.push(emptyLine(SPACING.md));
 
     const grouped = groupExercises(solutions.exercicios);
-    for (const [treinoName, items] of grouped.entries()) {
+    for (const [treinoName, items] of Array.from(grouped.entries())) {
       children.push(...renderTrainingBlock(treinoName, items));
       children.push(emptyLine(SPACING.md));
     }

@@ -11,7 +11,6 @@ export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
       defaultTheme="light"
       enableSystem={false}
       storageKey="medcall-theme"
-      suppressHydrationWarning
       {...props}
     >
       {children}

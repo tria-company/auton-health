@@ -129,7 +129,7 @@ export default function CadastrarPaciente() {
     
     try {
       const response = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
-      const data = response;
+      const data: any = await response.json();
       
       if (!data.erro) {
         // Preenche automaticamente os campos de endereço

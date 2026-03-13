@@ -46,15 +46,15 @@ export async function auditUpdateField(params: AuditUpdateFieldParams): Promise<
   } = params;
 
   const auditContext = getAuditContext(request);
-  const dataBefore = existingRecord ? sanitizeData(existingRecord) : null;
-  const dataAfter = updatedRecord ? sanitizeData(updatedRecord) : null;
+  const dataBefore = existingRecord ? sanitizeData(existingRecord) : undefined;
+  const dataAfter = updatedRecord ? sanitizeData(updatedRecord) : undefined;
 
   const auditParams = {
     user_id,
     user_email,
     user_name,
     user_role: 'medico' as const,
-    action: (wasCreated ? 'CREATE' : 'UPDATE') as const,
+    action: wasCreated ? 'CREATE' as const : 'UPDATE' as const,
     resource_type: resourceType,
     resource_id: consultaId,
     resource_description: `${resourceType} - ${consultation?.patient_name || 'Paciente'}`,

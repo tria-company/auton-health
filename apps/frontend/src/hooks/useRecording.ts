@@ -303,7 +303,7 @@ export function useRecording() {
 
       console.log('📤 [RECORDING] Response status:', response.status, response.statusText);
 
-      if (!response.success) {
+      if (!response.ok) {
         const errorText = await response.text();
         console.error('❌ [RECORDING] Erro na resposta:', errorText);
         throw new Error(`Upload failed: ${response.status} ${response.statusText} - ${errorText}`);
