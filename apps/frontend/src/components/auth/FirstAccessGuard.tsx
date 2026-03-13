@@ -46,7 +46,7 @@ export function FirstAccessGuard({ children }: { children: React.ReactNode }) {
                         .eq('doctor_id', data.id)
                         .order('created_at', { ascending: false })
                         .limit(1)
-                        .single();
+                        .maybeSingle();
 
                     if (assinatura && assinatura.assinatura_ativa === false) {
                         await supabase.auth.signOut();
