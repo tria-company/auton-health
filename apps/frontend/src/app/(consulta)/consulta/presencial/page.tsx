@@ -260,12 +260,12 @@ function PresencialConsultationContent() {
     });
 
     // Listener para upgrade de transporte (polling -> websocket)
-    newSocket.io.on('upgrade', () => {
+    (newSocket.io as any).on('upgrade', () => {
       console.log('🔄 Transporte atualizado para:', newSocket.io.engine.transport.name);
     });
 
     // Listener para erros de upgrade
-    newSocket.io.on('upgradeError', (error) => {
+    (newSocket.io as any).on('upgradeError', (error: any) => {
       console.warn('⚠️ Erro ao fazer upgrade para websocket, continuando com polling:', error);
       // Não definir erro aqui, pois polling ainda funciona
     });
