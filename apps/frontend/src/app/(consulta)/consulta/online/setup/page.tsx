@@ -6,6 +6,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Camera, Mic, Play, Settings, AlertCircle, User, CheckCircle, Volume2 } from 'lucide-react';
 import { useMediaDevices } from '@/hooks/useMediaDevices';
+import { supabase } from '@/lib/supabase';
 
 function SetupInner() {
   const router = useRouter();
@@ -13,6 +14,8 @@ function SetupInner() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [patientName, setPatientName] = useState('');
+  const [doctorId, setDoctorId] = useState<string | null>(null);
+  const [doctorName, setDoctorName] = useState('Dr. Médico');
   
   // Dados da consulta vindos da URL
   const consultationId = searchParams.get('consultationId');
@@ -47,6 +50,30 @@ function SetupInner() {
       return;
     }
   }, [consultationId, patientId]);
+
+  // Buscar dados do médico autenticado
+  useEffect(() => {
+    const loadDoctor = async () => {
+      try {
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (userError || !user) return;
+
+        const { data: medico, error: medicoError } = await supabase
+          .from('medicos')
+          .select('id, name')
+          .eq('user_auth', user.id)
+          .single();
+
+        if (!medicoError && medico) {
+          setDoctorId(medico.id);
+          setDoctorName(medico.name || 'Dr. Médico');
+        }
+      } catch (error) {
+        console.error('Erro ao carregar médico:', error);
+      }
+    };
+    loadDoctor();
+  }, []);
 
   // Carregar dispositivos automaticamente
   useEffect(() => {
@@ -87,8 +114,8 @@ function SetupInner() {
           session_type: 'online',
           participants: {
             doctor: {
-              id: 'doctor-current', // TODO: Pegar do contexto de auth
-              name: 'Dr. Médico', // TODO: Pegar do contexto de auth
+              id: doctorId,
+              name: doctorName,
             },
             patient: {
               id: patientId,
@@ -103,7 +130,7 @@ function SetupInner() {
         }),
       });
 
-      if (!response.success) {
+      if (!response.ok) {
         throw new Error('Falha ao criar sessão online');
       }
 

@@ -323,7 +323,7 @@ router.post('/finalize/:roomId', async (req: Request, res: Response) => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': 'Vc1mgGDEcnyqLH3LoHGUXoLTUg2BRVSu'
+            'Authorization': process.env.WEBHOOK_AUTH_HEADER || ''
           },
           body: JSON.stringify(webhookData)
         });

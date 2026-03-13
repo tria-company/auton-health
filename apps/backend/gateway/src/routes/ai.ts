@@ -30,9 +30,7 @@ router.post('/edit', async (req, res) => {
                 // O webhook-config.ts tem authHeader, mas ele é usado no frontend?
                 // Ah, no frontend 'page.tsx' ele pega getWebhookHeaders() mas NÃO manda no body da requisição pro gateway.
                 // O gatewayClient pega o token do usuário logado?
-                // O webhook espera um header Authorization específico (Vc1mgGDEcnyqLH3LoHGUXoLTUg2BRVSu).
-                // Vamos ver se precisamos incluir isso aqui.
-                'Authorization': 'Vc1mgGDEcnyqLH3LoHGUXoLTUg2BRVSu' // Hardcoded based on webhook-config.ts for now, or assume generic.
+                'Authorization': process.env.WEBHOOK_AUTH_HEADER || ''
             },
             body: JSON.stringify(payload)
         });

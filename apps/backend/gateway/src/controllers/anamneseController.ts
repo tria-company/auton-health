@@ -280,3 +280,110 @@ export async function getAnamneseInicial(req: AuthenticatedRequest, res: Respons
     });
   }
 }
+
+/**
+ * POST /anamnese/anamnese-inicial/save
+ * Salva anamnese inicial do paciente:
+ * 1. Upsert na tabela a_cadastro_anamnese
+ * 2. Atualiza dados correspondentes na tabela patients
+ */
+export async function saveAnamneseInicial(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        error: 'Não autorizado'
+      });
+    }
+
+    const { paciente_id, ...formData } = req.body;
+
+    if (!paciente_id) {
+      return res.status(400).json({
+        success: false,
+        error: 'paciente_id é obrigatório'
+      });
+    }
+
+    // 1. Whitelist de campos permitidos para a_cadastro_anamnese
+    const allowedAnamneseKeys = [
+      'nome_completo', 'cpf', 'email', 'genero', 'data_nascimento', 'idade', 'tipo_saguineo',
+      'estado_civil', 'profissao', 'altura', 'peso_atual', 'peso_antigo', 'peso_desejado',
+      'objetivo_principal', 'patrica_atividade_fisica', 'frequencia_deseja_treinar',
+      'restricao_movimento', 'informacoes_importantes', 'NecessidadeEnergeticaDiaria',
+      'proteinas', 'carboidratos', 'vegetais', 'legumes', 'leguminosas', 'gorduras', 'frutas',
+    ];
+
+    const anamnesePayload: Record<string, unknown> = {
+      paciente_id,
+      status: 'preenchida',
+      updated_at: new Date().toISOString(),
+    };
+    for (const key of allowedAnamneseKeys) {
+      if (Object.prototype.hasOwnProperty.call(formData, key)) {
+        anamnesePayload[key] = formData[key];
+      }
+    }
+
+    // Upsert na a_cadastro_anamnese (insert se não existe, update se já existe)
+    const { error: anamneseError } = await supabase
+      .from('a_cadastro_anamnese')
+      .upsert(anamnesePayload, { onConflict: 'paciente_id' });
+
+    if (anamneseError) {
+      console.error('[saveAnamneseInicial] Erro ao salvar anamnese:', anamneseError);
+      return res.status(500).json({
+        success: false,
+        error: `Erro ao salvar anamnese: ${anamneseError.message}`
+      });
+    }
+
+    // 2. Atualizar tabela patients com dados correspondentes
+    const patientUpdate: Record<string, unknown> = {};
+
+    if (formData.nome_completo) patientUpdate.name = formData.nome_completo;
+    if (formData.cpf) patientUpdate.cpf = formData.cpf;
+    if (formData.email) patientUpdate.email = formData.email;
+    if (formData.genero) {
+      // Mapear genero do form para o formato da tabela patients (M/F/O)
+      const genderMap: Record<string, string> = {
+        'Masculino': 'M',
+        'Feminino': 'F',
+        'Outro': 'O',
+      };
+      patientUpdate.gender = genderMap[formData.genero] || formData.genero;
+    }
+    if (formData.data_nascimento) {
+      // Converter DD/MM/AAAA para YYYY-MM-DD (formato date do PostgreSQL)
+      const parts = formData.data_nascimento.split('/');
+      if (parts.length === 3) {
+        patientUpdate.birth_date = `${parts[2]}-${parts[1]}-${parts[0]}`;
+      }
+    }
+
+    if (Object.keys(patientUpdate).length > 0) {
+      const { error: patientError } = await supabase
+        .from('patients')
+        .update(patientUpdate)
+        .eq('id', paciente_id);
+
+      if (patientError) {
+        console.error('[saveAnamneseInicial] Erro ao atualizar paciente:', patientError);
+        // Não retornar erro — a anamnese já foi salva
+        console.warn('[saveAnamneseInicial] Anamnese salva mas paciente não atualizado');
+      }
+    }
+
+    return res.json({
+      success: true,
+      message: 'Anamnese salva com sucesso'
+    });
+
+  } catch (error) {
+    console.error('[saveAnamneseInicial] Erro:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Erro interno do servidor'
+    });
+  }
+}

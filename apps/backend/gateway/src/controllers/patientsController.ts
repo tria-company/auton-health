@@ -2,7 +2,7 @@ import { Response } from 'express';
 import { supabase } from '../config/database';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { Resend } from 'resend';
-import { sendCredentialsWhatsApp } from './whatsappController';
+import { sendAccessLinkWhatsApp } from './whatsappController';
 
 /**
  * GET /patients
@@ -874,42 +874,44 @@ export async function syncPatientUser(req: AuthenticatedRequest, res: Response) 
       userAuthId = authData.user.id;
       userStatus = 'active';
 
-      // Enviar email com credenciais
+      // Gerar link de acesso e enviar por email
       try {
-        console.log('📧 [USER] Tentando enviar email com credenciais para:', patient.email);
-        await sendCredentialsEmail(patient.email!, patient.name, patient.email!, generatedPassword, true);
+        console.log('🔗 [USER] Gerando link de acesso para:', patient.email);
+        const accessLink = await generateRecoveryLink(patient.email!);
+
+        console.log('📧 [USER] Tentando enviar email com link de acesso para:', patient.email);
+        await sendAccessLinkEmail(patient.email!, patient.name, patient.email!, accessLink);
         emailSent = true;
-        console.log('✅ [USER] Email com credenciais enviado com sucesso para:', patient.email);
+        console.log('✅ [USER] Email com link de acesso enviado com sucesso para:', patient.email);
+
+        // Enviar link por WhatsApp se o paciente tiver telefone
+        const rawPhone = (patient as { phone?: string; telefone?: string }).phone ?? (patient as { telefone?: string }).telefone;
+        const patientPhone = (rawPhone || '').trim();
+        console.log('📱 [USER] Telefone do paciente:', patientPhone ? `presente (***${patientPhone.slice(-4)})` : 'ausente');
+        if (patientPhone) {
+          try {
+            const result = await sendAccessLinkWhatsApp(patientPhone, patient.name, patient.email!, accessLink);
+            whatsappSent = result.success;
+            whatsappError = result.error || null;
+            if (result.success) console.log('✅ [USER] Link de acesso enviado por WhatsApp para:', patientPhone.slice(-4) + '****');
+            else console.warn('⚠️ [USER] WhatsApp não enviado:', result.error);
+          } catch (err: any) {
+            whatsappError = err?.message || 'Erro ao enviar WhatsApp';
+            console.warn('⚠️ [USER] Erro ao enviar link por WhatsApp:', err?.message);
+          }
+        } else {
+          whatsappError = 'Telefone não cadastrado para o paciente';
+          console.log('📱 [USER] Paciente sem telefone cadastrado, WhatsApp não enviado');
+        }
       } catch (err: any) {
         emailError = err;
-        console.error('❌ [USER] Erro ao enviar email com credenciais:', err);
+        console.error('❌ [USER] Erro ao enviar link de acesso:', err);
         console.error('❌ [USER] Detalhes do erro:', {
           message: err.message,
           stack: err.stack,
           email: patient.email
         });
         // Não falhar se apenas o email não for enviado - usuário já foi criado
-      }
-
-      // Enviar credenciais por WhatsApp se o paciente tiver telefone (suporta phone ou telefone no banco)
-      const rawPhone = (patient as { phone?: string; telefone?: string }).phone ?? (patient as { telefone?: string }).telefone;
-      const patientPhone = (rawPhone || '').trim();
-      console.log('📱 [USER] Telefone do paciente:', patientPhone ? `presente (***${patientPhone.slice(-4)})` : 'ausente');
-      if (patientPhone && generatedPassword) {
-        const loginUrl = process.env.PATIENT_LOGIN_URL || 'https://pacientes.autonhealth.com.br';
-        try {
-          const result = await sendCredentialsWhatsApp(patientPhone, patient.name, patient.email!, generatedPassword, loginUrl);
-          whatsappSent = result.success;
-          whatsappError = result.error || null;
-          if (result.success) console.log('✅ [USER] Credenciais enviadas por WhatsApp para:', patientPhone.slice(-4) + '****');
-          else console.warn('⚠️ [USER] WhatsApp não enviado:', result.error);
-        } catch (err: any) {
-          whatsappError = err?.message || 'Erro ao enviar WhatsApp';
-          console.warn('⚠️ [USER] Erro ao enviar credenciais por WhatsApp:', err?.message);
-        }
-      } else if (!patientPhone) {
-        whatsappError = 'Telefone não cadastrado para o paciente';
-        console.log('📱 [USER] Paciente sem telefone cadastrado, WhatsApp não enviado');
       }
     } else {
       // Atualizar status do usuário existente
@@ -1130,62 +1132,32 @@ export async function resendPatientCredentials(req: AuthenticatedRequest, res: R
       });
     }
 
-    // Gerar nova senha temporária
-    const generateTemporaryPassword = (): string => {
-      const length = 12;
-      const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-      const lowercase = 'abcdefghijklmnopqrstuvwxyz';
-      const numbers = '0123456789';
-      const special = '!@#$%&*';
-      const allChars = uppercase + lowercase + numbers + special;
-
-      let password = '';
-      password += uppercase[Math.floor(Math.random() * uppercase.length)];
-      password += lowercase[Math.floor(Math.random() * lowercase.length)];
-      password += numbers[Math.floor(Math.random() * numbers.length)];
-      password += special[Math.floor(Math.random() * special.length)];
-
-      for (let i = password.length; i < length; i++) {
-        password += allChars[Math.floor(Math.random() * allChars.length)];
-      }
-
-      return password.split('').sort(() => Math.random() - 0.5).join('');
-    };
-
-    const newPassword = generateTemporaryPassword();
-
-    // Atualizar senha do usuário no Supabase Auth
-    const { error: updatePasswordError } = await supabase.auth.admin.updateUserById(patient.user_auth, {
-      password: newPassword,
-      user_metadata: {
-        ...authUser.user.user_metadata,
-        temporary_password: true
-      }
-    });
-
-    if (updatePasswordError) {
-      console.error('Erro ao atualizar senha do usuário:', updatePasswordError);
+    // Gerar link de recuperação de senha (sem expor senha em texto plano)
+    let accessLink: string;
+    try {
+      accessLink = await generateRecoveryLink(authUser.user.email!);
+    } catch (linkErr: any) {
+      console.error('Erro ao gerar link de recuperação:', linkErr);
       return res.status(500).json({
         success: false,
-        error: 'Erro ao atualizar senha do usuário'
+        error: 'Erro ao gerar link de acesso'
       });
     }
 
-    // Enviar email com novas credenciais
+    // Enviar email com link de acesso
     let emailSent = false;
     let emailError: any = null;
     try {
-      console.log('📧 [REENVIO-CRED] Email: reenviando credenciais para:', patient.email);
-      await sendCredentialsEmail(patient.email!, patient.name, authUser.user.email!, newPassword, true);
+      console.log('📧 [REENVIO-CRED] Email: reenviando link de acesso para:', patient.email);
+      await sendAccessLinkEmail(patient.email!, patient.name, authUser.user.email!, accessLink);
       emailSent = true;
       console.log('✅ [REENVIO-CRED] Email enviado (Resend). WhatsApp é via Evolution API.');
     } catch (err: any) {
       emailError = err;
       console.error('❌ [REENVIO-CRED] Erro ao reenviar email:', err);
-      // Não falhar completamente se apenas o email não for enviado
     }
 
-    // WhatsApp: sempre Evolution API (nunca Resend). Executar após o email.
+    // WhatsApp: enviar link de acesso via Evolution API
     console.log('📱 [REENVIO-CRED] Etapa WhatsApp (Evolution API)...');
     let whatsappSent = false;
     let whatsappError: string | null = null;
@@ -1194,16 +1166,15 @@ export async function resendPatientCredentials(req: AuthenticatedRequest, res: R
     if (!patientPhoneResend) console.log('📱 [REENVIO-CRED] WhatsApp: telefone ausente. Campos:', { phone: (patient as any).phone, telefone: (patient as any).telefone });
     else console.log('📱 [REENVIO-CRED] WhatsApp: Evolution API (não Resend). Telefone presente (***' + patientPhoneResend.slice(-4) + ')');
     if (patientPhoneResend) {
-      const loginUrl = process.env.PATIENT_LOGIN_URL || 'https://pacientes.autonhealth.com.br';
       try {
-        const result = await sendCredentialsWhatsApp(patientPhoneResend, patient.name, authUser.user.email!, newPassword, loginUrl);
+        const result = await sendAccessLinkWhatsApp(patientPhoneResend, patient.name, authUser.user.email!, accessLink);
         whatsappSent = result.success;
         whatsappError = result.error || null;
-        if (result.success) console.log('✅ [REENVIO-CRED] Credenciais enviadas por WhatsApp (Evolution API) para:', patientPhoneResend.slice(-4) + '****');
+        if (result.success) console.log('✅ [REENVIO-CRED] Link enviado por WhatsApp (Evolution API) para:', patientPhoneResend.slice(-4) + '****');
         else console.warn('⚠️ [REENVIO-CRED] WhatsApp não enviado:', result.error);
       } catch (err: any) {
         whatsappError = err?.message || 'Erro ao enviar WhatsApp';
-        console.warn('⚠️ [REENVIO-CRED] Erro ao enviar credenciais por WhatsApp (Evolution API):', err?.message);
+        console.warn('⚠️ [REENVIO-CRED] Erro ao enviar link por WhatsApp (Evolution API):', err?.message);
       }
     } else {
       whatsappError = 'Telefone não cadastrado para o paciente';
@@ -1212,12 +1183,11 @@ export async function resendPatientCredentials(req: AuthenticatedRequest, res: R
 
     return res.json({
       success: true,
-      message: emailSent || whatsappSent ? (emailSent && whatsappSent ? 'Credenciais reenviadas por email e WhatsApp' : emailSent ? 'Email com credenciais reenviado com sucesso' : 'Credenciais enviadas por WhatsApp') : 'Senha atualizada, mas nenhum envio realizado',
+      message: emailSent || whatsappSent ? (emailSent && whatsappSent ? 'Link de acesso reenviado por email e WhatsApp' : emailSent ? 'Email com link de acesso reenviado com sucesso' : 'Link de acesso enviado por WhatsApp') : 'Link gerado, mas nenhum envio realizado',
       emailSent: emailSent,
       emailError: emailError ? emailError.message : null,
       whatsappSent: whatsappSent,
-      whatsappError: whatsappError || null,
-      password: emailSent ? undefined : newPassword // Retornar senha apenas se email falhou
+      whatsappError: whatsappError || null
     });
 
   } catch (error: any) {
@@ -1230,16 +1200,40 @@ export async function resendPatientCredentials(req: AuthenticatedRequest, res: R
 }
 
 /**
- * Função auxiliar para enviar email com credenciais
+ * Gera um link de recuperação/definição de senha via Supabase Auth
  */
-async function sendCredentialsEmail(
+async function generateRecoveryLink(userEmail: string): Promise<string> {
+  const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
+    type: 'recovery',
+    email: userEmail,
+  });
+
+  if (linkError || !linkData?.properties?.action_link) {
+    console.error('❌ [RECOVERY] Erro ao gerar link:', linkError);
+    throw new Error(linkError?.message || 'Erro ao gerar link de recuperação');
+  }
+
+  // O action_link do Supabase aponta para o domínio do Supabase.
+  // Redirecionamos para o frontend do paciente para que o token seja processado lá.
+  const supabaseLink = new URL(linkData.properties.action_link);
+  const patientUrl = process.env.PATIENT_LOGIN_URL || 'https://pacientes.autonhealth.com.br';
+  // Manter o path e params do Supabase, mas trocar o host para o frontend
+  const frontendLink = `${patientUrl.replace(/\/$/, '')}/auth/callback${supabaseLink.search}${supabaseLink.hash}`;
+
+  console.log('🔗 [RECOVERY] Link gerado com sucesso');
+  return frontendLink;
+}
+
+/**
+ * Função auxiliar para enviar email com link de acesso (sem senha em texto plano)
+ */
+async function sendAccessLinkEmail(
   to: string,
   patientName: string,
   userEmail: string,
-  password: string,
-  temporaryPassword: boolean = false
+  accessLink: string
 ): Promise<void> {
-  console.log('📧 [EMAIL] Iniciando envio de email com credenciais...');
+  console.log('📧 [EMAIL] Iniciando envio de email com link de acesso...');
   console.log('  - Para:', to);
   console.log('  - Nome:', patientName);
   console.log('  - RESEND_API_KEY configurado:', !!process.env.RESEND_API_KEY);
@@ -1253,12 +1247,10 @@ async function sendCredentialsEmail(
   const resend = new Resend(process.env.RESEND_API_KEY);
   const fromEmail = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
   const appName = process.env.APP_NAME || 'Auton Health';
-  const loginUrl = process.env.PATIENT_LOGIN_URL || 'https://pacientes.autonhealth.com.br';
 
   console.log('📧 [EMAIL] Configurações:');
   console.log('  - From:', fromEmail);
   console.log('  - App Name:', appName);
-  console.log('  - Login URL (pacientes):', loginUrl);
 
   // Verificar se está em modo de teste
   const isTestMode = fromEmail.includes('@resend.dev');
@@ -1279,79 +1271,66 @@ async function sendCredentialsEmail(
   const { data, error } = await resend.emails.send({
     from: `${appName} <${fromEmail}>`,
     to: [to],
-    subject: temporaryPassword
-      ? `Suas Credenciais de Acesso - ${appName} (Senha Temporária)`
-      : `Suas Credenciais de Acesso - ${appName}`,
+    subject: `Defina sua senha de acesso - ${appName}`,
     html: `
       <!DOCTYPE html>
       <html>
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Credenciais de Acesso</title>
+        <title>Acesso ao Sistema</title>
       </head>
       <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background: linear-gradient(135deg, #1B4266 0%, #153350 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-          <h1 style="color: white; margin: 0; font-size: 28px;">Credenciais de Acesso</h1>
+          <h1 style="color: white; margin: 0; font-size: 28px;">Acesso ao Sistema</h1>
         </div>
-        
+
         <div style="background: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px;">
           <p style="font-size: 16px; margin-bottom: 20px;">
             Olá <strong>${patientName}</strong>,
           </p>
-          
+
           <p style="font-size: 16px; margin-bottom: 20px;">
-            Sua conta de acesso ao sistema foi criada com sucesso! ${temporaryPassword ? 'Você recebeu uma <strong>senha temporária</strong> que deve ser alterada no primeiro acesso.' : ''}
+            Sua conta de acesso ao sistema foi criada com sucesso!
+            Clique no botão abaixo para definir sua senha e acessar o sistema.
           </p>
-          
+
           <div style="background: #f9fafb; border: 2px solid #1B4266; border-radius: 8px; padding: 20px; margin: 25px 0;">
-            <h2 style="color: #1B4266; margin-top: 0; font-size: 18px; margin-bottom: 15px;">📧 Suas Credenciais:</h2>
-            
-            <div style="margin-bottom: 15px;">
-              <strong style="color: #6b7280; font-size: 14px; display: block; margin-bottom: 5px;">E-mail (Usuário):</strong>
+            <div style="margin-bottom: 10px;">
+              <strong style="color: #6b7280; font-size: 14px; display: block; margin-bottom: 5px;">Seu e-mail de acesso:</strong>
               <div style="background: white; padding: 12px; border-radius: 6px; border: 1px solid #d1d5db; font-family: monospace; font-size: 16px; color: #1B4266; font-weight: 600;">
                 ${userEmail}
               </div>
             </div>
-            
-            <div>
-              <strong style="color: #6b7280; font-size: 14px; display: block; margin-bottom: 5px;">Senha${temporaryPassword ? ' Temporária' : ''}:</strong>
-              <div style="background: white; padding: 12px; border-radius: 6px; border: 1px solid #d1d5db; font-family: monospace; font-size: 16px; color: #1B4266; font-weight: 600; letter-spacing: 2px;">
-                ${password}
-              </div>
-            </div>
           </div>
-          
-          ${temporaryPassword ? `
-          <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0; border-radius: 4px;">
-            <p style="margin: 0; font-size: 14px; color: #92400e;">
-              <strong>⚠️ Importante:</strong> Esta é uma senha temporária. Por segurança, altere sua senha no primeiro acesso ao sistema.
-            </p>
-          </div>
-          ` : ''}
-          
+
           <div style="text-align: center; margin: 30px 0;">
-            <a 
-              href="${loginUrl}/auth/signin" 
+            <a
+              href="${accessLink}"
               style="display: inline-block; background: linear-gradient(135deg, #1B4266 0%, #153350 100%); color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 12px rgba(27, 66, 102, 0.3);">
-              Acessar Sistema
+              Definir Senha e Acessar
             </a>
           </div>
-          
+
+          <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0; border-radius: 4px;">
+            <p style="margin: 0; font-size: 14px; color: #92400e;">
+              <strong>⏱️ Importante:</strong> Este link é válido por tempo limitado. Se expirar, solicite um novo link ao seu médico.
+            </p>
+          </div>
+
           <div style="background: #f9fafb; border-left: 4px solid #1B4266; padding: 15px; margin: 20px 0; border-radius: 4px;">
             <p style="margin: 0; font-size: 14px; color: #6b7280;">
               <strong>🔒 Dicas de Segurança:</strong><br>
-              • Guarde suas credenciais em local seguro<br>
+              • Escolha uma senha forte e única<br>
               • Não compartilhe sua senha com ninguém<br>
-              • Use uma senha forte e única<br>
-              ${temporaryPassword ? '• Altere sua senha temporária no primeiro acesso' : ''}
+              • Nunca clique em links suspeitos
             </p>
           </div>
-          
+
           <p style="font-size: 14px; color: #6b7280; margin-top: 30px; border-top: 1px solid #e5e7eb; padding-top: 20px;">
             Se você não solicitou esta conta ou tiver alguma dúvida, entre em contato com seu médico ou suporte.
           </p>
-          
+
           <p style="font-size: 12px; color: #9ca3af; margin-top: 20px; text-align: center;">
             Este é um email automático, por favor não responda.
           </p>

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authenticateToken } from '../middleware/auth';
-import { getAnamnese, updateAnamneseField, getAnamneseInicial } from '../controllers/anamneseController';
+import { getAnamnese, updateAnamneseField, getAnamneseInicial, saveAnamneseInicial } from '../controllers/anamneseController';
 
 const router = Router();
 
@@ -9,6 +9,12 @@ const router = Router();
  * Busca anamnese inicial do paciente
  */
 router.get('/anamnese-inicial', authenticateToken, getAnamneseInicial);
+
+/**
+ * POST /anamnese-inicial/save
+ * Salva anamnese inicial e atualiza dados do paciente
+ */
+router.post('/anamnese-inicial/save', authenticateToken, saveAnamneseInicial);
 
 /**
  * GET /anamnese/:consultaId

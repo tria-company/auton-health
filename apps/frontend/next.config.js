@@ -88,8 +88,7 @@ const nextConfig = {
 
   // Configurações de TypeScript
   typescript: {
-    // Em produção, pule a checagem de tipos (o SWC ainda transpila TS)
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
 };
 

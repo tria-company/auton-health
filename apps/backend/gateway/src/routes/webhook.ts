@@ -5,7 +5,7 @@ const router = Router();
 
 // Configuration for webhooks
 const WEBHOOK_BASE_URL = 'https://triahook.gst.dev.br';
-const WEBHOOK_AUTH_HEADER = 'Vc1mgGDEcnyqLH3LoHGUXoLTUg2BRVSu';
+const WEBHOOK_AUTH_HEADER = process.env.WEBHOOK_AUTH_HEADER || '';
 
 router.post('/edicao-livro-da-vida', async (req, res) => {
     try {

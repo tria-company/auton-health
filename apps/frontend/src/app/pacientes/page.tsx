@@ -204,16 +204,15 @@ export default function PatientsPage() {
       if (action === 'create') {
         if (response.emailSent || response.whatsappSent) {
           const parts = [response.message || 'Usuário criado com sucesso!'];
-          if (response.emailSent) parts.push('Email com credenciais enviado.');
-          if (response.whatsappSent) parts.push('Credenciais enviadas por WhatsApp.');
+          if (response.emailSent) parts.push('Link de acesso enviado por email.');
+          if (response.whatsappSent) parts.push('Link de acesso enviado por WhatsApp.');
           if (!response.whatsappSent && response.whatsappError) {
             parts.push(` WhatsApp não enviado: ${response.whatsappError}`);
           }
           showSuccess(parts.join(' '), 'Sucesso');
         } else {
-          const passwordInfo = response.password ? `\n\nSenha gerada: ${response.password}\n\nPor favor, informe esta senha ao paciente manualmente.` : '';
           showWarning(
-            `${response.message || 'Usuário criado com sucesso!'}\n\n⚠️ Email não foi enviado: ${response.emailError || 'Erro desconhecido'}${passwordInfo}`,
+            `${response.message || 'Usuário criado com sucesso!'}\n\n⚠️ Link de acesso não foi enviado: ${response.emailError || 'Erro desconhecido'}\n\nUse o botão "Reenviar Credenciais" para tentar novamente.`,
             'Atenção - Email não enviado'
           );
         }
@@ -275,16 +274,15 @@ export default function PatientsPage() {
 
       if (response.emailSent || response.whatsappSent) {
         const parts = [];
-        if (response.emailSent) parts.push('Email com credenciais reenviado.');
-        if (response.whatsappSent) parts.push('Credenciais enviadas por WhatsApp.');
+        if (response.emailSent) parts.push('Link de acesso reenviado por email.');
+        if (response.whatsappSent) parts.push('Link de acesso enviado por WhatsApp.');
         if (!response.whatsappSent && response.whatsappError) {
           parts.push(` WhatsApp não enviado: ${response.whatsappError}`);
         }
-        showSuccess(parts.join(' '), 'Credenciais Enviadas');
+        showSuccess(parts.join(' '), 'Link Enviado');
       } else {
-        const passwordInfo = response.password ? `\n\nNova senha gerada: ${response.password}\n\nPor favor, informe esta senha ao paciente manualmente.` : '';
         showWarning(
-          `Email não foi enviado: ${response.emailError || 'Erro desconhecido'}${passwordInfo}`,
+          `Link de acesso não foi enviado: ${response.emailError || 'Erro desconhecido'}`,
           'Atenção - Email não enviado'
         );
       }

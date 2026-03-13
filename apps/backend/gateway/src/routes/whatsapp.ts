@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import { authenticateToken } from '../middleware/auth';
-import { sendAnamneseWhatsApp } from '../controllers/whatsappController';
-import { whatsappController } from '../controllers/whatsapp.controller';
+import { sendAnamneseWhatsApp, sendTextWhatsApp } from '../controllers/whatsappController';
 
 const router = Router();
 
@@ -15,6 +14,6 @@ router.post('/anamnese', authenticateToken, sendAnamneseWhatsApp);
  * POST /whatsapp/send
  * Envia mensagem de texto genérica via WhatsApp
  */
-router.post('/send', authenticateToken, whatsappController.sendText);
+router.post('/send', authenticateToken, sendTextWhatsApp);
 
 export default router;

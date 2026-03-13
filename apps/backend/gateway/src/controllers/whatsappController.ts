@@ -1,9 +1,11 @@
-import { Response } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from '../middleware/auth';
+import { whatsappService } from '../services/whatsapp.service';
+import { z } from 'zod';
 
 /**
  * WhatsApp: usa APENAS Evolution API (mesmo fluxo da anamnese).
- * Resend é usado somente para e-mail (emailController / sendCredentialsEmail).
+ * Resend é usado somente para e-mail (emailController / sendAccessLinkEmail).
  */
 const EVOLUTION_API_URL = (process.env.EVOLUTION_API_URL || process.env.EVO_SERVICE_URL || 'https://evo.triacompany.com.br').trim().replace(/\/$/, '');
 const EVOLUTION_API_KEY = (process.env.EVOLUTION_API_KEY || process.env.EVO_APIKEY || '').trim();
@@ -136,40 +138,37 @@ Esta é uma mensagem automática.`;
   }
 }
 
-const DEFAULT_PATIENT_LOGIN_URL = 'https://pacientes.autonhealth.com.br';
 
 /**
- * Envia credenciais de acesso por WhatsApp via Evolution API (não usa Resend).
+ * Envia link de acesso por WhatsApp via Evolution API (sem senha em texto plano).
  * Mesmo canal da anamnese: Evolution API only.
  * Usado internamente ao criar/reenviar usuário do paciente.
  */
-export async function sendCredentialsWhatsApp(
+export async function sendAccessLinkWhatsApp(
   phone: string,
   patientName: string,
   userEmail: string,
-  password: string,
-  loginUrl: string = process.env.PATIENT_LOGIN_URL || DEFAULT_PATIENT_LOGIN_URL
+  accessLink: string
 ): Promise<{ success: boolean; error?: string; code?: string }> {
   const rawPhone = (phone || '').trim();
   if (!rawPhone) {
-    console.log('📱 [WHATSAPP] Credenciais: telefone vazio, não enviando');
+    console.log('📱 [WHATSAPP] Link de acesso: telefone vazio, não enviando');
     return { success: false, error: 'Telefone não informado' };
   }
 
   if (!EVOLUTION_API_KEY) {
-    console.warn('⚠️ [WHATSAPP] EVOLUTION_API_KEY não configurado, ignorando envio de credenciais');
+    console.warn('⚠️ [WHATSAPP] EVOLUTION_API_KEY não configurado, ignorando envio');
     return { success: false, error: 'WhatsApp não configurado (EVOLUTION_API_KEY)' };
   }
 
   const number = normalizePhoneToE164(rawPhone);
   if (number.length < 12) {
-    console.warn('⚠️ [WHATSAPP] Credenciais: número inválido após normalização:', number.length, 'dígitos');
+    console.warn('⚠️ [WHATSAPP] Link de acesso: número inválido após normalização:', number.length, 'dígitos');
     return { success: false, error: 'Número de telefone inválido. Use DDD + número (ex: 11999999999)' };
   }
 
-  console.log('📱 [WHATSAPP] Credenciais: enviando para número', number.slice(0, 4) + '****' + number.slice(-4));
+  console.log('📱 [WHATSAPP] Link de acesso: enviando para número', number.slice(0, 4) + '****' + number.slice(-4));
 
-  const signinUrl = `${loginUrl.replace(/\/$/, '')}/auth/signin`;
   const appName = process.env.APP_NAME || 'Auton Health';
 
   const text = `Olá *${patientName}*! 👋
@@ -177,11 +176,11 @@ export async function sendCredentialsWhatsApp(
 Sua conta de acesso ao *${appName}* foi criada.
 
 📧 *E-mail:* ${userEmail}
-🔑 *Senha temporária:* ${password}
 
-Acesse para entrar: ${signinUrl}
+🔗 Clique no link abaixo para definir sua senha e acessar o sistema:
+${accessLink}
 
-⚠️ Recomendamos alterar a senha no primeiro acesso.
+⏱️ Este link é válido por tempo limitado. Se expirar, solicite um novo ao seu médico.
 Esta é uma mensagem automática.`;
 
   // Verificar se o número possui WhatsApp (mesmo fluxo da anamnese)
@@ -201,12 +200,11 @@ Esta é uma mensagem automática.`;
       console.log('✅ [WHATSAPP] Número verificado - possui WhatsApp');
     }
   } catch (checkError) {
-    console.warn('⚠️ [WHATSAPP] Erro ao verificar número (credenciais), continuando envio:', checkError);
-    // Igual à anamnese: se falhar a verificação, tenta enviar mesmo assim
+    console.warn('⚠️ [WHATSAPP] Erro ao verificar número, continuando envio:', checkError);
   }
 
   const url = `${EVOLUTION_API_URL}/message/sendText/${EVOLUTION_INSTANCE}`;
-  console.log('📱 [WHATSAPP] Enviando credenciais via Evolution API...', { number: number.slice(-4) + '****' });
+  console.log('📱 [WHATSAPP] Enviando link de acesso via Evolution API...', { number: number.slice(-4) + '****' });
   try {
     const response = await fetch(url, {
       method: 'POST',
@@ -217,13 +215,49 @@ Esta é uma mensagem automática.`;
 
     if (!response.ok) {
       const errMsg = data?.message || data?.error || (typeof data === 'object' ? JSON.stringify(data) : String(data)) || `HTTP ${response.status}`;
-      console.error('❌ [WHATSAPP] Erro Evolution API (credenciais):', response.status, errMsg);
+      console.error('❌ [WHATSAPP] Erro Evolution API (link de acesso):', response.status, errMsg);
       return { success: false, error: errMsg };
     }
-    console.log('✅ [WHATSAPP] Credenciais enviadas por WhatsApp com sucesso');
+    console.log('✅ [WHATSAPP] Link de acesso enviado por WhatsApp com sucesso');
     return { success: true };
   } catch (err: any) {
-    console.error('❌ [WHATSAPP] Erro ao enviar credenciais:', err);
+    console.error('❌ [WHATSAPP] Erro ao enviar link de acesso:', err);
     return { success: false, error: err?.message || 'Erro ao enviar WhatsApp' };
+  }
+}
+
+// Schema de validação para envio de mensagem genérica
+const sendTextSchema = z.object({
+  number: z.string().min(1, 'Número é obrigatório'),
+  text: z.string().min(1, 'Texto da mensagem é obrigatório')
+});
+
+/**
+ * POST /whatsapp/send
+ * Envia uma mensagem de texto genérica via WhatsApp (Evolution API)
+ */
+export async function sendTextWhatsApp(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { number, text } = sendTextSchema.parse(req.body);
+
+    const whatsappCheck = await whatsappService.checkWhatsappNumber(number);
+    if (!whatsappCheck.exists) {
+      return res.status(400).json({
+        success: false,
+        error: 'O número informado não possui WhatsApp',
+        code: 'WHATSAPP_NOT_FOUND',
+        number: whatsappCheck.number
+      });
+    }
+
+    const result = await whatsappService.sendText({ number, text });
+
+    res.status(200).json({
+      success: true,
+      data: result,
+      message: 'Mensagem enviada com sucesso'
+    });
+  } catch (error) {
+    next(error);
   }
 }

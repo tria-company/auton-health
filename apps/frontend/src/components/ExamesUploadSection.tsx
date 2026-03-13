@@ -2,8 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { gatewayClient } from '@/lib/gatewayClient';
-import { Upload, FileText, CheckCircle, AlertCircle, Loader2, Search, MoreHorizontal, Plus, FileCheck } from 'lucide-react';
-import FileUpload, { useFileUpload, UploadedFile } from './FileUpload';
+import { supabase } from '@/lib/supabase';
+import { FileText, Loader2, Search, MoreHorizontal, Plus, FileCheck } from 'lucide-react';
+import { UploadedFile } from './FileUpload';
+import { ExamUploadModal } from './modals/ExamUploadModal';
 
 interface Exame {
   id: string;
@@ -29,41 +31,31 @@ export default function ExamesUploadSection({
   patientId,
   disabled = false
 }: ExamesUploadSectionProps) {
-  const { uploadedFiles, setUploadedFiles, clearFiles } = useFileUpload();
   const [exames, setExames] = useState<Exame[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [processingStatus, setProcessingStatus] = useState<'idle' | 'uploading' | 'processing' | 'success' | 'error'>('idle');
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
-  
+
   const itemsPerPage = 10;
 
   const fetchExames = async () => {
     try {
       setLoading(true);
-      console.log('🔍 Buscando exames para consulta:', consultaId);
       const response = await gatewayClient.get(`/exames/${consultaId}`);
       if (!response.success) {
-        const errorData = response(() => ({}));
-        console.error('❌ Erro ao buscar exames:', response.status, errorData);
-        throw new Error(errorData.error || 'Erro ao buscar exames');
+        console.error('Erro ao buscar exames:', response.status, response.error);
+        throw new Error(response.error || 'Erro ao buscar exames');
       }
-      const data = response;
-      console.log('✅ Exames recebidos:', data);
-      setExames(data.exames || []);
+      setExames((response as any).exames || []);
     } catch (error) {
-      console.error('❌ Erro ao buscar exames:', error);
+      console.error('Erro ao buscar exames:', error);
       setExames([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // Buscar exames ao carregar o componente
   useEffect(() => {
     if (consultaId) {
       fetchExames();
@@ -71,61 +63,46 @@ export default function ExamesUploadSection({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [consultaId]);
 
-  const handleFilesChange = (files: UploadedFile[]) => {
-    setUploadedFiles(files);
-    setErrorMessage(null);
-    setSuccessMessage(null);
-  };
+  const handleUploadExam = async (files: UploadedFile[]) => {
+    // 1. Upload de cada arquivo para o Supabase Storage
+    const folderPath = `exames/${patientId || consultaId}`;
+    const uploadedUrls: string[] = [];
 
-  const handleProcessExames = async () => {
-    if (uploadedFiles.length === 0) {
-      setErrorMessage('Por favor, selecione pelo menos um arquivo para processar.');
-      return;
-    }
+    for (const fileObj of files) {
+      const file = fileObj.file;
+      const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+      const fileName = `${Date.now()}_${sanitizedName}`;
+      const filePath = `${folderPath}/${fileName}`;
 
-    setIsProcessing(true);
-    setProcessingStatus('uploading');
-    setErrorMessage(null);
-    setSuccessMessage(null);
+      const { error } = await supabase.storage
+        .from('documents')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
 
-    try {
-      const formData = new FormData();
-      uploadedFiles.forEach(file => {
-        formData.append('files', file.file);
-      });
-
-      setProcessingStatus('processing');
-
-      const processResponse = await fetch(`/api/processar-exames/${consultaId}`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!processResponse.ok) {
-        const errorData = await processResponse.json();
-        throw new Error(errorData.error || 'Erro no processamento dos exames');
+      if (error) {
+        throw new Error(`Falha ao enviar ${file.name}: ${error.message}`);
       }
 
-      const processResult = await processResponse.json();
-      
-      setProcessingStatus('success');
-      setSuccessMessage(processResult.message || 'Exames processados com sucesso!');
-      clearFiles();
-      
-      // Atualizar lista de exames
-      setTimeout(() => {
-        fetchExames();
-        setShowUploadModal(false);
-        setProcessingStatus('idle');
-      }, 1000);
+      const { data: publicUrlData } = supabase.storage
+        .from('documents')
+        .getPublicUrl(filePath);
 
-    } catch (error) {
-      console.error('❌ Erro no processamento:', error);
-      setProcessingStatus('error');
-      setErrorMessage(error instanceof Error ? error.message : 'Erro desconhecido no processamento');
-    } finally {
-      setIsProcessing(false);
+      if (publicUrlData.publicUrl) {
+        uploadedUrls.push(publicUrlData.publicUrl);
+      }
     }
+
+    // 2. Vincular URLs à consulta via gateway
+    const linkResponse = await gatewayClient.post(`/exames/${consultaId}/link`, { fileUrls: uploadedUrls });
+
+    if (!linkResponse.success) {
+      throw new Error(linkResponse.error || 'Erro ao vincular exames à consulta');
+    }
+
+    // 3. Atualizar lista
+    fetchExames();
   };
 
   // Filtrar exames por termo de busca
@@ -134,7 +111,7 @@ export default function ExamesUploadSection({
     exame.tipo.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Calcular paginação
+  // Calcular paginacao
   const totalPages = Math.ceil(filteredExames.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedExames = filteredExames.slice(startIndex, startIndex + itemsPerPage);
@@ -145,25 +122,23 @@ export default function ExamesUploadSection({
 
   return (
     <div className="exames-section-container">
-      {/* Header com título "Exames" e ações */}
+      {/* Header */}
       <div className="exames-section-header">
         <div className="exames-tab-header">
           <div className="exames-tab-active">Exames</div>
         </div>
-        
+
         <div className="exames-header-actions">
-          {/* Botão Anexar Exame */}
           <button
             className="exames-anexar-button"
             onClick={() => setShowUploadModal(true)}
-            disabled={disabled || isProcessing}
+            disabled={disabled}
           >
             <Plus size={18} />
             <span>Anexar Exame</span>
             <FileCheck size={18} />
           </button>
 
-          {/* Campo de busca */}
           <div className="exames-search-container">
             <Search size={19} className="exames-search-icon" />
             <input
@@ -172,7 +147,7 @@ export default function ExamesUploadSection({
               value={searchTerm}
               onChange={(e) => {
                 setSearchTerm(e.target.value);
-                setCurrentPage(1); // Reset para primeira página ao buscar
+                setCurrentPage(1);
               }}
               className="exames-search-input"
             />
@@ -195,7 +170,6 @@ export default function ExamesUploadSection({
           </div>
         ) : (
           <>
-            {/* Cabeçalho da tabela */}
             <div className="exames-table-header">
               <div className="exames-table-header-content">
                 <div className="exames-table-col-nome">Nome do Exame</div>
@@ -208,7 +182,6 @@ export default function ExamesUploadSection({
               </div>
             </div>
 
-            {/* Linhas da tabela */}
             {paginatedExames.map((exame) => (
               <div key={exame.id} className="exames-table-row">
                 <div className="exames-table-row-content">
@@ -225,7 +198,7 @@ export default function ExamesUploadSection({
                     <button
                       className="exames-action-menu"
                       onClick={() => handleDownload(exame.url, exame.fileName)}
-                      title="Ver opções"
+                      title="Ver opcoes"
                     >
                       <MoreHorizontal size={24} />
                     </button>
@@ -237,7 +210,7 @@ export default function ExamesUploadSection({
         )}
       </div>
 
-      {/* Paginação */}
+      {/* Paginacao */}
       {totalPages > 1 && (
         <div className="exames-pagination">
           <button
@@ -247,7 +220,7 @@ export default function ExamesUploadSection({
           >
             ←
           </button>
-          
+
           {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
             let pageNum;
             if (totalPages <= 5) {
@@ -259,7 +232,7 @@ export default function ExamesUploadSection({
             } else {
               pageNum = currentPage - 2 + i;
             }
-            
+
             return (
               <button
                 key={pageNum}
@@ -270,7 +243,7 @@ export default function ExamesUploadSection({
               </button>
             );
           })}
-          
+
           {totalPages > 5 && currentPage < totalPages - 2 && (
             <>
               <span className="exames-pagination-ellipsis">...</span>
@@ -293,84 +266,12 @@ export default function ExamesUploadSection({
         </div>
       )}
 
-      {/* Modal de upload */}
-      {showUploadModal && (
-        <div className="exames-upload-modal-overlay" onClick={() => !isProcessing && setShowUploadModal(false)}>
-          <div className="exames-upload-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="exames-upload-modal-header">
-              <h3>Anexar Exames</h3>
-              <button
-                className="exames-upload-modal-close"
-                onClick={() => !isProcessing && setShowUploadModal(false)}
-                disabled={isProcessing}
-              >
-                ×
-              </button>
-            </div>
-
-            <div className="exames-upload-modal-content">
-              <p>Selecione os arquivos de exames para anexar à consulta.</p>
-              <p className="exames-upload-modal-hint">
-                <strong>Formatos aceitos:</strong> PDF, DOC, DOCX, JPG, PNG (máximo 10MB por arquivo)
-              </p>
-
-              <FileUpload
-                onFilesChange={handleFilesChange}
-                maxFiles={50}
-                maxSizePerFile={10}
-                acceptedTypes={['application/pdf', '.doc', '.docx', 'image/jpeg', 'image/png']}
-                disabled={disabled || isProcessing}
-              />
-
-              {errorMessage && (
-                <div className="exames-upload-alert error">
-                  <AlertCircle />
-                  <div>{errorMessage}</div>
-                </div>
-              )}
-
-              {successMessage && (
-                <div className="exames-upload-alert success">
-                  <CheckCircle />
-                  <div>{successMessage}</div>
-                </div>
-              )}
-            </div>
-
-            <div className="exames-upload-modal-footer">
-              <button
-                className="exames-upload-modal-cancel"
-                onClick={() => {
-                  if (!isProcessing) {
-                    setShowUploadModal(false);
-                    clearFiles();
-                    setErrorMessage(null);
-                    setSuccessMessage(null);
-                  }
-                }}
-                disabled={isProcessing}
-              >
-                Cancelar
-              </button>
-              <button
-                className="exames-upload-modal-submit"
-                onClick={handleProcessExames}
-                disabled={disabled || isProcessing || uploadedFiles.length === 0}
-              >
-                {processingStatus === 'uploading' && <Loader2 className="animate-spin" size={16} />}
-                {processingStatus === 'processing' && <Loader2 className="animate-spin" size={16} />}
-                {processingStatus === 'success' && <CheckCircle size={16} />}
-                {processingStatus === 'error' && <AlertCircle size={16} />}
-                {processingStatus === 'idle' && 'Anexar Exames'}
-                {processingStatus === 'uploading' && 'Enviando...'}
-                {processingStatus === 'processing' && 'Processando...'}
-                {processingStatus === 'success' && 'Concluído'}
-                {processingStatus === 'error' && 'Tentar Novamente'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Modal de upload - mesmo usado durante a consulta */}
+      <ExamUploadModal
+        isOpen={showUploadModal}
+        onClose={() => setShowUploadModal(false)}
+        onUpload={handleUploadExam}
+      />
     </div>
   );
 }

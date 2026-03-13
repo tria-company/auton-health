@@ -1,19 +1,19 @@
 import { Router } from 'express';
 import { authenticateToken } from '../middleware/auth';
-import { getExames, processarExames } from '../controllers/examesController';
+import { getExames, linkExames } from '../controllers/examesController';
 
 const router = Router();
 
 /**
  * GET /exames/:consultaId
- * Busca exames de uma consulta
+ * Busca exames de uma consulta (lê de consultations.exames text[])
  */
 router.get('/:consultaId', authenticateToken, getExames);
 
 /**
- * POST /processar-exames/:consultaId
- * Processa exames de uma consulta
+ * POST /exames/:consultaId/link
+ * Vincula URLs de arquivos já uploadados no Storage à consulta
  */
-router.post('/processar-exames/:consultaId', authenticateToken, processarExames);
+router.post('/:consultaId/link', authenticateToken, linkExames);
 
 export default router;

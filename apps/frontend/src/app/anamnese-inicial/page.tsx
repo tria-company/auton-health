@@ -5,7 +5,6 @@ import { gatewayClient } from '@/lib/gatewayClient';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useNotifications } from '@/components/shared/NotificationSystem';
 import { FileText, Save, ArrowLeft } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
 import './anamnese-inicial.css';
 
 interface AnamneseFormData {
@@ -73,6 +72,61 @@ const frutasOptions = [
   'Jabuticaba', 'Figo', 'Nectarina', 'Romã', 'Cereja', 'Pitaya'
 ];
 
+// Mapeamento categoria → opções (para inversão DRY)
+const categoryOptionsMap: Record<string, string[]> = {
+  proteinas: proteinasOptions,
+  carboidratos: carboidratosOptions,
+  legumes: legumesOptions,
+  leguminosas: leguminosasOptions,
+  gorduras: gordurasOptions,
+  frutas: frutasOptions,
+};
+
+/**
+ * Inverte seleção: dado um array de itens selecionados, retorna os NÃO selecionados.
+ * Usado para converter entre "o que o paciente NÃO quer" (UI) e "o que QUER" (DB).
+ */
+function invertSelection(selected: string[], allOptions: string[]): string[] {
+  return allOptions.filter(item => !selected.includes(item));
+}
+
+/**
+ * Converte dados do DB (o que DESEJA) para a UI (o que NÃO DESEJA).
+ */
+function dbToUi(dbData: any): any {
+  const uiData = { ...dbData };
+  for (const [key, options] of Object.entries(categoryOptionsMap)) {
+    if (uiData[key]) {
+      uiData[key] = invertSelection(dbData[key] || [], options);
+    }
+  }
+  // Vegetais: no DB é uma coluna única, na UI é separado em folhosos + ervas/temperos
+  const vegetaisDesejados: string[] = dbData.vegetais || [];
+  uiData.vegetais = invertSelection(vegetaisDesejados, vegetaisFolhososOptions);
+  uiData.ervas_temperos = invertSelection(vegetaisDesejados, ervasTemperosOptions);
+  return uiData;
+}
+
+/**
+ * Converte dados da UI (o que NÃO DESEJA) para o DB (o que DESEJA).
+ */
+function uiToDb(formData: any): any {
+  const dbData = { ...formData };
+  for (const [key, options] of Object.entries(categoryOptionsMap)) {
+    if (dbData[key]) {
+      dbData[key] = invertSelection(formData[key] || [], options);
+    }
+  }
+  // Vegetais: junta folhosos + ervas/temperos invertidos na mesma coluna
+  dbData.vegetais = [
+    ...invertSelection(formData.vegetais || [], vegetaisFolhososOptions),
+    ...invertSelection(formData.ervas_temperos || [], ervasTemperosOptions),
+  ];
+  // Remover campo virtual
+  delete dbData.ervas_temperos;
+  return dbData;
+}
+
 function AnamneseInicialContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -100,36 +154,8 @@ function AnamneseInicialContent() {
       if (!response.success) { throw new Error(response.error || "Erro na requisição"); }
       const data = response;
       if (data.anamnese) {
-        // Inverter a lógica ao carregar: se no banco está o que DESEJA,
-        // na interface mostramos o que NÃO DESEJA (inverso)
-        const loadedData = { ...data.anamnese };
-        
-        // Para cada categoria, calcular o inverso (todos - desejados = não desejados)
-        const desejados = data.anamnese;
-        if (loadedData.proteinas) {
-          loadedData.proteinas = proteinasOptions.filter(item => !(desejados.proteinas || []).includes(item));
-        }
-        if (loadedData.carboidratos) {
-          loadedData.carboidratos = carboidratosOptions.filter(item => !(desejados.carboidratos || []).includes(item));
-        }
-        // vegetais no DB pode conter folhosos + ervas/temperos; ao carregar separamos
-        const vegetaisDesejados = desejados.vegetais || [];
-        loadedData.vegetais = vegetaisFolhososOptions.filter(item => !vegetaisDesejados.includes(item));
-        loadedData.ervas_temperos = ervasTemperosOptions.filter(item => !vegetaisDesejados.includes(item));
-        if (loadedData.legumes) {
-          loadedData.legumes = legumesOptions.filter(item => !(desejados.legumes || []).includes(item));
-        }
-        if (loadedData.leguminosas) {
-          loadedData.leguminosas = leguminosasOptions.filter(item => !(desejados.leguminosas || []).includes(item));
-        }
-        if (loadedData.gorduras) {
-          loadedData.gorduras = gordurasOptions.filter(item => !(desejados.gorduras || []).includes(item));
-        }
-        if (loadedData.frutas) {
-          loadedData.frutas = frutasOptions.filter(item => !(desejados.frutas || []).includes(item));
-        }
-        
-        setFormData(loadedData);
+        // Converter do formato DB (o que DESEJA) para UI (o que NÃO DESEJA)
+        setFormData(dbToUi(data.anamnese));
       }
     } catch (error) {
       console.error('Erro ao carregar anamnese:', error);
@@ -172,69 +198,22 @@ function AnamneseInicialContent() {
     setSaving(true);
 
     try {
-      // Inverter a lógica: o que o usuário selecionou são os que NÃO deseja
-      // Precisamos enviar os que NÃO foram selecionados (os que DESEJA)
-      const invertedFormData = { ...formData };
-      
-      // Para cada categoria, calcular o inverso (todos os alimentos - selecionados = desejados)
-      if (invertedFormData.proteinas) {
-        invertedFormData.proteinas = proteinasOptions.filter(item => !(formData.proteinas || []).includes(item));
-      }
-      if (invertedFormData.carboidratos) {
-        invertedFormData.carboidratos = carboidratosOptions.filter(item => !(formData.carboidratos || []).includes(item));
-      }
-      // vegetais: junta folhosos + ervas/temperos (mesma coluna no DB)
-      const vegetaisDesejados = [
-        ...vegetaisFolhososOptions.filter(item => !(formData.vegetais || []).includes(item)),
-        ...ervasTemperosOptions.filter(item => !(formData.ervas_temperos || []).includes(item))
-      ];
-      invertedFormData.vegetais = vegetaisDesejados;
-      if (invertedFormData.legumes) {
-        invertedFormData.legumes = legumesOptions.filter(item => !(formData.legumes || []).includes(item));
-      }
-      if (invertedFormData.leguminosas) {
-        invertedFormData.leguminosas = leguminosasOptions.filter(item => !(formData.leguminosas || []).includes(item));
-      }
-      if (invertedFormData.gorduras) {
-        invertedFormData.gorduras = gordurasOptions.filter(item => !(formData.gorduras || []).includes(item));
-      }
-      if (invertedFormData.frutas) {
-        invertedFormData.frutas = frutasOptions.filter(item => !(formData.frutas || []).includes(item));
-      }
+      // Converter da UI (o que NÃO DESEJA) para o DB (o que DESEJA)
+      const invertedFormData = uiToDb(formData);
 
-      // Whitelist: apenas colunas que existem em a_cadastro_anamnese (evita PGRST204 por tipo_sanguineo etc)
-      const allowedKeys = [
-        'nome_completo', 'cpf', 'email', 'genero', 'data_nascimento', 'idade', 'tipo_saguineo',
-        'estado_civil', 'profissao', 'altura', 'peso_atual', 'peso_antigo', 'peso_desejado',
-        'objetivo_principal', 'patrica_atividade_fisica', 'frequencia_deseja_treinar',
-        'restricao_movimento', 'informacoes_importantes', 'NecessidadeEnergeticaDiaria',
-        'proteinas', 'carboidratos', 'vegetais', 'legumes', 'leguminosas', 'gorduras', 'frutas',
-        'status', 'updated_at'
-      ] as const;
-      const raw: Record<string, unknown> = { ...invertedFormData, status: 'preenchida' };
-      const payload: Record<string, unknown> = {};
-      for (const key of allowedKeys) {
-        if (Object.prototype.hasOwnProperty.call(raw, key)) payload[key] = raw[key];
-      }
       // Garantir tipo_saguineo (coluna no DB); valor pode vir como tipo_sanguineo no form (cache)
-      const tipoVal = raw.tipo_saguineo ?? (raw as any).tipo_sanguineo;
-      if (tipoVal !== undefined) payload.tipo_saguineo = tipoVal;
-      payload.updated_at = new Date().toISOString();
-      // Sempre marcar como preenchida ao salvar
-      payload.status = 'preenchida';
+      const tipoVal = invertedFormData.tipo_saguineo ?? (invertedFormData as any).tipo_sanguineo;
+      if (tipoVal !== undefined) invertedFormData.tipo_saguineo = tipoVal;
 
-      // Atualizar anamnese no Supabase
-      const { data: updatedAnamnese, error: updateError } = await supabase
-        .from('a_cadastro_anamnese')
-        .update(payload)
-        .eq('paciente_id', pacienteId)
-        .select()
-        .maybeSingle();
+      // Salvar via gateway (backend usa service_role, bypassa RLS)
+      // Também atualiza dados do paciente na tabela patients
+      const saveResponse = await gatewayClient.post('/anamnese/anamnese-inicial/save', {
+        paciente_id: pacienteId,
+        ...invertedFormData,
+      });
 
-      if (updateError) {
-        const errorMessage = updateError?.message || 'Erro ao salvar anamnese';
-        console.error('Erro ao atualizar anamnese:', updateError);
-        throw new Error(errorMessage);
+      if (!saveResponse.success) {
+        throw new Error(saveResponse.error || 'Erro ao salvar anamnese');
       }
 
       showSuccess('Anamnese salva com sucesso!', 'Sucesso');

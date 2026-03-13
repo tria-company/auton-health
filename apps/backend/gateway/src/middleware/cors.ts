@@ -20,11 +20,10 @@ function getAllowedOrigins(): string[] {
   // Origens de produção padrão
   const defaultProdOrigins = [
     'https://autonhealth.com.br',
-    '*.autonhealth.com.br', // Permitir qualquer subdomínio
+    '*.autonhealth.com.br', // Permitir subdomínios autonhealth
     'https://auton-health-frontend.vercel.app',
     'https://medcall-ai-frontend-v2.vercel.app',
     'https://medcall-ai-homolog.vercel.app',
-    '*.vercel.app' // Permitir qualquer subdomínio Vercel
   ];
 
   const origins: string[] = [];
@@ -94,31 +93,13 @@ let cachedOrigins: string[] | null = null;
 
 /**
  * Middleware CORS Configurável
- * 
+ *
  * Configurações via variáveis de ambiente:
  * - CORS_ORIGINS: Lista de origens separadas por vírgula
  * - FRONTEND_URL: URL do frontend (adicionado automaticamente)
- * - CORS_ALLOW_ALL: Se "true", permite todas as origens (NÃO recomendado em produção)
  */
 export const corsMiddleware = cors({
   origin: (origin, callback) => {
-    // TEMPORÁRIO: Permitir TODAS as origens para debug
-    console.log(`🔍 [CORS DEBUG] Origin recebido: ${origin}`);
-
-    // Modo permissivo (apenas para debug/desenvolvimento temporário)
-    if (process.env.CORS_ALLOW_ALL === 'true') {
-      if (isProduction) {
-        console.warn('⚠️ [CORS] CORS_ALLOW_ALL está ativo em PRODUÇÃO - isso é inseguro!');
-      }
-      return callback(null, true);
-    }
-
-    // TEMPORÁRIO: Permitir Vercel sem validação
-    if (origin && origin.includes('vercel.app')) {
-      console.log(`✅ [CORS] Permitindo Vercel: ${origin}`);
-      return callback(null, true);
-    }
-
     // Obter origens permitidas (com cache)
     if (!cachedOrigins) {
       cachedOrigins = getAllowedOrigins();
@@ -128,23 +109,12 @@ export const corsMiddleware = cors({
     const allowed = isOriginAllowed(origin, cachedOrigins);
 
     if (allowed) {
-      console.log(`✅ [CORS] Origem permitida: ${origin}`);
       return callback(null, true);
     }
 
-    // Log de origem bloqueada
+    // Log de origem bloqueada e rejeitar
     console.warn(`🚫 [CORS] Origem bloqueada: ${origin}`);
-    console.warn(`🚫 [CORS] Origens permitidas:`, cachedOrigins);
-
-    // Em desenvolvimento, ser mais permissivo e apenas logar
-    if (isDevelopment) {
-      console.warn(`⚠️ [CORS] Permitindo origem não configurada em dev: ${origin}`);
-      return callback(null, true);
-    }
-
-    // TEMPORÁRIO: Permitir de qualquer forma para debug
-    console.warn(`⚠️ [CORS TEMP] Permitindo origem para debug: ${origin}`);
-    return callback(null, true);
+    return callback(new Error(`Origem não permitida pelo CORS: ${origin}`));
   },
 
   // Permitir envio de cookies/credenciais

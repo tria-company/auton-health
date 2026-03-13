@@ -177,7 +177,6 @@ app.use('/api', solucoesRoutes);
 app.use('/agenda', agendaRoutes);
 app.use('/admin', adminRoutes);
 app.use('/exames', examesRoutes);
-app.use('/processar-exames', examesRoutes);
 app.use('/api/auth/google-calendar', googleCalendarRoutes);
 app.use('/ai', aiRoutes);
 app.use('/admin/consultations', consultasAdminRoutes);

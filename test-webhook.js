@@ -4,7 +4,7 @@ const testWebhook = async () => {
     // Configuração baseada no ambiente
     const isDevelopment = process.env.NODE_ENV === 'development';
     const suffix = isDevelopment ? '-teste' : '';
-    const authHeader = 'Vc1mgGDEcnyqLH3LoHGUXoLTUg2BRVSu';
+    const authHeader = process.env.WEBHOOK_AUTH_HEADER || '';
     
     const webhookUrl = `https://webhook.tc1.triacompany.com.br/webhook/usi-input-edicao-diagnostico${suffix}`;
     

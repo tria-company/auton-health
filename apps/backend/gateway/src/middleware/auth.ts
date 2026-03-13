@@ -1,6 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
 import { createClient } from '@supabase/supabase-js';
-import jwt from 'jsonwebtoken';
 import { config, isDevelopment } from '../config';
 
 // Interface para adicionar user ao Request
@@ -64,36 +63,17 @@ export async function authenticateToken(
         return next();
       }
     } catch (supabaseError: any) {
-      // Se for o erro específico de sessão, tentar validação manual como fallback
+      // Verificar se é erro de indisponibilidade do Supabase
       if (supabaseError.name === 'AuthSessionMissingError' || supabaseError.message?.includes('Auth session missing')) {
-        console.warn('[AUTH] Aviso: Falha na validação Supabase (AuthSessionMissingError). Tentando validação manual JWT...');
-
-        try {
-          // Fallback: Validar assinatura JWT manualmente
-          // Necessita que JWT_SECRET esteja configurado corretamente no .env
-          const decoded = jwt.verify(token, config.JWT_SECRET) as any;
-
-          if (decoded && decoded.sub) {
-            // Construir usuário mascarado a partir do token
-            req.user = {
-              id: decoded.sub,
-              email: decoded.email,
-              role: decoded.role || 'authenticated',
-              app_metadata: decoded.app_metadata || {},
-              user_metadata: decoded.user_metadata || {},
-              aud: decoded.aud,
-              created_at: new Date().toISOString()
-            };
-
-            console.log('[AUTH] ✅ Token validado manualmente via JWT Verify');
-            return next();
-          }
-        } catch (jwtError) {
-          console.error('[AUTH] ❌ Falha na validação manual JWT:', jwtError);
-        }
+        console.error('[AUTH] Supabase Auth indisponível:', supabaseError.message);
+        res.status(503).json({
+          success: false,
+          error: 'Serviço de autenticação temporariamente indisponível'
+        });
+        return;
       }
 
-      // Se chegou aqui, ambas validações falharam
+      // Token inválido ou expirado
       console.error('[AUTH] Erro ao validar token:', supabaseError);
       res.status(401).json({
         success: false,

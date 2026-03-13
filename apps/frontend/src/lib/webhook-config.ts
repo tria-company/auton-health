@@ -31,7 +31,7 @@ export function getWebhookConfig(): WebhookConfig {
   return {
     baseUrl: 'https://triahook.gst.dev.br',
     //baseUrl: 'https://webhook.tc1.triacompany.com.br',
-    authHeader: 'Vc1mgGDEcnyqLH3LoHGUXoLTUg2BRVSu'
+    authHeader: process.env.NEXT_PUBLIC_WEBHOOK_AUTH_HEADER || ''
   };
 }
 

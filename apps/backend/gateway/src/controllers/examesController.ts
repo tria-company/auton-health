@@ -4,7 +4,7 @@ import { AuthenticatedRequest } from '../middleware/auth';
 
 /**
  * GET /exames/:consultaId
- * Busca exames de uma consulta
+ * Busca exames de uma consulta a partir do campo consultations.exames (text[])
  */
 export async function getExames(req: AuthenticatedRequest, res: Response) {
   try {
@@ -17,23 +17,58 @@ export async function getExames(req: AuthenticatedRequest, res: Response) {
 
     const { consultaId } = req.params;
 
-    const { data: exames, error } = await supabase
-      .from('exames')
-      .select('*')
-      .eq('consultation_id', consultaId)
-      .order('created_at', { ascending: false });
+    console.log('[getExames] Buscando exames para consulta:', consultaId);
+
+    const { data: consultation, error } = await supabase
+      .from('consultations')
+      .select('exames')
+      .eq('id', consultaId)
+      .maybeSingle();
 
     if (error) {
-      console.error('Erro ao buscar exames:', error);
+      console.error('[getExames] Erro ao buscar exames:', error);
       return res.status(500).json({
         success: false,
         error: 'Erro ao buscar exames'
       });
     }
 
+    if (!consultation) {
+      console.warn('[getExames] Consulta não encontrada:', consultaId);
+      return res.json({
+        success: true,
+        exames: [],
+      });
+    }
+
+    // Transformar array de URLs em objetos para o frontend
+    const urls: string[] = consultation.exames || [];
+    const exames = urls.map((url, index) => {
+      // Extrair nome do arquivo da URL
+      const parts = url.split('/');
+      const rawFileName = parts[parts.length - 1] || `exame_${index + 1}`;
+      // Remover timestamp prefix (e.g. "1234567890_filename.pdf" -> "filename.pdf")
+      const fileName = rawFileName.replace(/^\d+_/, '');
+      // Extrair extensão para tipo
+      const ext = fileName.split('.').pop()?.toLowerCase() || '';
+      const tipo = ext === 'pdf' ? 'PDF'
+        : ['jpg', 'jpeg', 'png'].includes(ext) ? 'Imagem'
+        : ['doc', 'docx'].includes(ext) ? 'Documento'
+        : ext.toUpperCase();
+
+      return {
+        id: `${consultaId}-${index}`,
+        nome: decodeURIComponent(fileName),
+        dataAnexo: '', // Não temos data exata, pode ser inferido do timestamp
+        tipo,
+        url,
+        fileName: decodeURIComponent(fileName),
+      };
+    });
+
     return res.json({
       success: true,
-      exames: exames || []
+      exames,
     });
 
   } catch (error) {
@@ -46,10 +81,10 @@ export async function getExames(req: AuthenticatedRequest, res: Response) {
 }
 
 /**
- * POST /processar-exames/:consultaId
- * Processa exames de uma consulta
+ * POST /exames/:consultaId/link
+ * Recebe URLs de arquivos já uploadados no Storage e vincula à consulta
  */
-export async function processarExames(req: AuthenticatedRequest, res: Response) {
+export async function linkExames(req: AuthenticatedRequest, res: Response) {
   try {
     if (!req.user) {
       return res.status(401).json({
@@ -59,50 +94,71 @@ export async function processarExames(req: AuthenticatedRequest, res: Response) 
     }
 
     const { consultaId } = req.params;
-    const { exames } = req.body;
+    const { fileUrls } = req.body;
 
-    if (!exames || !Array.isArray(exames)) {
+    if (!fileUrls || !Array.isArray(fileUrls) || fileUrls.length === 0) {
       return res.status(400).json({
         success: false,
-        error: 'exames é obrigatório e deve ser um array'
+        error: 'fileUrls é obrigatório e deve ser um array não vazio'
       });
     }
 
-    // Processar cada exame
-    const processedExames = [];
-    for (const exame of exames) {
-      // Aqui você pode adicionar lógica de processamento de IA
-      // Por enquanto, apenas salva no banco
-      
-      const { data, error } = await supabase
-        .from('exames')
-        .insert({
-          consultation_id: consultaId,
-          ...exame,
-          processed_at: new Date().toISOString()
-        })
-        .select()
-        .single();
+    // Buscar exames atuais
+    const { data: consultation, error: fetchError } = await supabase
+      .from('consultations')
+      .select('exames')
+      .eq('id', consultaId)
+      .maybeSingle();
 
-      if (error) {
-        console.error('Erro ao processar exame:', error);
-        continue;
+    if (fetchError) {
+      console.error('Erro ao buscar consulta:', fetchError);
+      return res.status(500).json({
+        success: false,
+        error: 'Erro ao buscar consulta'
+      });
+    }
+
+    if (!consultation) {
+      return res.status(404).json({
+        success: false,
+        error: 'Consulta não encontrada'
+      });
+    }
+
+    // Append sem duplicatas
+    const currentExames: string[] = consultation?.exames || [];
+    const newExames = [...currentExames];
+    for (const url of fileUrls) {
+      if (!newExames.includes(url)) {
+        newExames.push(url);
       }
+    }
 
-      processedExames.push(data);
+    // Atualizar
+    const { error: updateError } = await supabase
+      .from('consultations')
+      .update({ exames: newExames })
+      .eq('id', consultaId);
+
+    if (updateError) {
+      console.error('Erro ao atualizar exames:', updateError);
+      return res.status(500).json({
+        success: false,
+        error: 'Erro ao vincular exames à consulta'
+      });
     }
 
     return res.json({
       success: true,
-      exames: processedExames,
-      message: `${processedExames.length} exames processados com sucesso`
+      message: `${fileUrls.length} exame(s) vinculado(s) com sucesso`,
+      totalExames: newExames.length,
     });
 
   } catch (error) {
-    console.error('Erro ao processar exames:', error);
+    console.error('Erro ao vincular exames:', error);
     return res.status(500).json({
       success: false,
-      error: 'Erro ao processar exames'
+      error: 'Erro interno do servidor'
     });
   }
 }
