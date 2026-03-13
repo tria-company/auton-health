@@ -12,16 +12,7 @@ import { formatDuration } from '@/lib/audioUtils';
 import { ConfirmModal } from '@/components/modals/ConfirmModal';
 import { supabase } from '@/lib/supabase';
 
-import { TranscriptionSegment } from '@medcall/shared-types';
-
-/*
-interface Transcription {
-  speaker: 'doctor' | 'patient';
-  text: string;
-  timestamp: string;
-  sequence: number;
-}
-*/
+import { TranscriptionSegment } from '@/types/transcription';
 
 function PresencialConsultationContent() {
   const router = useRouter();

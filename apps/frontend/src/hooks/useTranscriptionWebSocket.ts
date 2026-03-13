@@ -1,19 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 
-import { TranscriptionSegment } from '@medcall/shared-types';
-
-/* 
-interface TranscriptionSegment {
-  id: string;
-  text: string;
-  participantId: string;
-  participantName: string;
-  timestamp: Date;
-  final: boolean;
-  confidence?: number;
-}
-*/
+import { TranscriptionSegment } from '@/types/transcription';
 
 interface UseTranscriptionWebSocketProps {
   roomName: string;

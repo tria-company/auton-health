@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import { Stethoscope, User } from 'lucide-react';
 import { formatDuration } from '@/lib/audioUtils';
 
-import { TranscriptionSegment } from '@medcall/shared-types';
+import { TranscriptionSegment } from '@/types/transcription';
 
 interface PresencialTranscriptionProps {
   transcriptions: TranscriptionSegment[];

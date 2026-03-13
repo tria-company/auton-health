@@ -2,7 +2,7 @@
 
 import { useRef, useEffect } from 'react';
 import { FileText, User, Clock } from 'lucide-react';
-import { TranscriptionSegment } from '@medcall/shared-types';
+import { TranscriptionSegment } from '@/types/transcription';
 
 interface TranscriptionPanelProps {
   utterances: TranscriptionSegment[];
