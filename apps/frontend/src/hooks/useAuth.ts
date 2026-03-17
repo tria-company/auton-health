@@ -89,8 +89,40 @@ export function useAuth(): AuthState & AuthActions {
     return () => subscription.unsubscribe();
   }, []);
 
+  const checkEmailSubscription = async (email: string): Promise<boolean> => {
+    try {
+      const { data, error } = await supabase
+        .from('assinaturas')
+        .select('id')
+        .eq('email', email.toLowerCase().trim())
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        console.error('[DEBUG] checkEmailSubscription error:', error);
+        return false;
+      }
+
+      return !!data;
+    } catch {
+      return false;
+    }
+  };
+
   const signUp = async (email: string, password: string, name?: string, role?: string) => {
     try {
+      // Verificar se o email possui assinatura válida antes de criar a conta
+      const hasSubscription = await checkEmailSubscription(email);
+      if (!hasSubscription) {
+        return {
+          error: {
+            message: 'Este email não possui uma assinatura válida. Entre em contato com o suporte para adquirir uma assinatura antes de criar sua conta.',
+            name: 'AuthError',
+            status: 403,
+          } as AuthError,
+        };
+      }
+
       const { error } = await supabase.auth.signUp({
         email,
         password,
