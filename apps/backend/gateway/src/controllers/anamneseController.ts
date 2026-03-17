@@ -237,13 +237,7 @@ export async function updateAnamneseField(req: AuthenticatedRequest, res: Respon
  */
 export async function getAnamneseInicial(req: AuthenticatedRequest, res: Response) {
   try {
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        error: 'Não autorizado'
-      });
-    }
-
+    // Rota pública - paciente não está logado
     const { patient_id } = req.query;
 
     if (!patient_id) {
@@ -253,23 +247,48 @@ export async function getAnamneseInicial(req: AuthenticatedRequest, res: Respons
       });
     }
 
-    const { data: anamnese, error } = await supabase
-      .from('a_cadastro_anamnese')
-      .select('*')
-      .eq('paciente_id', patient_id)
-      .maybeSingle();
+    // Buscar anamnese e dados do paciente em paralelo
+    const [anamneseResult, patientResult] = await Promise.all([
+      supabase
+        .from('a_cadastro_anamnese')
+        .select('*')
+        .eq('paciente_id', patient_id)
+        .maybeSingle(),
+      supabase
+        .from('patients')
+        .select('id, name, email, cpf, gender, birth_date, user_auth')
+        .eq('id', patient_id)
+        .maybeSingle(),
+    ]);
 
-    if (error) {
-      console.error('Erro ao buscar anamnese inicial:', error);
+    if (anamneseResult.error) {
+      console.error('Erro ao buscar anamnese inicial:', anamneseResult.error);
       return res.status(500).json({
         success: false,
         error: 'Erro ao buscar anamnese inicial'
       });
     }
 
+    // Se não houver anamnese ainda, pré-popular com dados do paciente
+    let anamnese = anamneseResult.data;
+    if (!anamnese && patientResult.data) {
+      const p = patientResult.data;
+      anamnese = {
+        nome_completo: p.name || '',
+        email: p.email || '',
+        cpf: p.cpf || '',
+        genero: p.gender || '',
+        data_nascimento: p.birth_date || '',
+      };
+    }
+
+    // Email bloqueado se já existe user auth criado para o paciente
+    const emailLocked = Boolean(patientResult.data?.user_auth);
+
     return res.json({
       success: true,
-      anamnese: anamnese || null
+      anamnese: anamnese || null,
+      emailLocked,
     });
 
   } catch (error) {
@@ -289,13 +308,7 @@ export async function getAnamneseInicial(req: AuthenticatedRequest, res: Respons
  */
 export async function saveAnamneseInicial(req: AuthenticatedRequest, res: Response) {
   try {
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        error: 'Não autorizado'
-      });
-    }
-
+    // Rota pública - paciente não está logado
     const { paciente_id, ...formData } = req.body;
 
     if (!paciente_id) {

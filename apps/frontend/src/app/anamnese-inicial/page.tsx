@@ -137,6 +137,7 @@ function AnamneseInicialContent() {
   const [formData, setFormData] = useState<AnamneseFormData>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [emailLocked, setEmailLocked] = useState(false);
   const [currentSection, setCurrentSection] = useState(1);
 
   useEffect(() => {
@@ -156,6 +157,9 @@ function AnamneseInicialContent() {
       if (data.anamnese) {
         // Converter do formato DB (o que DESEJA) para UI (o que NÃO DESEJA)
         setFormData(dbToUi(data.anamnese));
+      }
+      if (data.emailLocked) {
+        setEmailLocked(true);
       }
     } catch (error) {
       console.error('Erro ao carregar anamnese:', error);
@@ -306,6 +310,9 @@ function AnamneseInicialContent() {
                 onChange={(e) => handleChange('email', e.target.value)}
                 className="form-input"
                 required
+                disabled={emailLocked}
+                title={emailLocked ? 'O e-mail não pode ser alterado pois já possui acesso ao sistema' : undefined}
+                style={emailLocked ? { backgroundColor: '#f0f0f0', cursor: 'not-allowed' } : undefined}
               />
             </div>
 

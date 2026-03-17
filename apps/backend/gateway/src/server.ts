@@ -169,7 +169,7 @@ app.use('/patients', patientsRoutes);
 app.use('/cadastro-anamnese', cadastroAnamneseRoutes);
 app.use('/sintese-analitica', sinteseAnaliticaRoutes);
 // Rota direta GET /anamnese-inicial (compatibilidade com frontend que chama sem prefixo /anamnese)
-app.get('/anamnese-inicial', authenticateToken, getAnamneseInicial);
+app.get('/anamnese-inicial', getAnamneseInicial);
 app.use('/anamnese', anamneseRoutes);
 app.use('/diagnostico', diagnosticoRoutes);
 app.use('/', solucoesRoutes);
