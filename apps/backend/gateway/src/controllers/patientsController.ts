@@ -880,7 +880,7 @@ export async function syncPatientUser(req: AuthenticatedRequest, res: Response) 
         const accessLink = await generateRecoveryLink(patient.email!);
 
         console.log('📧 [USER] Tentando enviar email com link de acesso para:', patient.email);
-        await sendAccessLinkEmail(patient.email!, patient.name, patient.email!, accessLink);
+        await sendAccessLinkEmail(patient.email!, patient.name, patient.email!, accessLink, generatedPassword || undefined);
         emailSent = true;
         console.log('✅ [USER] Email com link de acesso enviado com sucesso para:', patient.email);
 
@@ -1231,7 +1231,8 @@ async function sendAccessLinkEmail(
   to: string,
   patientName: string,
   userEmail: string,
-  accessLink: string
+  accessLink: string,
+  temporaryPassword?: string
 ): Promise<void> {
   console.log('📧 [EMAIL] Iniciando envio de email com link de acesso...');
   console.log('  - Para:', to);
@@ -1271,7 +1272,7 @@ async function sendAccessLinkEmail(
   const { data, error } = await resend.emails.send({
     from: `${appName} <${fromEmail}>`,
     to: [to],
-    subject: `Defina sua senha de acesso - ${appName}`,
+    subject: `Suas credenciais de acesso - ${appName}`,
     html: `
       <!DOCTYPE html>
       <html>
@@ -1292,7 +1293,7 @@ async function sendAccessLinkEmail(
 
           <p style="font-size: 16px; margin-bottom: 20px;">
             Sua conta de acesso ao sistema foi criada com sucesso!
-            Clique no botão abaixo para definir sua senha e acessar o sistema.
+            ${temporaryPassword ? 'Use as credenciais abaixo para fazer login. Recomendamos que altere sua senha após o primeiro acesso.' : 'Clique no botão abaixo para definir sua senha e acessar o sistema.'}
           </p>
 
           <div style="background: #f9fafb; border: 2px solid #1B4266; border-radius: 8px; padding: 20px; margin: 25px 0;">
@@ -1302,6 +1303,14 @@ async function sendAccessLinkEmail(
                 ${userEmail}
               </div>
             </div>
+            ${temporaryPassword ? `
+            <div style="margin-top: 15px;">
+              <strong style="color: #6b7280; font-size: 14px; display: block; margin-bottom: 5px;">Sua senha temporária:</strong>
+              <div style="background: white; padding: 12px; border-radius: 6px; border: 1px solid #d1d5db; font-family: monospace; font-size: 16px; color: #1B4266; font-weight: 600;">
+                ${temporaryPassword}
+              </div>
+            </div>
+            ` : ''}
           </div>
 
           <div style="text-align: center; margin: 30px 0;">
