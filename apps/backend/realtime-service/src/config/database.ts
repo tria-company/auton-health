@@ -500,6 +500,7 @@ export const db = {
     env?: string;
     from?: string | null; // ✅ Origem da plataforma (medcall, auton, localhost)
     clinica_id?: string; // ✅ Campo clinica_id opcional
+    andamento?: string; // ✅ NOVA, RETORNO ou CANCELADO
   }): Promise<any | null> {
     const now = new Date().toISOString();
 

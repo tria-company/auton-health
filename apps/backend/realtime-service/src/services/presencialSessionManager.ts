@@ -367,6 +367,7 @@ class PresencialSessionManager {
             .from('consultations')
             .update({
                 status: 'PROCESSING',
+                consulta_finalizada: true,
                 consulta_fim: session.endTime.toISOString(),
                 duracao: durationMinutes, // Campo duracao é REAL em minutos
                 updated_at: new Date().toISOString()

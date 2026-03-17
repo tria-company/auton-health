@@ -117,15 +117,17 @@ export function ActiveConsultationBanner() {
         return;
       }
       
-      // Buscar apenas consultas com status RECORDING (sala aberta/gravando)
+      // Buscar consultas não finalizadas do médico logado
       const { data: consultations, error: queryError } = await supabase
         .from('consultations')
         .select('*')
-        .eq('status', 'RECORDING')
         .eq('doctor_id', medico.id)
+        .or('consulta_finalizada.is.null,consulta_finalizada.eq.false')
+        .not('status', 'in', '("AGENDAMENTO","CREATED")')
+        .neq('andamento', 'CANCELADO')
         .order('created_at', { ascending: false })
         .limit(10);
-      
+
       if (queryError) {
         // ✅ Se já existe consulta ativa, não remover em caso de erro temporário
         if (!activeConsultationRef.current) {
@@ -135,11 +137,9 @@ export function ActiveConsultationBanner() {
         setLoading(false);
         return;
       }
-      
-      // Encontrar a primeira consulta com status RECORDING (sala em aberto)
-      const active = consultations?.find((c: ActiveConsultation) => 
-        c.status === 'RECORDING'
-      );
+
+      // Encontrar a primeira consulta em andamento (não finalizada)
+      const active = consultations?.[0] || null;
 
       if (active) {
         // ✅ Só atualizar se for uma consulta diferente (mudança de ID)
@@ -239,11 +239,12 @@ export function ActiveConsultationBanner() {
         return;
       }
 
-      // Se sala não encontrada (ex.: já finalizada), apenas atualizar status para PROCESSING
+      // Se sala não encontrada (ex.: já finalizada), marcar como finalizada
       const statusCode = (finalizeResponse as any).status;
       if (statusCode === 400 || statusCode === 404) {
         const response = await gatewayClient.patch(`/consultations/${activeConsultation.id}`, {
-          status: 'PROCESSING',
+          consulta_finalizada: true,
+          consulta_fim: new Date().toISOString(),
         });
         if (!response.success) {
           throw new Error(response.error || 'Erro na requisição');

@@ -1,14 +1,14 @@
 'use client';
 
-import { useState } from 'react';
 import { TrendingUp } from 'lucide-react';
 import './ConsultationStatusChart.css';
 
 interface StatusData {
-  created: number;
-  inProgress: number;
-  completed: number;
-  cancelled: number;
+  novos: number;
+  novosConcluidos: number;
+  retorno: number;
+  retornoConcluidos: number;
+  cancelado: number;
 }
 
 interface MetricData {
@@ -28,10 +28,11 @@ interface ConsultationStatusChartProps {
 }
 
 const defaultData: StatusData = {
-  created: 8,
-  inProgress: 5,
-  completed: 12,
-  cancelled: 2
+  novos: 0,
+  novosConcluidos: 0,
+  retorno: 0,
+  retornoConcluidos: 0,
+  cancelado: 0
 };
 
 const periods = [
@@ -41,48 +42,42 @@ const periods = [
   { value: '30d', label: 'Últimos 30 dias' }
 ];
 
-export function ConsultationStatusChart({ 
-  data = defaultData, 
+export function ConsultationStatusChart({
+  data = defaultData,
   metrics = [],
   selectedPeriod = 'hoje',
   onPeriodChange,
   duracaoMedia = 0,
   taxaFinalizacao = 0
 }: ConsultationStatusChartProps) {
-  const total = data.created + data.inProgress + data.completed + data.cancelled;
-  
+  console.log('📊 [DONUT] Data recebido:', JSON.stringify(data));
+  const total = data.novos + data.retorno + data.cancelado;
+
   // Calcular percentuais para o gráfico donut
   const percentages = {
-    novos: total > 0 ? (data.created / total) * 100 : 0,
-    retorno: total > 0 ? (data.inProgress / total) * 100 : 0,
-    cancelados1: total > 0 ? (data.completed / total) * 100 : 0,
-    cancelados2: total > 0 ? (data.cancelled / total) * 100 : 0
+    novos: total > 0 ? (data.novos / total) * 100 : 0,
+    retorno: total > 0 ? (data.retorno / total) * 100 : 0,
+    cancelado: total > 0 ? (data.cancelado / total) * 100 : 0
   };
 
   // Calcular ângulos para o gráfico de donut (conic-gradient)
   let currentAngle = 0;
   const segments: string[] = [];
-  
-  if (data.created > 0) {
+
+  if (data.novos > 0) {
     const angle = (percentages.novos / 100) * 360;
     segments.push(`#5D87FF ${currentAngle}deg ${currentAngle + angle}deg`);
     currentAngle += angle;
   }
-  
-  if (data.inProgress > 0) {
+
+  if (data.retorno > 0) {
     const angle = (percentages.retorno / 100) * 360;
     segments.push(`#13DDB9 ${currentAngle}deg ${currentAngle + angle}deg`);
     currentAngle += angle;
   }
-  
-  if (data.completed > 0) {
-    const angle = (percentages.cancelados1 / 100) * 360;
-    segments.push(`#FA8A6B ${currentAngle}deg ${currentAngle + angle}deg`);
-    currentAngle += angle;
-  }
-  
-  if (data.cancelled > 0) {
-    const angle = (percentages.cancelados2 / 100) * 360;
+
+  if (data.cancelado > 0) {
+    const angle = (percentages.cancelado / 100) * 360;
     segments.push(`#1325DE ${currentAngle}deg ${currentAngle + angle}deg`);
   }
 
@@ -107,7 +102,7 @@ export function ConsultationStatusChart({
       {/* Gráfico com Legenda */}
       <div className="chart-with-legend">
         <div className="donut-chart-container">
-          <div 
+          <div
             className="donut-chart"
             style={{ background: pieGradient }}
           >
@@ -121,19 +116,14 @@ export function ConsultationStatusChart({
         <div className="status-legend">
           <div className="legend-item">
             <span className="legend-dot legend-novos"></span>
-            <span className="legend-label">Novos</span>
+            <span className="legend-label">Novos ({data.novosConcluidos})</span>
           </div>
-          
+
           <div className="legend-item">
             <span className="legend-dot legend-retorno"></span>
-            <span className="legend-label">Retorno</span>
+            <span className="legend-label">Retorno ({data.retornoConcluidos})</span>
           </div>
-          
-          <div className="legend-item">
-            <span className="legend-dot legend-cancelados1"></span>
-            <span className="legend-label">Concluídas</span>
-          </div>
-          
+
           <div className="legend-item">
             <span className="legend-dot legend-cancelados2"></span>
             <span className="legend-label">Canceladas</span>
@@ -144,7 +134,7 @@ export function ConsultationStatusChart({
       {/* Filtro por período */}
       <div className="period-filter-section">
         <label className="period-filter-label">Filtrar pro periodo</label>
-        <select 
+        <select
           value={selectedPeriod}
           onChange={(e) => onPeriodChange?.(e.target.value)}
           className="period-select"
@@ -208,8 +198,8 @@ export function ConsultationStatusChart({
         <div className="metric-value-small">{taxaFinalizacao.toFixed(0)}%</div>
         <div className="progress-bar-container">
           <div className="progress-bar-bg">
-            <div 
-              className="progress-bar-fill" 
+            <div
+              className="progress-bar-fill"
               style={{ width: `${Math.min(taxaFinalizacao, 100)}%` }}
             ></div>
           </div>

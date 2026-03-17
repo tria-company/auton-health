@@ -281,8 +281,9 @@ export async function updateConsultation(req: AuthenticatedRequest, res: Respons
       });
     }
 
-    // ✅ REQ 4: Se o status estiver sendo atualizado para COMPLETED, salvar transcrição
+    // ✅ REQ 4: Se o status estiver sendo atualizado para COMPLETED, salvar transcrição e marcar como finalizada
     if (updateData.status === 'COMPLETED') {
+      updateData.consulta_finalizada = true;
       try {
         const { data: transcriptionData, error: transError } = await supabase
           .from('transcriptions')
@@ -303,6 +304,11 @@ export async function updateConsultation(req: AuthenticatedRequest, res: Respons
       } catch (e) {
         console.warn(`⚠️ [UPDATE-CONSULTATION] Erro ao buscar transcrição final: ${e}`);
       }
+    }
+
+    // Garantir consulta_finalizada = true se estiver sendo passado no payload
+    if (updateData.consulta_finalizada === true && !updateData.consulta_fim) {
+      updateData.consulta_fim = new Date().toISOString();
     }
 
     // Atualizar consulta
@@ -539,7 +545,7 @@ export async function createScheduledConsultation(req: AuthenticatedRequest, res
       return res.status(401).json({ success: false, error: 'Não autorizado' });
     }
 
-    const { patient_id, patient_name, consultation_type, scheduled_date, duration_minutes = 60 } = req.body;
+    const { patient_id, patient_name, consultation_type, scheduled_date, duration_minutes = 60, andamento } = req.body;
     const doctorAuthId = req.user.id;
 
     if (!patient_id || !scheduled_date) {
@@ -611,6 +617,7 @@ export async function createScheduledConsultation(req: AuthenticatedRequest, res
         consulta_fim: endTime.toISOString(),
         doctor_id: doctorId,
         from: consultationFrom,
+        andamento: andamento || 'NOVA',
         created_at: new Date().toISOString()
       })
       .select()

@@ -269,7 +269,7 @@ export function setupRoomsWebSocket(io: SocketIOServer): void {
     // ==================== CRIAR SALA ====================
 
     socket.on('createRoom', async (data, callback) => {
-      const { hostName, roomName, patientId, patientName, patientEmail, patientPhone, userAuth, consultationType, agendamentoId } = data;
+      const { hostName, roomName, patientId, patientName, patientEmail, patientPhone, userAuth, consultationType, agendamentoId, andamento } = data;
 
       // Verificar se usuário já está em outra sala ATIVA
       if (userToRoom.has(hostName)) {
@@ -477,7 +477,8 @@ export function setupRoomsWebSocket(io: SocketIOServer): void {
                   patient_context: `Consulta ${consultationTypeValue.toLowerCase()} - Sala: ${roomName || 'Sala sem nome'}`,
                   env: env, // ✅ Passando ambiente detectado
                   from: consultationFrom, // ✅ Origem da plataforma
-                  clinica_id: doctor.clinica_id // ✅ Vinculando à clínica do médico
+                  clinica_id: doctor.clinica_id, // ✅ Vinculando à clínica do médico
+                  andamento: andamento || 'NOVA' // ✅ Tipo: NOVA ou RETORNO
                 });
 
                 if (consultation) {
@@ -1341,6 +1342,7 @@ export function setupRoomsWebSocket(io: SocketIOServer): void {
               .from('consultations')
               .update({
                 status: 'PROCESSING',
+                consulta_finalizada: true,
                 consulta_fim: consultaFim, // ✅ Registrar fim da consulta
                 duracao: duracaoMinutos, // ✅ Duração em minutos
                 updated_at: consultaFim
@@ -1356,7 +1358,7 @@ export function setupRoomsWebSocket(io: SocketIOServer): void {
                 { roomId, error: updateError.message }
               );
             } else {
-              console.log(`📋 Consulta ${consultationId} atualizada para PROCESSING (duração: ${duracaoMinutos.toFixed(2)} min)`);
+              console.log(`📋 Consulta ${consultationId} finalizada e atualizada para PROCESSING (duração: ${duracaoMinutos.toFixed(2)} min)`);
             }
           } catch (updateError) {
             console.error('❌ Erro ao atualizar consulta:', updateError);
@@ -1393,6 +1395,7 @@ export function setupRoomsWebSocket(io: SocketIOServer): void {
               await supabase
                 .from('consultations')
                 .update({
+                  consulta_finalizada: true,
                   consulta_fim: new Date().toISOString(),
                   duracao: duracaoMinutos
                 })

@@ -7,7 +7,7 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 /**
  * GET /admin/consultations
- * Busca todas as consultas abertas/em andamento (status RECORDING)
+ * Busca todas as call_sessions ativas (status = 'active')
  */
 export const getActiveConsultations = async (req: Request, res: Response) => {
   try {
@@ -27,19 +27,29 @@ export const getActiveConsultations = async (req: Request, res: Response) => {
       return res.status(403).json({ error: 'Acesso negado - apenas administradores' });
     }
 
-    // Buscar sessões ativas (status diferente de 'ended')
-    console.log('🔍 [ADMIN] Buscando sessões ativas...');
+    // Buscar call_sessions ativas (status = 'active')
+    console.log('🔍 [ADMIN] Buscando call_sessions com status active...');
 
     const { data: sessionsData, error: sessionsError } = await supabase
       .from('call_sessions')
       .select(`
-        room_id,
-        status,
-        webrtc_active,
+        id,
         consultation_id,
-        created_at,
+        room_id,
+        room_name,
+        status,
+        started_at,
+        session_type,
         consultations!inner(
-          *,
+          id,
+          doctor_id,
+          patient_id,
+          patient_name,
+          status,
+          consultation_type,
+          consulta_inicio,
+          created_at,
+          from,
           medicos!inner(
             name,
             email
@@ -50,12 +60,12 @@ export const getActiveConsultations = async (req: Request, res: Response) => {
         )
       `)
       .eq('status', 'active')
-      .order('created_at', { ascending: false });
+      .order('started_at', { ascending: false });
 
     if (sessionsError) {
-      console.error('[ConsultasAdminController] Erro ao buscar sessões:', sessionsError);
+      console.error('[ConsultasAdminController] Erro ao buscar call_sessions:', sessionsError);
       return res.status(500).json({
-        error: 'Erro ao buscar sessões',
+        error: 'Erro ao buscar sessões ativas',
         details: sessionsError.message
       });
     }
@@ -71,19 +81,18 @@ export const getActiveConsultations = async (req: Request, res: Response) => {
         patient_id: c.patient_id,
         status: c.status,
         consulta_inicio: c.consulta_inicio,
-        patient_name: c.patients?.name || 'Paciente desconhecido',
+        patient_name: c.patients?.name || c.patient_name || 'Paciente desconhecido',
         consultation_type: c.consultation_type,
         created_at: c.created_at,
         medico_email: c.medicos?.email || null,
         medico_name: c.medicos?.name || null,
         from: c.from || null,
-        room_id: s.room_id,
-        session_status: s.status,
-        webrtc_active: s.webrtc_active || false,
+        room_id: s.room_id || null,
+        session_status: s.status || null,
       };
     });
 
-    console.log(`📋 [ADMIN] Retornando ${consultations.length} consultas ao frontend`);
+    console.log(`📋 [ADMIN] Retornando ${consultations.length} sessões ativas ao frontend`);
 
     return res.json({
       success: true,
@@ -180,9 +189,10 @@ export const terminateConsultation = async (req: Request, res: Response) => {
       console.warn(`⚠️ [TERMINATE-CONSULTATION] Erro ao buscar transcrição final: ${e}`);
     }
 
-    // Atualizar status da consulta para COMPLETED e salvar transcrição
+    // Atualizar status da consulta para COMPLETED e marcar como finalizada
     const updateData: any = {
       status: 'COMPLETED',
+      consulta_finalizada: true,
       consulta_fim: new Date().toISOString(),
     };
 

@@ -452,7 +452,8 @@ export function CreateConsultationRoom({
           patient_name: selectedPatientData.name,
           consultation_type: consultationType,
           scheduled_date: consultaInicio,
-          duration_minutes: 60 // Padrão 1 hora
+          duration_minutes: 60, // Padrão 1 hora
+          andamento: patientReturnType === 'retorno' ? 'RETORNO' : 'NOVA'
         });
 
         setIsCreatingRoom(false);
@@ -565,6 +566,7 @@ export function CreateConsultationRoom({
             status: 'RECORDING',
             doctor_id: medico.id,
             from: consultationFrom,
+            andamento: patientReturnType === 'retorno' ? 'RETORNO' : 'NOVA',
           })
           .select()
           .single();
@@ -611,7 +613,8 @@ export function CreateConsultationRoom({
           consultationType: consultationType,
           microphoneId: selectedMicrophone,
           // ✅ NOVO: ID do agendamento para atualizar em vez de criar nova consulta
-          agendamentoId: isFromAgendamento ? agendamentoId : null
+          agendamentoId: isFromAgendamento ? agendamentoId : null,
+          andamento: patientReturnType === 'retorno' ? 'RETORNO' : 'NOVA'
         }, (response: any) => {
           setIsCreatingRoom(false);
 

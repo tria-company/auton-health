@@ -4420,20 +4420,19 @@ function ConsultationDetailsOverview({
   const getPatientHeight = () => {
     const altura = patientData?.altura;
     if (!altura) return null;
-    // Se altura já está formatada (contém "m"), retornar como está
-    if (typeof altura === 'string' && altura.includes('m')) {
+    // Se altura já está formatada (contém "m" ou "cm"), retornar como está
+    if (typeof altura === 'string' && (altura.includes('m') || altura.includes('cm'))) {
       return altura;
     }
-    // Se for número, formatar
-    if (typeof altura === 'number') {
-      return `${altura.toString().replace('.', ',')} m`;
-    }
-    // Se for string numérica, formatar
-    if (typeof altura === 'string') {
-      const num = parseFloat(altura);
-      if (!isNaN(num)) {
-        return `${num.toString().replace('.', ',')} m`;
+    // Altura é armazenada em centímetros - converter para metros na exibição
+    const num = typeof altura === 'number' ? altura : parseFloat(altura);
+    if (!isNaN(num)) {
+      // Valores >= 100 estão em cm, converter para metros
+      if (num >= 100) {
+        return `${(num / 100).toFixed(2).replace('.', ',')} m`;
       }
+      // Valores < 100 já estão em metros (ex: 1.75)
+      return `${num.toFixed(2).replace('.', ',')} m`;
     }
     return altura;
   };

@@ -50,6 +50,8 @@ interface DashboardData {
   };
   distribuicoes: {
     porStatus: Record<string, number>;
+    porAndamento: Record<string, number>;
+    concluidosPorAndamento: Record<string, number>;
     porTipo: Record<string, number>;
   };
   atividades: {
@@ -197,6 +199,8 @@ export default function DashboardPage() {
         },
         distribuicoes: {
           porStatus: { CREATED: 1, COMPLETED: 5, PROCESSING: 0 },
+          porAndamento: { NOVA: 4, RETORNO: 2, CANCELADO: 0 },
+          concluidosPorAndamento: { NOVA: 3, RETORNO: 2 },
           porTipo: { PRESENCIAL: 3, TELEMEDICINA: 3 },
         },
         atividades: {
@@ -263,6 +267,7 @@ export default function DashboardPage() {
 
         const data = response.data;
 
+        console.log('📊 [FRONTEND] Period update - distribuicoes:', JSON.stringify(data.distribuicoes));
         // Atualizar apenas os dados que mudam com o período, mantendo o resto
         setDashboardData(prev => {
           if (!prev) return prev;
@@ -405,6 +410,7 @@ export default function DashboardPage() {
         throw new Error(response.error || 'Erro ao carregar dados do dashboard');
       }
 
+      console.log('📊 [FRONTEND] Dashboard data recebido:', JSON.stringify(response.data?.distribuicoes));
       setDashboardData(response.data);
     } catch (err) {
       console.error('Erro ao carregar dashboard:', err);
@@ -598,10 +604,11 @@ export default function DashboardPage() {
           )}
           <ConsultationStatusChart
             data={{
-              created: dashboardData?.distribuicoes?.porStatus?.CREATED || 0,
-              inProgress: dashboardData?.distribuicoes?.porStatus?.PROCESSING || 0,
-              completed: dashboardData?.distribuicoes?.porStatus?.COMPLETED || 0,
-              cancelled: dashboardData?.distribuicoes?.porStatus?.CANCELLED || 0
+              novos: dashboardData?.distribuicoes?.porAndamento?.NOVA || 0,
+              novosConcluidos: dashboardData?.distribuicoes?.concluidosPorAndamento?.NOVA || 0,
+              retorno: dashboardData?.distribuicoes?.porAndamento?.RETORNO || 0,
+              retornoConcluidos: dashboardData?.distribuicoes?.concluidosPorAndamento?.RETORNO || 0,
+              cancelado: dashboardData?.distribuicoes?.porAndamento?.CANCELADO || 0
             }}
             metrics={[
               {

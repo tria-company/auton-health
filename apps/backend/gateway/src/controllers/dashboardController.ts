@@ -35,6 +35,31 @@ export async function getDashboardData(req: AuthenticatedRequest, res: Response)
       });
     }
 
+    console.log('👨‍⚕️ [DASHBOARD] Médico encontrado:', { id: medico.id, name: medico.name, authId: doctorAuthId });
+
+    // Debug: contar TODAS as consultas do médico (sem filtro de data)
+    const { count: totalConsultasSemFiltro, error: debugError } = await supabase
+      .from('consultations')
+      .select('*', { count: 'exact', head: true })
+      .eq('doctor_id', medico.id);
+
+    console.log('🔍 [DASHBOARD] Total consultas do médico (sem filtro de data):', totalConsultasSemFiltro, debugError ? `Erro: ${debugError.message}` : '');
+
+    // Debug: contar consultas sem filtro de doctor_id para ver se existem no banco
+    if (totalConsultasSemFiltro === 0) {
+      const { count: totalGeralConsultas } = await supabase
+        .from('consultations')
+        .select('*', { count: 'exact', head: true });
+      console.log('⚠️ [DASHBOARD] Total geral de consultas no banco (sem filtro de médico):', totalGeralConsultas);
+
+      // Buscar os doctor_ids distintos para debug
+      const { data: sampleConsultas } = await supabase
+        .from('consultations')
+        .select('doctor_id, status, created_at')
+        .limit(5);
+      console.log('⚠️ [DASHBOARD] Amostra de consultas no banco:', JSON.stringify(sampleConsultas));
+    }
+
     // Período alvo
     const { year, period, chartPeriod, chartDate, chartMonth, chartYear } = req.query;
     const targetYear = year ? Number(year) : new Date().getFullYear();
@@ -114,12 +139,12 @@ export async function getDashboardData(req: AuthenticatedRequest, res: Response)
       .gte('created_at', today.toISOString())
       .lt('created_at', tomorrow.toISOString());
 
-    // Consultas concluídas
+    // Consultas finalizadas
     let consultasConcluidasQuery = supabase
       .from('consultations')
       .select('*', { count: 'exact', head: true })
       .eq('doctor_id', medico.id)
-      .eq('status', 'COMPLETED');
+      .eq('consulta_finalizada', true);
 
     if (period === 'hoje' || period === '7d' || period === '15d' || period === '30d') {
       consultasConcluidasQuery = consultasConcluidasQuery
@@ -153,7 +178,7 @@ export async function getDashboardData(req: AuthenticatedRequest, res: Response)
       .from('consultations')
       .select('*', { count: 'exact', head: true })
       .eq('doctor_id', medico.id)
-      .eq('status', 'COMPLETED')
+      .eq('consulta_finalizada', true)
       .gte('created_at', inicioMesAnteriorConsultas.toISOString())
       .lte('created_at', fimMesAnteriorConsultas.toISOString());
 
@@ -205,9 +230,9 @@ export async function getDashboardData(req: AuthenticatedRequest, res: Response)
     // IMPORTANTE: Filtrado por doctor_id para garantir que apenas consultas do médico logado sejam consideradas
     let consultasComDuracaoQuery = supabase
       .from('consultations')
-      .select('id, duration, duracao, consultation_type, created_at, updated_at, consulta_inicio, consulta_fim, status')
+      .select('id, duration, duracao, consultation_type, created_at, updated_at, consulta_inicio, consulta_fim, status, consulta_finalizada')
       .eq('doctor_id', medico.id) // ✅ FILTRO POR MÉDICO
-      .in('status', ['COMPLETED', 'PROCESSING', 'VALID_SOLUCAO']);
+      .eq('consulta_finalizada', true);
 
     // Aplicar filtro de período baseado na data real da consulta
     // Para períodos específicos, filtrar por updated_at (quando foi finalizada) ou consulta_fim
@@ -347,10 +372,10 @@ export async function getDashboardData(req: AuthenticatedRequest, res: Response)
       ? consultasTelemedicina.reduce((acc, c) => acc + calcularDuracaoEmSegundos(c), 0) / consultasTelemedicina.length
       : 0;
 
-    // Consultas por status
+    // Consultas por status, andamento e consulta_finalizada
     let consultasPorStatusQuery = supabase
       .from('consultations')
-      .select('status')
+      .select('status, andamento, consulta_finalizada')
       .eq('doctor_id', medico.id);
 
     if (period === 'hoje' || period === '7d' || period === '15d' || period === '30d') {
@@ -359,12 +384,35 @@ export async function getDashboardData(req: AuthenticatedRequest, res: Response)
         .lte('created_at', endDateRange.toISOString());
     }
 
-    const { data: consultasPorStatus } = await consultasPorStatusQuery;
+    const { data: consultasPorStatus, error: statusError } = await consultasPorStatusQuery;
+
+    console.log('📊 [DASHBOARD] Consultas por status:', {
+      total: consultasPorStatus?.length || 0,
+      periodo: period,
+      startDate: startDateRange.toISOString(),
+      endDate: endDateRange.toISOString(),
+      error: statusError?.message
+    });
 
     const statusCounts = consultasPorStatus?.reduce((acc, c) => {
       acc[c.status] = (acc[c.status] || 0) + 1;
       return acc;
     }, {} as Record<string, number>) || {};
+
+    // Contagem por andamento (NOVA, RETORNO, CANCELADO) e concluídos por andamento
+    const andamentoCounts: Record<string, number> = {};
+    const concluidosPorAndamento: Record<string, number> = {};
+    consultasPorStatus?.forEach(c => {
+      const andamento = c.andamento || 'NOVA';
+      andamentoCounts[andamento] = (andamentoCounts[andamento] || 0) + 1;
+      if (c.consulta_finalizada === true) {
+        concluidosPorAndamento[andamento] = (concluidosPorAndamento[andamento] || 0) + 1;
+      }
+    });
+
+    console.log('📊 [DASHBOARD] andamentoCounts:', JSON.stringify(andamentoCounts));
+    console.log('📊 [DASHBOARD] concluidosPorAndamento:', JSON.stringify(concluidosPorAndamento));
+    console.log('📊 [DASHBOARD] Amostra consultasPorStatus:', JSON.stringify(consultasPorStatus?.slice(0, 3)));
 
     // Consultas por tipo
     let consultasPorTipoQuery = supabase
@@ -451,7 +499,7 @@ export async function getDashboardData(req: AuthenticatedRequest, res: Response)
     // Buscar consultas para o gráfico
     const { data: consultasGrafico } = await supabase
       .from('consultations')
-      .select('created_at, status, consultation_type')
+      .select('created_at, status, consultation_type, consulta_finalizada')
       .eq('doctor_id', medico.id)
       .gte('created_at', chartStartDate.toISOString())
       .lte('created_at', chartEndDate.toISOString())
@@ -477,7 +525,7 @@ export async function getDashboardData(req: AuthenticatedRequest, res: Response)
       } else {
         acc[dateKey].telemedicina += 1;
       }
-      if (c.status === 'COMPLETED') {
+      if (c.consulta_finalizada === true) {
         acc[dateKey].concluidas += 1;
       }
       return acc;
@@ -488,11 +536,11 @@ export async function getDashboardData(req: AuthenticatedRequest, res: Response)
       ...data
     })).sort((a, b) => a.date.localeCompare(b.date));
 
-    // Taxa de sucesso
+    // Taxa de sucesso (finalização)
     const totalConsultas = Object.values(statusCounts).reduce((acc, count) => acc + count, 0);
-    const consultasCompletas = (statusCounts.COMPLETED || 0) + (statusCounts.VALID_SOLUCAO || 0);
+    const consultasFinalizadas = consultasPorStatus?.filter(c => c.consulta_finalizada === true).length || 0;
     const taxaSucesso = totalConsultas > 0
-      ? (consultasCompletas / totalConsultas) * 100
+      ? (consultasFinalizadas / totalConsultas) * 100
       : 0;
 
     // Próximas consultas
@@ -576,6 +624,8 @@ export async function getDashboardData(req: AuthenticatedRequest, res: Response)
         },
         distribuicoes: {
           porStatus: statusCounts,
+          porAndamento: andamentoCounts,
+          concluidosPorAndamento: concluidosPorAndamento,
           porTipo: tipoCounts
         },
         atividades: {

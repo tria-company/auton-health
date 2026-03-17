@@ -302,6 +302,7 @@ router.post('/:sessionId/complete', asyncHandler(async (req: Request, res: Respo
   if (session.consultation_id) {
     await db.updateConsultation(session.consultation_id, {
       status: 'COMPLETED',
+      consulta_finalizada: true,
       duration: durationSeconds,
       notes: protocol.summary,
     });

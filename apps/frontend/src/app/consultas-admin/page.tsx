@@ -12,8 +12,6 @@ import {
   ExternalLink,
   Loader2,
   PhoneOff,
-  Wifi,
-  WifiOff,
   CheckCircle,
   XCircle
 } from 'lucide-react';
@@ -37,7 +35,6 @@ interface ConsultaAdmin {
   from: string | null;
   room_id: string | null;
   session_status: string | null;
-  webrtc_active: boolean;
 }
 
 interface ConsultasResponse {
@@ -231,8 +228,8 @@ export default function ConsultasAdminPage() {
           <h1>Painel Administrativo</h1>
         </div>
         <div className="admin-subtitle">
-          <p>Consultas abertas no sistema</p>
-          <span className="consultation-count">{consultas.length} consulta(s) em aberto</span>
+          <p>Sessões ativas no sistema</p>
+          <span className="consultation-count">{consultas.length} sessão(ões) ativa(s)</span>
         </div>
         <button
           className="btn-refresh"
@@ -261,8 +258,8 @@ export default function ConsultasAdminPage() {
       {consultas.length === 0 && !error ? (
         <div className="admin-empty">
           <Video size={48} />
-          <h3>Nenhuma consulta aberta</h3>
-          <p>Não há consultas em andamento no momento.</p>
+          <h3>Nenhuma sessão ativa</h3>
+          <p>Não há sessões de chamada ativas no momento.</p>
         </div>
       ) : (
         <div className="admin-table-container">
@@ -274,7 +271,6 @@ export default function ConsultasAdminPage() {
                 <th>Paciente</th>
                 <th>Status</th>
                 <th>Origem</th>
-                <th>WebRTC</th>
                 <th>Início</th>
                 <th>Room ID</th>
                 <th>Ações</th>
@@ -282,7 +278,7 @@ export default function ConsultasAdminPage() {
             </thead>
             <tbody>
               {consultas.map((consulta) => (
-                <tr key={consulta.id} className={consulta.webrtc_active ? 'row-webrtc-active' : ''}>
+                <tr key={consulta.id}>
                   <td className="td-id">
                     <code>{consulta.id.substring(0, 8)}...</code>
                     <button
@@ -324,19 +320,6 @@ export default function ConsultasAdminPage() {
                       </span>
                     ) : (
                       <span className="from-badge from-unknown">-</span>
-                    )}
-                  </td>
-                  <td className="td-webrtc">
-                    {consulta.webrtc_active ? (
-                      <div className="webrtc-active">
-                        <Wifi size={16} className="webrtc-icon active" />
-                        <span className="webrtc-label active">Conectado</span>
-                      </div>
-                    ) : (
-                      <div className="webrtc-inactive">
-                        <WifiOff size={16} className="webrtc-icon inactive" />
-                        <span className="webrtc-label inactive">Desconectado</span>
-                      </div>
                     )}
                   </td>
                   <td className="td-date">

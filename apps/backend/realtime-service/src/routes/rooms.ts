@@ -240,6 +240,7 @@ router.post('/finalize/:roomId', async (req: Request, res: Response) => {
           .from('consultations')
           .update({
             status: 'PROCESSING',
+            consulta_finalizada: true,
             consulta_fim: consultaFim,
             duracao: duracaoMinutos,
             updated_at: consultaFim
@@ -249,7 +250,7 @@ router.post('/finalize/:roomId', async (req: Request, res: Response) => {
         if (updateError) {
           console.error('❌ [FINALIZE-HTTP] Erro ao atualizar consulta:', updateError);
         } else {
-          console.log(`📋 [FINALIZE-HTTP] Consulta ${consultationId} atualizada para PROCESSING`);
+          console.log(`📋 [FINALIZE-HTTP] Consulta ${consultationId} finalizada e atualizada para PROCESSING`);
         }
       }
 

@@ -1371,35 +1371,39 @@ export function ConsultationRoom({
 
     if (userType === 'doctor') {
 
-      // Médico: usar nome salvo ou prompt
-
-      let savedHostName = localStorage.getItem('hostName');
-
-      if (!savedHostName) {
-
-        const prompted = prompt('Digite seu nome (Médico):');
-
-        if (prompted && prompted.trim()) {
-
-          savedHostName = prompted.trim();
-
-          localStorage.setItem('hostName', savedHostName);
-
+      // Médico: buscar nome do médico logado via Supabase
+      const fetchDoctorName = async () => {
+        try {
+          const { supabase } = await import('@/lib/supabase');
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user?.id) {
+            const { data: medico } = await supabase
+              .from('medicos')
+              .select('name')
+              .eq('user_auth', user.id)
+              .single();
+            if (medico?.name) {
+              setUserName(medico.name);
+              localStorage.setItem('hostName', medico.name);
+              return;
+            }
+          }
+          // Fallback: usar localStorage se existir
+          const savedHostName = localStorage.getItem('hostName');
+          if (savedHostName) {
+            setUserName(savedHostName);
+          } else {
+            showError('Nome do médico não encontrado. Verifique seu cadastro.', 'Erro de Configuração');
+          }
+        } catch (err) {
+          console.error('Erro ao buscar nome do médico:', err);
+          const savedHostName = localStorage.getItem('hostName');
+          if (savedHostName) {
+            setUserName(savedHostName);
+          }
         }
-
-      }
-
-
-
-      if (savedHostName) {
-
-        setUserName(savedHostName);
-
-      } else {
-
-        showError('Nome do médico não informado. Recarregue a página.', 'Erro de Configuração');
-
-      }
+      };
+      fetchDoctorName();
 
     } else if (userType === 'patient') {
 
@@ -4634,7 +4638,18 @@ export function ConsultationRoom({
                   <div className="data-content">
                     <div className="data-label">Altura</div>
                     <div className="data-value">
-                      {patientAnamnese?.altura ? `${patientAnamnese.altura} m` : 'N/A'}
+                      {patientAnamnese?.altura
+                        ? (() => {
+                            const num = parseFloat(patientAnamnese.altura);
+                            if (!isNaN(num) && num >= 100) {
+                              return `${(num / 100).toFixed(2).replace('.', ',')} m`;
+                            }
+                            if (!isNaN(num)) {
+                              return `${num.toFixed(2).replace('.', ',')} m`;
+                            }
+                            return patientAnamnese.altura;
+                          })()
+                        : 'N/A'}
                     </div>
                   </div>
                 </div>
