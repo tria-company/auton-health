@@ -6,15 +6,15 @@ const router = Router();
 
 /**
  * GET /anamnese-inicial
- * Busca anamnese inicial do paciente
+ * Busca anamnese inicial do paciente (rota pública - paciente não está logado)
  */
-router.get('/anamnese-inicial', authenticateToken, getAnamneseInicial);
+router.get('/anamnese-inicial', getAnamneseInicial);
 
 /**
  * POST /anamnese-inicial/save
- * Salva anamnese inicial e atualiza dados do paciente
+ * Salva anamnese inicial e atualiza dados do paciente (rota pública - paciente não está logado)
  */
-router.post('/anamnese-inicial/save', authenticateToken, saveAnamneseInicial);
+router.post('/anamnese-inicial/save', saveAnamneseInicial);
 
 /**
  * GET /anamnese/:consultaId
