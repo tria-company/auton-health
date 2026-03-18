@@ -48,56 +48,82 @@ function ResetPasswordContent() {
   useEffect(() => {
     let settled = false;
 
-    // 1. Listen for PASSWORD_RECOVERY event (handles hash fragment flow)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (settled) return;
-      if (event === 'PASSWORD_RECOVERY' && session) {
-        settled = true;
-        setSessionReady(true);
-      }
-    });
+    // First: sign out any existing session to prevent cross-user contamination
+    const init = async () => {
+      await supabase.auth.signOut();
 
-    // 2. Try PKCE code exchange, then fallback to existing session
-    const tryEstablishSession = async () => {
-      // Give onAuthStateChange a moment to fire (handles hash fragment)
-      await new Promise((r) => setTimeout(r, 500));
-      if (settled) return;
-
-      const code = searchParams.get('code');
-
-      if (code) {
-        try {
-          const { error } = await supabase.auth.exchangeCodeForSession(code);
-          if (!error) {
-            settled = true;
-            setSessionReady(true);
-            return;
-          }
-          console.warn('PKCE exchange failed, checking existing session:', error.message);
-        } catch (err) {
-          console.warn('PKCE exchange error:', err);
+      // 1. Listen for PASSWORD_RECOVERY event (handles hash fragment flow)
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        if (settled) return;
+        if (event === 'PASSWORD_RECOVERY' && session) {
+          settled = true;
+          setSessionReady(true);
         }
-      }
+      });
 
-      // Fallback: check if session was established by another means
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        settled = true;
-        setSessionReady(true);
-        return;
-      }
+      // 2. Try methods to establish recovery session
+      const tryEstablishSession = async () => {
+        // Give onAuthStateChange a moment to fire (handles hash fragment)
+        await new Promise((r) => setTimeout(r, 500));
+        if (settled) return;
 
-      // Wait a bit more for onAuthStateChange
-      await new Promise((r) => setTimeout(r, 2000));
-      if (settled) return;
+        // Method A: token_hash verification (bypasses PKCE, works cross-domain)
+        const tokenHash = searchParams.get('token_hash');
+        const type = searchParams.get('type');
 
-      setSessionError('Link de recuperação inválido ou expirado. Solicite um novo link.');
+        if (tokenHash && type === 'recovery') {
+          try {
+            const { error } = await supabase.auth.verifyOtp({
+              token_hash: tokenHash,
+              type: 'recovery',
+            });
+            if (!error) {
+              settled = true;
+              setSessionReady(true);
+              return;
+            }
+            console.warn('Token hash verification failed:', error.message);
+          } catch (err) {
+            console.warn('Token hash verification error:', err);
+          }
+        }
+
+        // Method B: PKCE code exchange (works when same domain originated the request)
+        const code = searchParams.get('code');
+
+        if (code) {
+          try {
+            const { error } = await supabase.auth.exchangeCodeForSession(code);
+            if (!error) {
+              settled = true;
+              setSessionReady(true);
+              return;
+            }
+            console.warn('PKCE exchange failed:', error.message);
+          } catch (err) {
+            console.warn('PKCE exchange error:', err);
+          }
+        }
+
+        // Wait a bit more for onAuthStateChange (hash fragment may still be processing)
+        await new Promise((r) => setTimeout(r, 2000));
+        if (settled) return;
+
+        setSessionError('Link de recuperação inválido ou expirado. Solicite um novo link.');
+      };
+
+      tryEstablishSession();
+
+      return subscription;
     };
 
-    tryEstablishSession();
+    let subscription: { unsubscribe: () => void } | undefined;
+    init().then((sub) => {
+      subscription = sub;
+    });
 
     return () => {
-      subscription.unsubscribe();
+      subscription?.unsubscribe();
     };
   }, [searchParams]);
 
