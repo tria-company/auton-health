@@ -4567,6 +4567,24 @@ export function ConsultationRoom({
           </div>
         )}
 
+        {/* Banner de orientação para pacientes sobre permissão de câmera/microfone */}
+        {userType === 'patient' && !localStreamState && !mediaPermissionDenied && (
+          <div className="patient-media-guide-banner">
+            <div className="patient-media-guide-icon">
+              <Video size={24} />
+            </div>
+            <div className="patient-media-guide-content">
+              <strong>Permita o acesso à câmera e ao microfone</strong>
+              <p>Quando o navegador solicitar, clique em <strong>&quot;Permitir&quot;</strong> para que o médico possa ver e ouvir você durante a consulta.</p>
+              <div className="patient-media-guide-steps">
+                <span>1. Clique em &quot;Permitir&quot; no pop-up do navegador</span>
+                <span>2. Se não aparecer, clique no ícone de cadeado na barra de endereço</span>
+                <span>3. Ative &quot;Câmera&quot; e &quot;Microfone&quot;</span>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Sidebar lateral esquerda com informações do paciente - apenas para médico */}
         {userType === 'doctor' && (
           <div className="doctor-patient-sidebar">

@@ -3599,7 +3599,7 @@ function SuplemementacaoSection({
     if (items.length === 0) {
       return (
         <CollapsibleSection title={title} defaultOpen={true}>
-          <p style={{ color: '#666', fontStyle: 'italic', padding: '20px' }}>Nenhum item cadastrado</p>
+          <p className="suplementacao-empty-text">Nenhum item cadastrado</p>
           {addButton}
         </CollapsibleSection>
       );
@@ -3610,7 +3610,7 @@ function SuplemementacaoSection({
         <div className="anamnese-subsection">
           {items.map((item, index) => (
             <div key={index} style={{ marginBottom: '16px' }}>
-              <h4 style={{ marginBottom: '12px', fontSize: '14px', fontWeight: 600, color: '#374151' }}>
+              <h4 className="suplementacao-item-title">
                 Item {index + 1}
               </h4>
               <div className="anamnese-subsection">
@@ -4454,19 +4454,26 @@ function ConsultationDetailsOverview({
   const getPatientHeight = () => {
     const altura = patientData?.altura;
     if (!altura) return null;
-    // Se altura já está formatada (contém "m" ou "cm"), retornar como está
-    if (typeof altura === 'string' && (altura.includes('m') || altura.includes('cm'))) {
+    // Se altura já está formatada (contém "cm"), retornar como está
+    if (typeof altura === 'string' && altura.includes('cm')) {
       return altura;
     }
-    // Altura é armazenada em centímetros - converter para metros na exibição
+    // Se contém "m" mas não "cm", converter para cm
+    if (typeof altura === 'string' && altura.includes('m')) {
+      const num = parseFloat(altura.replace(',', '.').replace('m', '').trim());
+      if (!isNaN(num) && num < 10) {
+        return `${Math.round(num * 100)} cm`;
+      }
+      return altura;
+    }
     const num = typeof altura === 'number' ? altura : parseFloat(altura);
     if (!isNaN(num)) {
-      // Valores >= 100 estão em cm, converter para metros
-      if (num >= 100) {
-        return `${(num / 100).toFixed(2).replace('.', ',')} m`;
+      // Valores < 10 estão em metros (ex: 1.75), converter para cm
+      if (num < 10) {
+        return `${Math.round(num * 100)} cm`;
       }
-      // Valores < 100 já estão em metros (ex: 1.75)
-      return `${num.toFixed(2).replace('.', ',')} m`;
+      // Valores >= 10 já estão em cm
+      return `${Math.round(num)} cm`;
     }
     return altura;
   };
@@ -7594,7 +7601,7 @@ function ConsultasPageContent() {
             <div className="chat-container">
               <div className="chat-header">
                 <div>
-                  <h3>Chat com IA - Assistente de Diagnóstico</h3>
+                  <h3>Chat com IA - Assistente de Análise</h3>
                   {selectedField && (
                     <p className="chat-field-indicator">
                       <Sparkles className="w-4 h-4 inline mr-1" />

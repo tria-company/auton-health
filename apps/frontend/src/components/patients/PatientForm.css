@@ -116,9 +116,10 @@
 }
 
 .section-icon {
-  width: 20px;
-  height: 20px;
-  color: #666666;
+  width: 20px !important;
+  height: 20px !important;
+  min-width: 20px;
+  color: #1B4266;
   flex-shrink: 0;
 }
 
@@ -127,6 +128,7 @@
   font-weight: 600;
   color: #1A1A1A;
   margin: 0;
+  line-height: 1.2;
 }
 
 /* Form Grid */
@@ -435,8 +437,12 @@
 }
 
 .field-icon {
+  width: 18px !important;
+  height: 18px !important;
+  min-width: 18px;
   color: #6B7280;
   flex-shrink: 0;
+  vertical-align: middle;
 }
 
 .char-count {

@@ -5010,7 +5010,8 @@
   color: #cccccc;
 }
 
-.dark .chat-input-area {
+.dark .chat-input-area,
+.dark .chat-input-container {
   background: linear-gradient(135deg, #2a2a2a 0%, rgba(42, 42, 42, 0.5) 100%);
   border-top: 2px solid rgba(255, 255, 255, 0.1);
 }
@@ -5021,9 +5022,51 @@
   color: #ffffff;
 }
 
+.dark .chat-input::placeholder {
+  color: #6b7280;
+}
+
 .dark .chat-input:focus {
   background: #333333;
   border-color: #1B4266;
+}
+
+.dark .message-content {
+  background: linear-gradient(135deg, #2a2a2a 0%, #333333 100%);
+  color: #e5e7eb;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.dark .user-message .message-content,
+.dark .chat-message.user .message-content {
+  background: linear-gradient(135deg, #1e3a5f 0%, #1a2f4a 100%);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  color: #e5e7eb;
+}
+
+.dark .message-avatar.ai-avatar {
+  background: linear-gradient(135deg, #1e3a5f 0%, #1a2f4a 100%);
+  color: #60a5fa;
+  border: 2px solid rgba(96, 165, 250, 0.3);
+}
+
+.dark .message-avatar.user-avatar {
+  background: linear-gradient(135deg, #2d1b69 0%, #1e1145 100%);
+  color: #a78bfa;
+  border: 2px solid rgba(167, 139, 250, 0.3);
+}
+
+.dark .chat-send-button {
+  background: linear-gradient(135deg, #1B4266 0%, #2563eb 100%);
+  color: #ffffff;
+}
+
+.dark .chat-field-indicator {
+  color: #9ca3af;
+}
+
+.dark .chat-welcome {
+  color: #9ca3af;
 }
 
 .dark .chat-empty-state {
@@ -5046,7 +5089,7 @@
 }
 
 .dark .anamnese-header h2 {
-  color: #1B4266;
+  color: #e5e7eb !important;
 }
 
 .dark .anamnese-warning-banner {
@@ -5073,6 +5116,28 @@
 
 .dark .collapsible-icon {
   color: #9ca3af;
+}
+
+/* Suplementação item titles and empty text */
+.suplementacao-item-title {
+  margin-bottom: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.dark .suplementacao-item-title {
+  color: #e5e7eb !important;
+}
+
+.suplementacao-empty-text {
+  color: #666;
+  font-style: italic;
+  padding: 20px;
+}
+
+.dark .suplementacao-empty-text {
+  color: #9ca3af !important;
 }
 
 .dark .collapsible-content {

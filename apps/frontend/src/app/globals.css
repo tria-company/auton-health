@@ -3011,12 +3011,18 @@ body {
 .user-info {
   padding: 0.75rem;
   border-bottom: 1px solid var(--border-color);
+  overflow: hidden;
+  max-width: 100%;
 }
 
 .user-email {
   font-size: 0.875rem;
   color: var(--text-secondary);
   margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .dark .user-email {

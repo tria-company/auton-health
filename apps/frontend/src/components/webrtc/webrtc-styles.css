@@ -2032,6 +2032,112 @@
   }
 }
 
+/* Banner de orientação para pacientes - permissão de mídia */
+.patient-media-guide-banner {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  background: rgba(27, 66, 102, 0.95);
+  backdrop-filter: blur(12px);
+  color: #fff;
+  padding: 18px 22px;
+  border-radius: 14px;
+  max-width: 520px;
+  width: calc(100% - 32px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  animation: guideSlideDown 0.5s ease-out;
+}
+
+@keyframes guideSlideDown {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.patient-media-guide-icon {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  background: rgba(166, 206, 57, 0.2);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #A6CE39;
+}
+
+.patient-media-guide-content {
+  flex: 1;
+}
+
+.patient-media-guide-content strong {
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 6px;
+  color: #fff;
+}
+
+.patient-media-guide-content p {
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 0 0 10px 0;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.patient-media-guide-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.patient-media-guide-steps span {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.4;
+}
+
+@media (max-width: 480px) {
+  .patient-media-guide-banner {
+    top: 8px;
+    padding: 14px 16px;
+    gap: 10px;
+    border-radius: 12px;
+  }
+
+  .patient-media-guide-icon {
+    width: 36px;
+    height: 36px;
+  }
+
+  .patient-media-guide-icon svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .patient-media-guide-content strong {
+    font-size: 14px;
+  }
+
+  .patient-media-guide-content p {
+    font-size: 12px;
+  }
+
+  .patient-media-guide-steps span {
+    font-size: 11px;
+  }
+}
+
 .remote-playback-overlay {
   position: absolute;
   inset: 0;

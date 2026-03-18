@@ -584,7 +584,7 @@
 }
 
 .dark .consultation-type {
-  color: var(--text-secondary, #CCCCCC);
+  color: #ffffff !important;
 }
 
 .consultation-id-col,
