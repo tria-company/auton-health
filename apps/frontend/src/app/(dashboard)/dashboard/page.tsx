@@ -791,8 +791,6 @@ export default function DashboardPage() {
             <div className="consultations-header-active">Consultas</div>
             <div className="consultations-header-item consultations-header-patient">Paciente</div>
             <div className="consultations-header-divider"></div>
-            <div className="consultations-header-item">id</div>
-            <div className="consultations-header-divider"></div>
             <div className="consultations-header-item">Início</div>
             <div className="consultations-header-divider"></div>
             <div className="consultations-header-item">Duração</div>
@@ -855,8 +853,6 @@ export default function DashboardPage() {
                         <div className="consultation-type">{tipoConsulta}</div>
                       </div>
                     </div>
-                    <div className="consultation-divider"></div>
-                    <div className="consultation-id-col">{consulta.id.substring(0, 8)}</div>
                     <div className="consultation-divider"></div>
                     <div className="consultation-time-col">{horarioInicio}</div>
                     <div className="consultation-divider"></div>

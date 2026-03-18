@@ -44,36 +44,61 @@ function ResetPasswordContent() {
     setMounted(true);
   }, []);
 
-  // Exchange the code from the URL for a valid session
+  // Establish session from the recovery link
   useEffect(() => {
-    const exchangeCode = async () => {
+    let settled = false;
+
+    // 1. Listen for PASSWORD_RECOVERY event (handles hash fragment flow)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (settled) return;
+      if (event === 'PASSWORD_RECOVERY' && session) {
+        settled = true;
+        setSessionReady(true);
+      }
+    });
+
+    // 2. Try PKCE code exchange, then fallback to existing session
+    const tryEstablishSession = async () => {
+      // Give onAuthStateChange a moment to fire (handles hash fragment)
+      await new Promise((r) => setTimeout(r, 500));
+      if (settled) return;
+
       const code = searchParams.get('code');
 
       if (code) {
         try {
           const { error } = await supabase.auth.exchangeCodeForSession(code);
-          if (error) {
-            console.error('Erro ao trocar código por sessão:', error);
-            setSessionError('Link de recuperação inválido ou expirado. Solicite um novo link.');
+          if (!error) {
+            settled = true;
+            setSessionReady(true);
             return;
           }
-          setSessionReady(true);
+          console.warn('PKCE exchange failed, checking existing session:', error.message);
         } catch (err) {
-          console.error('Erro ao processar código:', err);
-          setSessionError('Erro ao processar link de recuperação. Tente novamente.');
-        }
-      } else {
-        // No code - check if there's already a session (e.g. hash fragment flow)
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          setSessionReady(true);
-        } else {
-          setSessionError('Link de recuperação inválido. Solicite um novo link.');
+          console.warn('PKCE exchange error:', err);
         }
       }
+
+      // Fallback: check if session was established by another means
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        settled = true;
+        setSessionReady(true);
+        return;
+      }
+
+      // Wait a bit more for onAuthStateChange
+      await new Promise((r) => setTimeout(r, 2000));
+      if (settled) return;
+
+      setSessionError('Link de recuperação inválido ou expirado. Solicite um novo link.');
     };
 
-    exchangeCode();
+    tryEstablishSession();
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, [searchParams]);
 
   const currentTheme = mounted ? (theme === 'system' ? systemTheme : theme) : 'light';
