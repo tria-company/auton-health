@@ -542,6 +542,55 @@ export async function updatePatient(req: AuthenticatedRequest, res: Response) {
       });
     }
 
+    // Sincronizar campos correlacionados com a_cadastro_anamnese
+    const fieldMapping: Record<string, string> = {
+      name: 'nome_completo',
+      birth_date: 'data_nascimento',
+      cpf: 'cpf',
+      email: 'email',
+      gender: 'genero',
+    };
+
+    const cadastroUpdate: Record<string, any> = {};
+    for (const [patientField, cadastroField] of Object.entries(fieldMapping)) {
+      if (patientField in patientData) {
+        let value = patientData[patientField];
+
+        if (patientField === 'gender' && value) {
+          const genderMap: Record<string, string> = {
+            'M': 'Masculino',
+            'F': 'Feminino',
+            'O': 'Outro',
+          };
+          value = genderMap[value] || value;
+        }
+
+        if (patientField === 'birth_date' && value) {
+          // Converter YYYY-MM-DD para DD/MM/YYYY
+          const match = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+          if (match) {
+            value = `${match[3]}/${match[2]}/${match[1]}`;
+          }
+        }
+
+        cadastroUpdate[cadastroField] = value;
+      }
+    }
+
+    if (Object.keys(cadastroUpdate).length > 0) {
+      console.log('[updatePatient] Sincronizando com a_cadastro_anamnese:', cadastroUpdate);
+      const { error: syncError } = await supabase
+        .from('a_cadastro_anamnese')
+        .update({ ...cadastroUpdate, updated_at: new Date().toISOString() })
+        .eq('paciente_id', id);
+
+      if (syncError) {
+        console.error('[updatePatient] ⚠️ Erro ao sincronizar com a_cadastro_anamnese:', syncError);
+      } else {
+        console.log('[updatePatient] ✅ Sincronizado com a_cadastro_anamnese');
+      }
+    }
+
     return res.json({
       success: true,
       patient: updatedPatient
@@ -748,6 +797,56 @@ export async function updateCadastroAnamnese(req: AuthenticatedRequest, res: Res
       }
       console.log('[updateCadastroAnamnese] ✅ Criado com sucesso');
       result = data;
+    }
+
+    // Sincronizar campos correlacionados com a tabela patients
+    const fieldMapping: Record<string, string> = {
+      nome_completo: 'name',
+      data_nascimento: 'birth_date',
+      cpf: 'cpf',
+      email: 'email',
+      genero: 'gender',
+    };
+
+    const patientUpdate: Record<string, any> = {};
+    for (const [cadastroField, patientField] of Object.entries(fieldMapping)) {
+      if (cadastroField in cadastroData) {
+        let value = cadastroData[cadastroField];
+
+        if (cadastroField === 'genero' && value) {
+          const genderMap: Record<string, string> = {
+            'masculino': 'M',
+            'feminino': 'F',
+            'outro': 'O',
+          };
+          value = genderMap[value.toLowerCase()] || value;
+        }
+
+        if (cadastroField === 'data_nascimento' && value) {
+          // Converter DD/MM/YYYY ou DDMMYYYY para YYYY-MM-DD
+          const digits = value.replace(/\D/g, '');
+          if (digits.length === 8) {
+            value = `${digits.slice(4, 8)}-${digits.slice(2, 4)}-${digits.slice(0, 2)}`;
+          }
+        }
+
+        patientUpdate[patientField] = value;
+      }
+    }
+
+    if (Object.keys(patientUpdate).length > 0) {
+      console.log('[updateCadastroAnamnese] Sincronizando com patients:', patientUpdate);
+      const { error: syncError } = await supabase
+        .from('patients')
+        .update(patientUpdate)
+        .eq('id', patientId);
+
+      if (syncError) {
+        console.error('[updateCadastroAnamnese] ⚠️ Erro ao sincronizar com patients:', syncError);
+        // Não falha a requisição, apenas loga o erro
+      } else {
+        console.log('[updateCadastroAnamnese] ✅ Sincronizado com patients');
+      }
     }
 
     return res.json({

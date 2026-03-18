@@ -2251,8 +2251,18 @@
 
 .data-field:hover {
   transform: none;
-  box-shadow: none;
-  background: transparent;
+  box-shadow: 0 4px 20px rgba(27, 66, 102, 0.15);
+  background: white;
+  z-index: 10;
+  position: relative;
+}
+
+.data-field:hover .data-value {
+  white-space: pre-wrap !important;
+  overflow: visible !important;
+  text-overflow: unset !important;
+  -webkit-line-clamp: unset !important;
+  display: block !important;
 }
 
 .data-label {
@@ -2272,19 +2282,23 @@
 }
 
 .data-value {
-  font-size: 14px;
+  font-size: 13px !important;
   color: #1f2937;
-  line-height: 1.7;
+  line-height: 1.5;
   margin: 0;
   padding: 2px 0;
   word-wrap: break-word;
   word-break: break-word;
   overflow-wrap: break-word;
   hyphens: auto;
-  font-weight: 400;
+  font-weight: 400 !important;
   max-width: 100%;
-  white-space: pre-wrap;
-  overflow: visible;
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
 }
 
 .data-value > div {
@@ -2300,6 +2314,8 @@
 .data-value-empty {
   color: #9ca3af;
   font-style: normal;
+  font-weight: 400 !important;
+  font-size: 13px !important;
 }
 
 .data-value-empty::before {
@@ -5324,8 +5340,9 @@
 }
 
 .dark .data-field:hover {
-  box-shadow: 0 2px 8px rgba(27, 66, 102, 0.2);
+  box-shadow: 0 4px 20px rgba(27, 66, 102, 0.3);
   border-left-color: #2a5a7a;
+  background: #333;
 }
 
 .dark .data-label {

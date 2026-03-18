@@ -125,6 +125,17 @@ function cleanExpiredRoom(roomId: string): void {
     closeOpenAIConnection(room.participantUserName, 'sala expirada');
   }
 
+  // Atualizar call_sessions.status para 'ended' no banco
+  db.updateCallSession(roomId, {
+    status: 'ended',
+    ended_at: new Date().toISOString(),
+    webrtc_active: false
+  }).then(() => {
+    console.log(`✅ call_sessions.status atualizado para 'ended' (sala expirada: ${roomId})`);
+  }).catch((err) => {
+    console.error(`⚠️ Erro ao atualizar call_sessions na expiração da sala ${roomId}:`, err);
+  });
+
   // Remover sala
   rooms.delete(roomId);
 }

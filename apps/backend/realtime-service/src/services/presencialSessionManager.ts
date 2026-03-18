@@ -374,6 +374,24 @@ class PresencialSessionManager {
             })
             .eq('id', session.consultationId);
 
+        // Atualizar call_sessions.status para 'ended'
+        {
+            const { error: csError } = await supabase
+                .from('call_sessions')
+                .update({
+                    status: 'ended',
+                    ended_at: session.endTime.toISOString(),
+                    webrtc_active: false
+                })
+                .eq('room_id', sessionId);
+
+            if (csError) {
+                console.error(`⚠️ [PRESENCIAL] Erro ao atualizar call_sessions:`, csError);
+            } else {
+                console.log(`✅ [PRESENCIAL] call_sessions.status atualizado para 'ended'`);
+            }
+        }
+
         console.log(`✅ [PRESENCIAL] Sessão ${sessionId} finalizada (${session.totalTranscriptions} transcrições, ${durationMinutes.toFixed(2)} min)`);
 
         // 💰 NOVO: Calcular e atualizar valor_consulta

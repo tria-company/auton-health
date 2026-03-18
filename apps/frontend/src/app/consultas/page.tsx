@@ -428,20 +428,42 @@ function CadastroDataField({
   value,
   fieldName,
   onSave,
-  readOnly = false
+  readOnly = false,
+  mask
 }: {
   label: string;
   value: any;
   fieldName: string;
   onSave: (fieldName: string, newValue: string) => Promise<void>;
   readOnly?: boolean;
+  mask?: 'date';
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
+  const applyDateMask = (val: string) => {
+    const digits = val.replace(/\D/g, '').slice(0, 8);
+    if (digits.length <= 2) return digits;
+    if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+    return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+  };
+
+  const formatDisplayDate = (val: string) => {
+    if (!val) return val;
+    // Already formatted
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(val)) return val;
+    // Raw digits like "02052001"
+    const digits = val.replace(/\D/g, '');
+    if (digits.length === 8) {
+      return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+    }
+    return val;
+  };
+
   const handleEdit = () => {
-    setEditValue(String(value || ''));
+    const raw = String(value || '');
+    setEditValue(mask === 'date' ? applyDateMask(raw) : raw);
     setIsEditing(true);
   };
 
@@ -484,7 +506,8 @@ function CadastroDataField({
       );
     }
 
-    return <p className="data-value">{String(value)}</p>;
+    const displayVal = mask === 'date' ? formatDisplayDate(String(value)) : String(value);
+    return <p className="data-value">{displayVal}</p>;
   };
 
   return (
@@ -504,13 +527,24 @@ function CadastroDataField({
 
       {isEditing ? (
         <div className="edit-field">
-          <textarea
-            value={editValue}
-            onChange={(e) => setEditValue(e.target.value)}
-            className="edit-input"
-            rows={3}
-            placeholder="Digite o novo valor..."
-          />
+          {mask === 'date' ? (
+            <input
+              type="text"
+              value={editValue}
+              onChange={(e) => setEditValue(applyDateMask(e.target.value))}
+              className="edit-input"
+              placeholder="DD/MM/AAAA"
+              maxLength={10}
+            />
+          ) : (
+            <textarea
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              className="edit-input"
+              rows={3}
+              placeholder="Digite o novo valor..."
+            />
+          )}
           <div className="edit-actions">
             <button
               className="save-button"
@@ -1099,7 +1133,7 @@ function AnamneseSection({
               <div className="anamnese-subsection">
                 <h4>Identificação</h4>
                 <CadastroDataField label="Nome Completo" value={cadastroAnamnese?.nome_completo} fieldName="nome_completo" onSave={handleSaveCadastroField} readOnly={readOnly} />
-                <CadastroDataField label="Data de Nascimento" value={cadastroAnamnese?.data_nascimento} fieldName="data_nascimento" onSave={handleSaveCadastroField} readOnly={readOnly} />
+                <CadastroDataField label="Data de Nascimento" value={cadastroAnamnese?.data_nascimento} fieldName="data_nascimento" onSave={handleSaveCadastroField} readOnly={readOnly} mask="date" />
                 <CadastroDataField label="CPF" value={cadastroAnamnese?.cpf} fieldName="cpf" onSave={handleSaveCadastroField} readOnly={readOnly} />
                 <CadastroDataField label="Estado Civil" value={cadastroAnamnese?.estado_civil} fieldName="estado_civil" onSave={handleSaveCadastroField} readOnly={readOnly} />
                 <CadastroDataField label="Email" value={cadastroAnamnese?.email} fieldName="email" onSave={handleSaveCadastroField} readOnly={readOnly} />

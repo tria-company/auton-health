@@ -123,9 +123,15 @@ export async function getConsultations(req: AuthenticatedRequest, res: Response)
       });
     }
 
+    // Usar o nome atualizado de patients.name se disponível
+    const enrichedConsultations = (consultations || []).map((c: any) => ({
+      ...c,
+      patient_name: c.patients?.name || c.patient_name,
+    }));
+
     return res.json({
       success: true,
-      consultations: consultations || [],
+      consultations: enrichedConsultations,
       pagination: {
         page: pageNum,
         limit: limitNum,
@@ -197,9 +203,15 @@ export async function getConsultationById(req: AuthenticatedRequest, res: Respon
       });
     }
 
+    // Usar o nome atualizado de patients.name se disponível
+    const result = {
+      ...consultation,
+      patient_name: (consultation as any).patients?.name || consultation.patient_name,
+    };
+
     return res.json({
       success: true,
-      ...consultation
+      ...result
     });
 
   } catch (error) {
