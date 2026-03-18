@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
-import { Lock, Eye, EyeOff, Stethoscope, User, ArrowLeft } from 'lucide-react';
+import { Lock, Eye, EyeOff, Stethoscope, User, ArrowLeft, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useTheme } from 'next-themes';
 import './reset-password.css';
@@ -12,8 +12,13 @@ type UserRole = 'medico' | 'paciente' | null;
 
 export default function ResetPasswordPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { theme, systemTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+
+  // Session state
+  const [sessionReady, setSessionReady] = useState(false);
+  const [sessionError, setSessionError] = useState<string | null>(null);
 
   // Step control
   const [role, setRole] = useState<UserRole>(null);
@@ -30,6 +35,38 @@ export default function ResetPasswordPage() {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Exchange the code from the URL for a valid session
+  useEffect(() => {
+    const exchangeCode = async () => {
+      const code = searchParams.get('code');
+
+      if (code) {
+        try {
+          const { error } = await supabase.auth.exchangeCodeForSession(code);
+          if (error) {
+            console.error('Erro ao trocar código por sessão:', error);
+            setSessionError('Link de recuperação inválido ou expirado. Solicite um novo link.');
+            return;
+          }
+          setSessionReady(true);
+        } catch (err) {
+          console.error('Erro ao processar código:', err);
+          setSessionError('Erro ao processar link de recuperação. Tente novamente.');
+        }
+      } else {
+        // No code - check if there's already a session (e.g. hash fragment flow)
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          setSessionReady(true);
+        } else {
+          setSessionError('Link de recuperação inválido. Solicite um novo link.');
+        }
+      }
+    };
+
+    exchangeCode();
+  }, [searchParams]);
 
   const currentTheme = mounted ? (theme === 'system' ? systemTheme : theme) : 'light';
   const logoSrc = currentTheme === 'dark' ? '/logo-white.svg' : '/logo-black.svg';
@@ -74,6 +111,59 @@ export default function ResetPasswordPage() {
       setLoading(false);
     }
   };
+
+  // Loading: exchanging code for session
+  if (!sessionReady && !sessionError) {
+    return (
+      <div className="reset-password-page">
+        <div className="reset-password-container">
+          <div className="reset-password-logo-section">
+            <div className="reset-password-logo-wrapper">
+              <Image src={logoSrc} alt="TRIA Logo" width={120} height={120} className="reset-password-logo-image" priority />
+            </div>
+          </div>
+          <div className="reset-password-card">
+            <div className="reset-password-header" style={{ paddingBottom: '2rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}>
+                <Loader2 size={32} className="spinner" style={{ animation: 'spin 1s linear infinite', color: '#1B4266' }} />
+              </div>
+              <p className="reset-password-subtitle">Verificando link de recuperação...</p>
+            </div>
+          </div>
+        </div>
+        <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
+
+  // Error: invalid or expired code
+  if (sessionError) {
+    return (
+      <div className="reset-password-page">
+        <div className="reset-password-container">
+          <div className="reset-password-logo-section">
+            <div className="reset-password-logo-wrapper">
+              <Image src={logoSrc} alt="TRIA Logo" width={120} height={120} className="reset-password-logo-image" priority />
+            </div>
+          </div>
+          <div className="reset-password-card">
+            <div className="reset-password-header">
+              <h2 className="reset-password-title">Link Expirado</h2>
+            </div>
+            <div className="reset-password-form-wrapper">
+              <div className="error-message">{sessionError}</div>
+              <div className="back-action-wrapper">
+                <a href="/auth/forgot-password" className="back-action-link" style={{ textDecoration: 'none' }}>
+                  <ArrowLeft size={16} />
+                  <span>Solicitar novo link</span>
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Step 1: Role selection
   if (!role) {
