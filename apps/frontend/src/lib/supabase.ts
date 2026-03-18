@@ -240,6 +240,7 @@ export async function createConsultation(consultationData: {
         ...consultationData,
         doctor_id: medico.id,
         from: consultationFrom,
+        consulta_inicio: new Date().toISOString(),
       })
       .select()
       .single();

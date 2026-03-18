@@ -64,12 +64,17 @@ export function setupPresencialWebSocket(io: SocketIOServer): void {
                 });
 
                 // Atualizar consultation para status RECORDING
+                const updateData: any = {
+                    status: 'RECORDING',
+                    updated_at: new Date().toISOString()
+                };
+                // Preencher consulta_inicio se ainda não estiver definido
+                if (!consultation.consulta_inicio) {
+                    updateData.consulta_inicio = new Date().toISOString();
+                }
                 await supabase
                     .from('consultations')
-                    .update({
-                        status: 'RECORDING',
-                        updated_at: new Date().toISOString()
-                    })
+                    .update(updateData)
                     .eq('id', consultationId);
 
                 // Entrar na sala Socket.IO

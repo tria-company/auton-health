@@ -567,6 +567,7 @@ export function CreateConsultationRoom({
             doctor_id: medico.id,
             from: consultationFrom,
             andamento: patientReturnType === 'retorno' ? 'RETORNO' : 'NOVA',
+            consulta_inicio: new Date().toISOString(),
           })
           .select()
           .single();
