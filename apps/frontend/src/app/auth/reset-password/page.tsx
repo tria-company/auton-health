@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { Lock, Eye, EyeOff, Stethoscope, User, ArrowLeft, Loader2 } from 'lucide-react';
@@ -11,6 +11,14 @@ import './reset-password.css';
 type UserRole = 'medico' | 'paciente' | null;
 
 export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={<div className="reset-password-page"><div style={{ textAlign: 'center', color: '#6B7280' }}>Carregando...</div></div>}>
+      <ResetPasswordContent />
+    </Suspense>
+  );
+}
+
+function ResetPasswordContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { theme, systemTheme } = useTheme();
