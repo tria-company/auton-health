@@ -7,12 +7,13 @@ import {
   MoreVertical, Calendar, Video, User, AlertCircle, ArrowLeft,
   Clock, Phone, FileText, Stethoscope, Mic, Download, Play,
   Save, X, Sparkles, Edit, Plus, Trash2, Pencil, ArrowRight, Search, Send,
-  Dna, Brain, Apple, Pill, Dumbbell, Leaf, LogIn, Scale, Ruler, Droplet, FolderOpen, AlertTriangle, FileDown
+  Dna, Brain, Apple, Pill, Dumbbell, Leaf, LogIn, Scale, Ruler, Droplet, FolderOpen, AlertTriangle, FileDown, ChevronRight
 } from 'lucide-react';
 import Image from 'next/image';
 import { StatusBadge, mapBackendStatus } from '../../components/StatusBadge';
 import ExamesUploadSection from '../../components/ExamesUploadSection';
 import SolutionsViewer from '../../components/solutions/SolutionsViewer';
+import EvolucaoSection from '../../components/evolucao/EvolucaoSection';
 import { getWebhookEndpoints, getWebhookHeaders } from '@/lib/webhook-config';
 import { gatewayClient } from '@/lib/gatewayClient';
 import { supabase } from '@/lib/supabase';
@@ -4246,7 +4247,7 @@ function ConsultationDetailsOverview({
 }: {
   consultaDetails: Consultation;
   patientId?: string;
-  onNavigateToSection: (section: 'ANAMNESE' | 'DIAGNOSTICO' | 'SOLUCOES' | 'EXAMES') => void;
+  onNavigateToSection: (section: 'ANAMNESE' | 'DIAGNOSTICO' | 'SOLUCOES' | 'EXAMES' | 'EVOLUCAO') => void;
   onBack: () => void;
   hasAnamneseData: () => boolean;
   hasDiagnosticoData: () => boolean;
@@ -4734,6 +4735,16 @@ function ConsultationDetailsOverview({
               <span>Exames</span>
               <ArrowRight size={18} />
             </button>
+
+            {/* Botão Evolução */}
+            <button
+              className="consultation-details-action-button consultation-details-action-button-outline"
+              onClick={() => onNavigateToSection('EVOLUCAO')}
+            >
+              <Plus size={18} />
+              <span>Evolução</span>
+              <ArrowRight size={18} />
+            </button>
           </div>
         </div>
       </div>
@@ -4770,7 +4781,7 @@ function ConsultasPageContent() {
   const [showSolutionsViewer, setShowSolutionsViewer] = useState(false);
   const [forceRender, setForceRender] = useState(0); // Para forçar re-render
 
-  const [selectedSection, setSelectedSection] = useState<'ANAMNESE' | 'DIAGNOSTICO' | 'SOLUCOES' | 'EXAMES' | null>(null);
+  const [selectedSection, setSelectedSection] = useState<'ANAMNESE' | 'DIAGNOSTICO' | 'SOLUCOES' | 'EXAMES' | 'EVOLUCAO' | null>(null);
   const [forceShowSolutionSelection, setForceShowSolutionSelection] = useState(false);
   const [downloadingDocx, setDownloadingDocx] = useState(false);
 
@@ -5071,6 +5082,8 @@ function ConsultasPageContent() {
   const [atividadeFisicaData, setAtividadeFisicaData] = useState<ExercicioFisico[]>([]);
   const [loadingAtividadeFisica, setLoadingAtividadeFisica] = useState(false);
   const [editingExercicio, setEditingExercicio] = useState<{ id: number, field: string } | null>(null);
+  const [selectedTreino, setSelectedTreino] = useState<string | null>(null);
+  const [videoHelpExercicio, setVideoHelpExercicio] = useState<string | null>(null);
 
   // Estado para autocomplete de exercícios
   const [exercicioSuggestions, setExercicioSuggestions] = useState<Array<{ id: number, atividade: string, grupo_muscular: string }>>([]);
@@ -7313,6 +7326,8 @@ function ConsultasPageContent() {
               }
             } else if (section === 'EXAMES') {
               setSelectedSection('EXAMES');
+            } else if (section === 'EVOLUCAO') {
+              setSelectedSection('EVOLUCAO');
             }
           }}
           onBack={handleBackToList}
@@ -8208,6 +8223,40 @@ function ConsultasPageContent() {
           consultaId={consultaId}
           onBack={() => setSelectedSection(null)}
         />
+      );
+    }
+
+    if (selectedSection === 'EVOLUCAO') {
+      if (!consultaDetails || !consultaId) {
+        return (
+          <div className="consultas-container consultas-details-container">
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
+              <div className="loading-spinner"></div>
+            </div>
+          </div>
+        );
+      }
+      return (
+        <div className="consultas-container consultas-details-container">
+          <div className="consultas-header" style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+            <button
+              className="back-button"
+              onClick={() => setSelectedSection(null)}
+              style={{ marginRight: '15px', display: 'flex', alignItems: 'center', gap: '5px' }}
+            >
+              <ArrowLeft className="w-5 h-5" />
+              Voltar
+            </button>
+            <h1 className="consultas-title" style={{ flex: 1 }}>Evolucao Mensal</h1>
+          </div>
+          <div style={{ padding: '0 8px' }}>
+            <EvolucaoSection
+              consultaId={consultaId}
+              patientId={consultaDetails.patient_id}
+              patientName={consultaDetails.patient_name}
+            />
+          </div>
+        </div>
       );
     }
 
@@ -9477,159 +9526,269 @@ function ConsultasPageContent() {
             </div>
           </div>
 
-          <div className="anamnese-container">
-            <div className="anamnese-header">
-              <h2>Protocolo de Atividade Física</h2>
-            </div>
-
-            <div className="anamnese-content">
+          <div className="anamnese-container" style={{ padding: '24px' }}>
+            <div className="anamnese-content" style={{ padding: '0 8px' }}>
               {loadingAtividadeFisica ? (
                 <div className="loading-container">
                   <div className="loading-spinner"></div>
-                  <p>Carregando exercícios físicos...</p>
+                  <p>Carregando exercicios fisicos...</p>
                 </div>
-              ) : (
-                <div className="atividade-fisica-container">
-                  <div className="anamnese-sections">
-                    {atividadeFisicaData.length === 0 ? (
-                      <div className="no-data" style={{ padding: '40px', width: '100%' }}>
-                        <FileText className="w-16 h-16" style={{ color: '#6366f1', marginBottom: '20px' }} />
-                        <h3>Nenhum exercício encontrado</h3>
-                        <p>Não há exercícios físicos cadastrados para este paciente.</p>
+              ) : atividadeFisicaData.length === 0 ? (
+                <div className="no-data" style={{ padding: '40px', width: '100%', textAlign: 'center' }}>
+                  <Dumbbell style={{ width: 48, height: 48, color: '#94A3B8', marginBottom: '16px' }} />
+                  <h3 style={{ color: '#0F172A', marginBottom: 8 }}>Nenhum exercicio encontrado</h3>
+                  <p style={{ color: '#64748B' }}>Nao ha exercicios fisicos cadastrados para este paciente.</p>
+                </div>
+              ) : (() => {
+                const treinosAgrupados = atividadeFisicaData.reduce((acc, ex) => {
+                  const treino = ex.nome_treino || 'Treino Sem Nome';
+                  if (!acc[treino]) acc[treino] = [];
+                  acc[treino].push(ex);
+                  return acc;
+                }, {} as Record<string, ExercicioFisico[]>);
+
+                const treinoKeys = Object.keys(treinosAgrupados);
+                const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+                // NIVEL 2: Detalhe do treino selecionado
+                if (selectedTreino && treinosAgrupados[selectedTreino]) {
+                  const exercicios = treinosAgrupados[selectedTreino];
+                  const treinoIndex = treinoKeys.indexOf(selectedTreino);
+                  const letter = letters[treinoIndex] || '';
+                  const grupoMuscular = exercicios[0]?.grupo_muscular || '';
+                  const totalSeries = exercicios.reduce((sum, ex) => sum + (parseInt(ex.series || '0') || 0), 0);
+
+                  return (
+                    <div>
+                      <button
+                        onClick={() => setSelectedTreino(null)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 8,
+                          background: 'none', border: 'none', cursor: 'pointer',
+                          color: '#1A3D61', fontSize: 14, fontWeight: 600,
+                          padding: '8px 0', marginBottom: 20
+                        }}
+                      >
+                        <ArrowLeft size={18} /> Voltar aos treinos
+                      </button>
+
+                      <div style={{
+                        background: '#1A3D61', borderRadius: 16, padding: '24px 28px',
+                        color: 'white', marginBottom: 24
+                      }}>
+                        <div style={{ fontSize: 13, opacity: 0.7, marginBottom: 4 }}>
+                          Treino {letter} - {(() => { const dias = ['Segunda', 'Terca', 'Quarta', 'Quinta', 'Sexta', 'Sabado', 'Domingo']; return dias[treinoIndex % 7] || ''; })()}-feira
+                        </div>
+                        <div style={{ fontSize: 22, fontWeight: 700, marginBottom: 8 }}>{grupoMuscular || selectedTreino}</div>
+                        <div style={{ display: 'flex', gap: 20, fontSize: 13, opacity: 0.8 }}>
+                          <span>{exercicios.length} exercicios</span>
+                          <span>{totalSeries} series totais</span>
+                        </div>
                       </div>
-                    ) : (
-                      <>
-                        {/* Agrupar exercícios por nome_treino */}
-                        {Object.entries(
-                          atividadeFisicaData.reduce((acc, exercicio) => {
-                            const treino = exercicio.nome_treino || 'Treino Sem Nome';
-                            if (!acc[treino]) {
-                              acc[treino] = [];
-                            }
-                            acc[treino].push(exercicio);
-                            return acc;
-                          }, {} as Record<string, ExercicioFisico[]>)
-                        ).map(([nomeTreino, exercicios]: [string, ExercicioFisico[]]) => (
-                          <CollapsibleSection key={nomeTreino} title={nomeTreino} defaultOpen={true}>
-                            <div className="anamnese-subsection">
-                              {exercicios.map((exercicio: ExercicioFisico) => (
-                                <div key={exercicio.id} style={{ marginBottom: '16px' }}>
-                                  <h4 style={{ marginBottom: '12px', fontSize: '14px', fontWeight: 600, color: '#374151' }}>
-                                    {exercicio.nome_exercicio || 'Exercício Sem Nome'}
-                                  </h4>
-                                  <div className="anamnese-subsection">
-                                    <DataField
-                                      label="Nome do Exercício"
-                                      value={exercicio.nome_exercicio || ''}
-                                      fieldPath={`exercicios.${exercicio.id}.nome_exercicio`}
-                                      consultaId={consultaDetails?.id || consultaId || ''}
-                                      onSave={async (fieldPath: string, newValue: string, consultaId: string) => {
-                                        await handleSaveExercicio(exercicio.id, 'nome_exercicio', newValue);
-                                      }}
-                                    />
-                                    <DataField
-                                      label="Tipo de Treino"
-                                      value={exercicio.tipo_treino || ''}
-                                      fieldPath={`exercicios.${exercicio.id}.tipo_treino`}
-                                      consultaId={consultaDetails?.id || consultaId || ''}
-                                      onSave={async (fieldPath: string, newValue: string, consultaId: string) => {
-                                        await handleSaveExercicio(exercicio.id, 'tipo_treino', newValue);
-                                      }}
-                                    />
-                                    <DataField
-                                      label="Grupo Muscular"
-                                      value={exercicio.grupo_muscular || ''}
-                                      fieldPath={`exercicios.${exercicio.id}.grupo_muscular`}
-                                      consultaId={consultaDetails?.id || consultaId || ''}
-                                      onSave={async (fieldPath: string, newValue: string, consultaId: string) => {
-                                        await handleSaveExercicio(exercicio.id, 'grupo_muscular', newValue);
-                                      }}
-                                    />
-                                    <DataField
-                                      label="Séries"
-                                      value={exercicio.series || ''}
-                                      fieldPath={`exercicios.${exercicio.id}.series`}
-                                      consultaId={consultaDetails?.id || consultaId || ''}
-                                      onSave={async (fieldPath: string, newValue: string, consultaId: string) => {
-                                        await handleSaveExercicio(exercicio.id, 'series', newValue);
-                                      }}
-                                    />
-                                    <DataField
-                                      label="Repetições"
-                                      value={exercicio.repeticoes || ''}
-                                      fieldPath={`exercicios.${exercicio.id}.repeticoes`}
-                                      consultaId={consultaDetails?.id || consultaId || ''}
-                                      onSave={async (fieldPath: string, newValue: string, consultaId: string) => {
-                                        await handleSaveExercicio(exercicio.id, 'repeticoes', newValue);
-                                      }}
-                                    />
-                                    <DataField
-                                      label="Descanso"
-                                      value={exercicio.descanso || ''}
-                                      fieldPath={`exercicios.${exercicio.id}.descanso`}
-                                      consultaId={consultaDetails?.id || consultaId || ''}
-                                      onSave={async (fieldPath: string, newValue: string, consultaId: string) => {
-                                        await handleSaveExercicio(exercicio.id, 'descanso', newValue);
-                                      }}
-                                    />
-                                    <DataField
-                                      label="Treino Atual"
-                                      value={exercicio.treino_atual ? String(exercicio.treino_atual) : ''}
-                                      fieldPath={`exercicios.${exercicio.id}.treino_atual`}
-                                      consultaId={consultaDetails?.id || consultaId || ''}
-                                      onSave={async (fieldPath: string, newValue: string, consultaId: string) => {
-                                        await handleSaveExercicio(exercicio.id, 'treino_atual', newValue);
-                                      }}
-                                    />
-                                    <DataField
-                                      label="Próximo Treino"
-                                      value={exercicio.proximo_treino ? String(exercicio.proximo_treino) : ''}
-                                      fieldPath={`exercicios.${exercicio.id}.proximo_treino`}
-                                      consultaId={consultaDetails?.id || consultaId || ''}
-                                      onSave={async (fieldPath: string, newValue: string, consultaId: string) => {
-                                        await handleSaveExercicio(exercicio.id, 'proximo_treino', newValue);
-                                      }}
-                                    />
-                                    <DataField
-                                      label="Último Treino"
-                                      value={exercicio.ultimo_treino ? 'Sim' : 'Não'}
-                                      fieldPath={`exercicios.${exercicio.id}.ultimo_treino`}
-                                      consultaId={consultaDetails?.id || consultaId || ''}
-                                      onSave={async (fieldPath: string, newValue: string, consultaId: string) => {
-                                        await handleSaveExercicio(exercicio.id, 'ultimo_treino', newValue);
-                                      }}
-                                    />
-                                    <DataField
-                                      label="Alertas Importantes"
-                                      value={exercicio.alertas_importantes || ''}
-                                      fieldPath={`exercicios.${exercicio.id}.alertas_importantes`}
-                                      consultaId={consultaDetails?.id || consultaId || ''}
-                                      onSave={async (fieldPath: string, newValue: string, consultaId: string) => {
-                                        await handleSaveExercicio(exercicio.id, 'alertas_importantes', newValue);
-                                      }}
-                                    />
-                                    <DataField
-                                      label="Observações"
-                                      value={exercicio.observacoes || ''}
-                                      fieldPath={`exercicios.${exercicio.id}.observacoes`}
-                                      consultaId={consultaDetails?.id || consultaId || ''}
-                                      onSave={async (fieldPath: string, newValue: string, consultaId: string) => {
-                                        await handleSaveExercicio(exercicio.id, 'observacoes', newValue);
-                                      }}
-                                    />
-                                  </div>
-                                </div>
-                              ))}
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                        {exercicios.map((exercicio, idx) => (
+                          <div key={exercicio.id} style={{
+                            background: '#FFFFFF', border: '1.5px solid #E2E8F0',
+                            borderRadius: 14, padding: '20px 24px', position: 'relative'
+                          }}>
+                            <div style={{
+                              position: 'absolute', top: 20, left: 24,
+                              width: 28, height: 28, borderRadius: '50%',
+                              background: '#F1F5F9', display: 'flex', alignItems: 'center',
+                              justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#1A3D61'
+                            }}>
+                              {String(idx + 1).padStart(2, '0')}
                             </div>
-                          </CollapsibleSection>
+
+                            <div style={{ marginLeft: 44 }}>
+                              <div style={{ fontSize: 11, color: '#94A3B8', fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: 0.5, marginBottom: 4 }}>
+                                Nome do Exercicio
+                              </div>
+                              <div style={{ fontSize: 16, fontWeight: 700, color: '#0F172A', marginBottom: 16 }}>
+                                {exercicio.nome_exercicio || 'Sem nome'}
+                              </div>
+
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
+                                <div style={{ background: '#F8FAFC', borderRadius: 10, padding: '10px 14px' }}>
+                                  <div style={{ fontSize: 11, color: '#94A3B8', fontWeight: 600, marginBottom: 2 }}>Series:</div>
+                                  <div style={{ fontSize: 16, fontWeight: 700, color: '#0F172A' }}>{exercicio.series || '-'}</div>
+                                </div>
+                                <div style={{ background: '#F8FAFC', borderRadius: 10, padding: '10px 14px' }}>
+                                  <div style={{ fontSize: 11, color: '#94A3B8', fontWeight: 600, marginBottom: 2 }}>Repeticoes:</div>
+                                  <div style={{ fontSize: 16, fontWeight: 700, color: '#0F172A' }}>{exercicio.repeticoes || '-'}</div>
+                                </div>
+                                <div style={{ background: '#F8FAFC', borderRadius: 10, padding: '10px 14px' }}>
+                                  <div style={{ fontSize: 11, color: '#94A3B8', fontWeight: 600, marginBottom: 2 }}>Descanso:</div>
+                                  <div style={{ fontSize: 16, fontWeight: 700, color: '#0F172A' }}>{exercicio.descanso || '-'}</div>
+                                </div>
+                              </div>
+
+                              {/* Botao Ajuda */}
+                              <button
+                                onClick={() => setVideoHelpExercicio(exercicio.nome_exercicio || '')}
+                                style={{
+                                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                                  background: '#F1F5F9', border: '1.5px solid #E2E8F0',
+                                  borderRadius: 10, padding: '8px 14px', cursor: 'pointer',
+                                  fontSize: 13, fontWeight: 600, color: '#1A3D61',
+                                  marginBottom: exercicio.observacoes ? 12 : 0,
+                                  transition: 'all 0.2s ease'
+                                }}
+                                onMouseEnter={(e) => { e.currentTarget.style.background = '#E2E8F0'; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.background = '#F1F5F9'; }}
+                              >
+                                Ajuda
+                                <span style={{
+                                  width: 18, height: 18, borderRadius: '50%',
+                                  background: '#1A3D61', color: 'white',
+                                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                  fontSize: 11, fontWeight: 700
+                                }}>?</span>
+                              </button>
+
+                              {exercicio.observacoes && (
+                                <div style={{ background: '#F8FAFC', borderRadius: 10, padding: '12px 14px' }}>
+                                  <div style={{ fontSize: 11, color: '#94A3B8', fontWeight: 600, marginBottom: 4 }}>Observacoes:</div>
+                                  <div style={{ fontSize: 13, color: '#64748B', lineHeight: 1.6 }}>{exercicio.observacoes}</div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
                         ))}
-                      </>
-                    )}
+                      </div>
+                    </div>
+                  );
+                }
+
+                // NIVEL 1: Lista de treinos da semana
+                return (
+                  <div>
+                    <h2 style={{ fontSize: 22, fontWeight: 700, color: '#0F172A', marginBottom: 6 }}>
+                      Treinos da semana
+                    </h2>
+                    <p style={{ fontSize: 14, color: '#64748B', marginBottom: 24 }}>
+                      Selecione um treino para ver os exercicios
+                    </p>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      {treinoKeys.map((nomeTreino, idx) => {
+                        const exercicios = treinosAgrupados[nomeTreino];
+                        const letter = letters[idx] || '';
+                        const grupoMuscular = exercicios[0]?.grupo_muscular || '';
+                        const dias = ['Segunda', 'Terca', 'Quarta', 'Quinta', 'Sexta', 'Sabado', 'Domingo'];
+                        const dia = dias[idx % 7] || '';
+
+                        return (
+                          <button
+                            key={nomeTreino}
+                            onClick={() => setSelectedTreino(nomeTreino)}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: 16,
+                              background: '#FFFFFF', border: '1.5px solid #E2E8F0',
+                              borderRadius: 14, padding: '18px 20px', cursor: 'pointer',
+                              textAlign: 'left', transition: 'all 0.2s ease', width: '100%'
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#1A3D61'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(26,61,97,0.08)'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#E2E8F0'; e.currentTarget.style.boxShadow = 'none'; }}
+                          >
+                            <div style={{
+                              width: 44, height: 44, borderRadius: 12,
+                              background: '#1A3D61', color: 'white',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              fontSize: 18, fontWeight: 700, flexShrink: 0
+                            }}>
+                              {letter}
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: 15, fontWeight: 700, color: '#0F172A', marginBottom: 2 }}>
+                                Treino {letter} — {grupoMuscular || nomeTreino}
+                              </div>
+                              <div style={{ fontSize: 13, color: '#94A3B8' }}>
+                                {dia}-feira - {exercicios.length} exercicios
+                              </div>
+                            </div>
+                            <ChevronRight size={20} style={{ color: '#94A3B8' }} />
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
             </div>
           </div>
+
+          {/* Popup de Video de Ajuda */}
+          {videoHelpExercicio && (
+            <div
+              style={{
+                position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                background: 'rgba(0,0,0,0.6)', zIndex: 9999,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                padding: 24
+              }}
+              onClick={() => setVideoHelpExercicio(null)}
+            >
+              <div
+                style={{
+                  background: '#FFFFFF', borderRadius: 16, width: '100%', maxWidth: 640,
+                  overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '16px 20px', borderBottom: '1px solid #E2E8F0'
+                }}>
+                  <div>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: '#0F172A' }}>
+                      Como executar
+                    </div>
+                    <div style={{ fontSize: 13, color: '#64748B', marginTop: 2 }}>
+                      {videoHelpExercicio}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setVideoHelpExercicio(null)}
+                    style={{
+                      width: 32, height: 32, borderRadius: 8,
+                      border: '1px solid #E2E8F0', background: '#F8FAFC',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      cursor: 'pointer', color: '#64748B'
+                    }}
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+                <div style={{
+                  aspectRatio: '16/9', background: '#0F172A',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center',
+                  justifyContent: 'center', gap: 12, color: '#94A3B8'
+                }}>
+                  <Play size={48} style={{ color: '#1A3D61' }} />
+                  <span style={{ fontSize: 14, fontWeight: 500 }}>
+                    Video em breve
+                  </span>
+                  <span style={{ fontSize: 12, color: '#64748B' }}>
+                    O video demonstrativo sera adicionado pelo profissional
+                  </span>
+                </div>
+                <div style={{ padding: '16px 20px', borderTop: '1px solid #E2E8F0', textAlign: 'center' }}>
+                  <button
+                    onClick={() => setVideoHelpExercicio(null)}
+                    style={{
+                      padding: '10px 32px', background: '#1A3D61', color: 'white',
+                      border: 'none', borderRadius: 10, fontSize: 14,
+                      fontWeight: 600, cursor: 'pointer'
+                    }}
+                  >
+                    Entendi
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       );
     }
