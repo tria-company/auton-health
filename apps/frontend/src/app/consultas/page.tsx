@@ -9586,10 +9586,60 @@ function ConsultasPageContent() {
           </div>
 
           <div className="anamnese-container">
-            <div className="anamnese-header">
-              <h2>Protocolo de Suplementação</h2>
-            </div>
+            <div className="anamnese-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2>Protocolo de Suplementacao</h2>
+              <button
+                onClick={async () => {
+                  try {
+                    const { gerarReceitaPdf } = await import('@/lib/receitaPdf');
 
+                    // Buscar dados do medico
+                    const { data: medicoData } = await supabase
+                      .from('medicos')
+                      .select('name, crm, especialidade, phone, email, endereco')
+                      .eq('user_auth', user?.id)
+                      .maybeSingle();
+
+                    // Buscar dados de suplementacao
+                    const supResponse = await gatewayClient.get(`/solucao-suplementacao/${consultaDetails?.id || consultaId}`);
+
+                    if (supResponse.success && supResponse.suplementacao_data) {
+                      gerarReceitaPdf({
+                        suplementacaoData: supResponse.suplementacao_data,
+                        medico: {
+                          nome: medicoData?.name || 'Dr(a). Medico',
+                          crm: medicoData?.crm || '',
+                          especialidade: medicoData?.especialidade || '',
+                          telefone: medicoData?.phone || '',
+                          email: medicoData?.email || '',
+                          endereco: medicoData?.endereco || '',
+                        },
+                        paciente: {
+                          nome: consultaDetails?.patient_name || '',
+                          email: consultaDetails?.patients?.email || '',
+                          telefone: consultaDetails?.patients?.phone || '',
+                        },
+                        dataConsulta: new Date(consultaDetails?.created_at || '').toLocaleDateString('pt-BR'),
+                      });
+                    }
+                  } catch (err) {
+                    console.error('Erro ao gerar PDF:', err);
+                  }
+                }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '8px',
+                  padding: '10px 20px', background: '#1A3D61', color: '#fff',
+                  border: 'none', borderRadius: '10px', fontSize: '13px',
+                  fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s',
+                  fontFamily: 'inherit',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = '#0F172A'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = '#1A3D61'; }}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="M12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>
+                Gerar Receita PDF
+              </button>
+            </div>
 
             <div className="anamnese-content">
               <SuplemementacaoSection
