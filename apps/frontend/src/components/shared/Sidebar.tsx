@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   LayoutDashboard,
   Building2,
+  ClipboardList,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
@@ -32,12 +33,11 @@ const menuItems = [
   { icon: MessageCircle, label: 'Consultas', href: '/consultas' },
   { icon: Calendar, label: 'Agenda', href: '/agenda' },
   { icon: User, label: 'Pacientes', href: '/pacientes' },
+  { icon: ClipboardList, label: 'Cadastro', href: '/cadastro' },
   { icon: Settings, label: 'Configurações', href: '/configuracoes' },
 ];
 
-const clinicMenuItems = [
-  { icon: LayoutDashboard, label: 'Gestão de Clínica', href: '/clinica/gestao' },
-];
+const clinicMenuItems: { icon: any; label: string; href: string }[] = [];
 
 const adminMenuItems = [
   { icon: Building2, label: 'Administração', href: '/administracao' },

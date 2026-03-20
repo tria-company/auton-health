@@ -3423,6 +3423,82 @@ interface SuplementacaoItem {
   termino: string;
 }
 
+// Painel de favoritos do Cadastro - mostra itens favoritados para adicao rapida
+function FavoritesPanel({
+  type,
+  onSelect
+}: {
+  type: 'refeicoes' | 'treinos' | 'suplementos' | 'fitoterapicos';
+  onSelect: (item: any) => void;
+}) {
+  const [favorites, setFavorites] = useState<any[]>([]);
+  const [isOpen, setIsOpen] = useState(false);
+
+  useEffect(() => {
+    // Buscar favoritos do localStorage (dados do Cadastro)
+    try {
+      const stored = localStorage.getItem('cadastro_data');
+      if (stored) {
+        const allData = JSON.parse(stored);
+        const items = allData[type] || [];
+        setFavorites(items.filter((item: any) => item.favorito));
+      }
+    } catch (e) {
+      console.error('Erro ao carregar favoritos:', e);
+    }
+  }, [type]);
+
+  if (favorites.length === 0) return null;
+
+  return (
+    <div style={{
+      marginBottom: '16px',
+      border: '1.5px solid #E2E8F0',
+      borderRadius: '12px',
+      overflow: 'hidden',
+      background: '#F8FAFC',
+    }}>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '12px 16px', border: 'none', background: 'transparent',
+          cursor: 'pointer', fontSize: '13px', fontWeight: 600, color: '#1A3D61',
+          fontFamily: 'inherit',
+        }}
+      >
+        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#f59e0b" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          Meus Favoritos ({favorites.length})
+        </span>
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s' }}><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+      {isOpen && (
+        <div style={{ padding: '0 16px 16px', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+          {favorites.map((item: any) => (
+            <button
+              key={item.id}
+              onClick={() => onSelect(item)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '6px',
+                padding: '6px 14px', borderRadius: '20px',
+                border: '1.5px solid #E2E8F0', background: '#ffffff',
+                fontSize: '12px', fontWeight: 600, color: '#1A3D61',
+                cursor: 'pointer', transition: 'all 0.2s', fontFamily: 'inherit',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = '#1A3D61'; e.currentTarget.style.background = 'rgba(26,61,97,0.05)'; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = '#E2E8F0'; e.currentTarget.style.background = '#ffffff'; }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+              {item.nome}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SuplemementacaoSection({
   consultaId
 }: {
@@ -3442,6 +3518,8 @@ function SuplemementacaoSection({
   const [addingCategory, setAddingCategory] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const [deletingItem, setDeletingItem] = useState<string | null>(null);
+
   const handleAddItem = async (category: 'suplementos' | 'fitoterapicos' | 'homeopatia' | 'florais_bach') => {
     try {
       setAddingCategory(category);
@@ -3456,6 +3534,24 @@ function SuplemementacaoSection({
       showError(err instanceof Error ? err.message : 'Erro ao adicionar item', 'Erro');
     } finally {
       setAddingCategory(null);
+    }
+  };
+
+  const handleDeleteItem = async (category: 'suplementos' | 'fitoterapicos' | 'homeopatia' | 'florais_bach', index: number) => {
+    const key = `${category}-${index}`;
+    if (!confirm('Tem certeza que deseja excluir este item?')) return;
+    try {
+      setDeletingItem(key);
+      const response = await gatewayClient.post(`/solucao-suplementacao/${consultaId}/delete-item`, { category, index });
+      if (!response.success) {
+        throw new Error((response as { error?: string }).error || 'Erro ao excluir item');
+      }
+      await loadSuplementacaoData();
+    } catch (err) {
+      console.error('Erro ao excluir item:', err);
+      showError(err instanceof Error ? err.message : 'Erro ao excluir item', 'Erro');
+    } finally {
+      setDeletingItem(null);
     }
   };
 
@@ -3611,9 +3707,26 @@ function SuplemementacaoSection({
         <div className="anamnese-subsection">
           {items.map((item, index) => (
             <div key={index} style={{ marginBottom: '16px' }}>
-              <h4 className="suplementacao-item-title">
-                Item {index + 1}
-              </h4>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                <h4 className="suplementacao-item-title" style={{ margin: 0 }}>
+                  Item {index + 1}
+                </h4>
+                <button
+                  onClick={() => handleDeleteItem(category, index)}
+                  disabled={deletingItem === `${category}-${index}`}
+                  title="Excluir item"
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: '32px', height: '32px', borderRadius: '8px',
+                    border: '1.5px solid #E2E8F0', background: 'transparent',
+                    color: '#94A3B8', cursor: 'pointer', transition: 'all 0.2s',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = '#ef4444'; e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.background = '#fef2f2'; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = '#E2E8F0'; e.currentTarget.style.color = '#94A3B8'; e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                </button>
+              </div>
               <div className="anamnese-subsection">
                 <DataField
                   label="Nome"
@@ -3726,8 +3839,32 @@ function SuplemementacaoSection({
     );
   };
 
+  const handleAddFromFavorite = async (item: any, category: 'suplementos' | 'fitoterapicos') => {
+    try {
+      setAddingCategory(category);
+      const response = await gatewayClient.post(`/solucao-suplementacao/${consultaId}/add-item`, {
+        category,
+        prefill: {
+          nome: item.nome,
+          dosagem: item.dosagem || '',
+          horario: item.horario || '',
+          objetivo: item.objetivo || '',
+        }
+      });
+      if (response.success) {
+        await loadSuplementacaoData();
+      }
+    } catch (err) {
+      console.error('Erro ao adicionar favorito:', err);
+    } finally {
+      setAddingCategory(null);
+    }
+  };
+
   return (
     <div className="anamnese-sections">
+      <FavoritesPanel type="suplementos" onSelect={(item) => handleAddFromFavorite(item, 'suplementos')} />
+      <FavoritesPanel type="fitoterapicos" onSelect={(item) => handleAddFromFavorite(item, 'fitoterapicos')} />
       {renderCategoryTable("1. Suplementos", "suplementos", effectiveSuplementacaoData.suplementos)}
       {renderCategoryTable("2. Fitoterápicos", "fitoterapicos", effectiveSuplementacaoData.fitoterapicos)}
       {renderCategoryTable("3. Homeopatia", "homeopatia", effectiveSuplementacaoData.homeopatia)}
@@ -3747,6 +3884,7 @@ function AlimentacaoSection({
   const [alimentacaoData, setAlimentacaoData] = useState<any>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [deletingMeal, setDeletingMeal] = useState<string | null>(null);
 
   useEffect(() => {
     loadAlimentacaoData();
@@ -3842,8 +3980,41 @@ function AlimentacaoSection({
   };
 
   const handleAIEdit = (fieldPath: string, label: string) => {
-    // Esta função será implementada se necessário para edição com IA
     console.log('Edição com IA:', fieldPath, label);
+  };
+
+  const handleDeleteMeal = async (mealId: string, mealIndex: number) => {
+    if (!confirm('Tem certeza que deseja excluir esta refeicao?')) return;
+    try {
+      setDeletingMeal(mealId || `meal-${mealIndex}`);
+      const response = await gatewayClient.post(`/alimentacao/${consultaId}/delete-meal`, {
+        mealId,
+        mealIndex
+      });
+      if (response.success) {
+        await loadAlimentacaoData();
+      }
+    } catch (error) {
+      console.error('Erro ao excluir refeicao:', error);
+    } finally {
+      setDeletingMeal(null);
+    }
+  };
+
+  const handleDeletePrincipalItem = async (mealIndex: number, itemIndex: number) => {
+    if (!confirm('Tem certeza que deseja excluir este item?')) return;
+    try {
+      const response = await gatewayClient.post(`/alimentacao/${consultaId}/delete-item`, {
+        mealIndex,
+        itemIndex,
+        type: 'principal'
+      });
+      if (response.success) {
+        await loadAlimentacaoData();
+      }
+    } catch (error) {
+      console.error('Erro ao excluir item:', error);
+    }
   };
 
   const formatValueForDataField = (value: any): string => {
@@ -3902,6 +4073,9 @@ function AlimentacaoSection({
 
   return (
     <div className="anamnese-sections">
+      <FavoritesPanel type="refeicoes" onSelect={(item) => {
+        console.log('Adicionar refeicao favorita:', item);
+      }} />
       {mealsToRender.length === 0 ? (
         <div className="anamnese-sections">
           <p style={{ color: '#666', fontStyle: 'italic', padding: '20px' }}>
@@ -3917,11 +4091,28 @@ function AlimentacaoSection({
 
             return (
               <div key={meal.id || index} className="alimentacao-meal-card">
-                <div className="alimentacao-meal-header">
-                  <div className="alimentacao-meal-icon">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2" /><path d="M7 2v20" /><path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7" /></svg>
+                <div className="alimentacao-meal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div className="alimentacao-meal-icon">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2" /><path d="M7 2v20" /><path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7" /></svg>
+                    </div>
+                    <h3>{meal.nome || `Refeição ${index + 1}`}</h3>
                   </div>
-                  <h3>{meal.nome || `Refeição ${index + 1}`}</h3>
+                  <button
+                    onClick={() => handleDeleteMeal(meal.id, index)}
+                    disabled={deletingMeal === (meal.id || `meal-${index}`)}
+                    title="Excluir refeicao"
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      width: '32px', height: '32px', borderRadius: '8px',
+                      border: '1.5px solid #E2E8F0', background: 'transparent',
+                      color: '#94A3B8', cursor: 'pointer', transition: 'all 0.2s', flexShrink: 0,
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = '#ef4444'; e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.background = '#fef2f2'; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = '#E2E8F0'; e.currentTarget.style.color = '#94A3B8'; e.currentTarget.style.background = 'transparent'; }}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                  </button>
                 </div>
 
                 <div className="alimentacao-meal-body">
@@ -3939,9 +4130,25 @@ function AlimentacaoSection({
                           <div key={idx} className="alimentacao-principal-item">
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                               <span className="nome">{item.alimento}</span>
-                              {item.categoria && (
-                                <span className="badge">{item.categoria}</span>
-                              )}
+                              <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexShrink: 0 }}>
+                                {item.categoria && (
+                                  <span className="badge">{item.categoria}</span>
+                                )}
+                                <button
+                                  onClick={() => handleDeletePrincipalItem(index, idx)}
+                                  title="Excluir item"
+                                  style={{
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    width: '24px', height: '24px', borderRadius: '6px',
+                                    border: '1px solid #E2E8F0', background: 'transparent',
+                                    color: '#94A3B8', cursor: 'pointer', transition: 'all 0.2s', padding: 0,
+                                  }}
+                                  onMouseEnter={e => { e.currentTarget.style.borderColor = '#ef4444'; e.currentTarget.style.color = '#ef4444'; }}
+                                  onMouseLeave={e => { e.currentTarget.style.borderColor = '#E2E8F0'; e.currentTarget.style.color = '#94A3B8'; }}
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                                </button>
+                              </div>
                             </div>
                             <div className="meta">
                               {item.gramas && (

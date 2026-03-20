@@ -220,7 +220,7 @@ function AnamneseInicialContent() {
       const response = await gatewayClient.get(`/anamnese/anamnese-inicial?patient_id=${pacienteId}`);
       if (!response.success) { throw new Error(response.error || "Erro na requisição"); }
       if (response.anamnese) {
-        setFormData(dbToUi(response.anamnese));
+        setFormData(prev => ({ ...prev, ...response.anamnese }));
       }
       if (response.emailLocked) {
         setEmailLocked(true);

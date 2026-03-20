@@ -1,0 +1,834 @@
+/* ============================================
+   CADASTRO PAGE - Design System Colors
+   #1A3D61 (primary), #F1F5F9 (bg), #E2E8F0 (border)
+   #64748B (text-secondary), #0F172A (text-primary)
+   ============================================ */
+
+.cadastro-page {
+  min-height: 100vh;
+  background: #F1F5F9;
+  padding: 32px;
+}
+
+.cadastro-container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Header */
+.cadastro-header {
+  margin-bottom: 32px;
+}
+
+.cadastro-header-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.cadastro-title {
+  font-size: 28px;
+  font-weight: 800;
+  color: #0F172A;
+}
+
+.cadastro-subtitle {
+  font-size: 14px;
+  color: #64748B;
+}
+
+/* Tabs */
+.cadastro-tabs {
+  display: flex;
+  gap: 4px;
+  background: #E2E8F0;
+  border-radius: 12px;
+  padding: 4px;
+  margin-bottom: 28px;
+  overflow-x: auto;
+}
+
+.cadastro-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: #64748B;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.cadastro-tab:hover {
+  background: rgba(255, 255, 255, 0.5);
+  color: #1A3D61;
+}
+
+.cadastro-tab.active {
+  background: #ffffff;
+  color: #1A3D61;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.cadastro-tab svg {
+  width: 18px;
+  height: 18px;
+}
+
+.cadastro-tab-count {
+  background: #1A3D61;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 20px;
+  min-width: 22px;
+  text-align: center;
+}
+
+.cadastro-tab.active .cadastro-tab-count {
+  background: #1A3D61;
+}
+
+/* Section Header */
+.cadastro-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.cadastro-section-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0F172A;
+}
+
+.cadastro-section-subtitle {
+  font-size: 13px;
+  color: #64748B;
+  margin-top: 2px;
+}
+
+.cadastro-btn-add {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: #1A3D61;
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.cadastro-btn-add:hover {
+  background: #0F172A;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(26, 61, 97, 0.3);
+}
+
+/* Search & Filters */
+.cadastro-filters {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+  align-items: center;
+}
+
+.cadastro-search {
+  position: relative;
+  flex: 1;
+  max-width: 400px;
+}
+
+.cadastro-search svg {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94A3B8;
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+}
+
+.cadastro-search input {
+  width: 100%;
+  padding: 10px 14px 10px 42px;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 10px;
+  font-size: 14px;
+  background: #ffffff;
+  color: #0F172A;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.cadastro-search input:focus {
+  outline: none;
+  border-color: #1A3D61;
+  box-shadow: 0 0 0 3px rgba(26, 61, 97, 0.1);
+}
+
+.cadastro-filter-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #64748B;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.cadastro-filter-btn:hover {
+  border-color: #1A3D61;
+  color: #1A3D61;
+}
+
+.cadastro-filter-btn.active {
+  background: rgba(26, 61, 97, 0.08);
+  border-color: #1A3D61;
+  color: #1A3D61;
+  font-weight: 600;
+}
+
+/* Cards Grid */
+.cadastro-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+/* Card */
+.cadastro-card {
+  background: #ffffff;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 14px;
+  padding: 20px;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.cadastro-card:hover {
+  border-color: #1A3D61;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+}
+
+.cadastro-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.cadastro-card-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0F172A;
+  margin-bottom: 4px;
+}
+
+.cadastro-card-category {
+  font-size: 12px;
+  color: #64748B;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cadastro-card-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.cadastro-card-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1.5px solid #E2E8F0;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #94A3B8;
+}
+
+.cadastro-card-btn:hover {
+  border-color: #1A3D61;
+  color: #1A3D61;
+  background: #F1F5F9;
+}
+
+.cadastro-card-btn.favorite {
+  color: #f59e0b;
+  border-color: #f59e0b;
+  background: #fef9c3;
+}
+
+.cadastro-card-btn.favorite:hover {
+  background: #fef3c7;
+}
+
+.cadastro-card-body {
+  margin-bottom: 14px;
+}
+
+.cadastro-card-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.cadastro-card-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  background: #F1F5F9;
+  color: #64748B;
+  border: 1px solid #E2E8F0;
+}
+
+.cadastro-card-tag.highlight {
+  background: rgba(26, 61, 97, 0.08);
+  color: #1A3D61;
+  border-color: rgba(26, 61, 97, 0.2);
+}
+
+.cadastro-card-description {
+  font-size: 13px;
+  color: #64748B;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.cadastro-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 12px;
+  border-top: 1px solid #F1F5F9;
+}
+
+.cadastro-card-date {
+  font-size: 11px;
+  color: #94A3B8;
+}
+
+.cadastro-card-badge-fav {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  background: #fef9c3;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+/* Empty State */
+.cadastro-empty {
+  text-align: center;
+  padding: 60px 20px;
+  background: #ffffff;
+  border: 2px dashed #E2E8F0;
+  border-radius: 16px;
+}
+
+.cadastro-empty-icon {
+  width: 64px;
+  height: 64px;
+  background: #F1F5F9;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+  color: #94A3B8;
+}
+
+.cadastro-empty-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0F172A;
+  margin-bottom: 6px;
+}
+
+.cadastro-empty-text {
+  font-size: 13px;
+  color: #64748B;
+  margin-bottom: 20px;
+}
+
+.cadastro-empty-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 24px;
+  background: #1A3D61;
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.cadastro-empty-btn:hover {
+  background: #0F172A;
+}
+
+/* Modal */
+.cadastro-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: cadastroFadeIn 0.2s ease;
+}
+
+@keyframes cadastroFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.cadastro-modal {
+  background: #ffffff;
+  border-radius: 18px;
+  width: 100%;
+  max-width: 560px;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+  animation: cadastroSlideIn 0.25s ease;
+}
+
+@keyframes cadastroSlideIn {
+  from { transform: translateY(10px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.cadastro-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid #E2E8F0;
+}
+
+.cadastro-modal-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0F172A;
+}
+
+.cadastro-modal-close {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1.5px solid #E2E8F0;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #64748B;
+  transition: all 0.2s ease;
+}
+
+.cadastro-modal-close:hover {
+  background: #F1F5F9;
+  color: #0F172A;
+}
+
+.cadastro-modal-body {
+  padding: 24px;
+}
+
+.cadastro-form-group {
+  margin-bottom: 18px;
+}
+
+.cadastro-form-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0F172A;
+  margin-bottom: 6px;
+}
+
+.cadastro-form-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 10px;
+  font-size: 14px;
+  color: #0F172A;
+  background: #ffffff;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.cadastro-form-input:focus {
+  outline: none;
+  border-color: #1A3D61;
+  box-shadow: 0 0 0 3px rgba(26, 61, 97, 0.1);
+}
+
+.cadastro-form-textarea {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 10px;
+  font-size: 14px;
+  color: #0F172A;
+  background: #ffffff;
+  transition: all 0.2s ease;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 80px;
+}
+
+.cadastro-form-textarea:focus {
+  outline: none;
+  border-color: #1A3D61;
+  box-shadow: 0 0 0 3px rgba(26, 61, 97, 0.1);
+}
+
+.cadastro-form-select {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 10px;
+  font-size: 14px;
+  color: #0F172A;
+  background: #ffffff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748B' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  padding-right: 36px;
+}
+
+.cadastro-form-select:focus {
+  outline: none;
+  border-color: #1A3D61;
+  box-shadow: 0 0 0 3px rgba(26, 61, 97, 0.1);
+}
+
+.cadastro-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.cadastro-form-hint {
+  font-size: 11px;
+  color: #94A3B8;
+  margin-top: 4px;
+}
+
+.cadastro-form-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #F8FAFC;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.cadastro-form-toggle:hover {
+  border-color: #1A3D61;
+}
+
+.cadastro-form-toggle.active {
+  background: #fef9c3;
+  border-color: #f59e0b;
+}
+
+.cadastro-form-toggle-star {
+  color: #E2E8F0;
+  transition: color 0.2s ease;
+}
+
+.cadastro-form-toggle.active .cadastro-form-toggle-star {
+  color: #f59e0b;
+}
+
+.cadastro-form-toggle-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0F172A;
+}
+
+.cadastro-form-toggle-hint {
+  font-size: 11px;
+  color: #64748B;
+}
+
+.cadastro-modal-footer {
+  display: flex;
+  gap: 12px;
+  padding: 20px 24px;
+  border-top: 1px solid #E2E8F0;
+}
+
+.cadastro-btn-cancel {
+  flex: 1;
+  padding: 10px;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 10px;
+  background: transparent;
+  color: #64748B;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.cadastro-btn-cancel:hover {
+  border-color: #1A3D61;
+  color: #0F172A;
+}
+
+.cadastro-btn-save {
+  flex: 2;
+  padding: 10px;
+  border: none;
+  border-radius: 10px;
+  background: #1A3D61;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.cadastro-btn-save:hover {
+  background: #0F172A;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .cadastro-page {
+    padding: 16px;
+  }
+
+  .cadastro-header-content {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .cadastro-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .cadastro-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .cadastro-filters {
+    flex-direction: column;
+  }
+
+  .cadastro-search {
+    max-width: 100%;
+  }
+
+  .cadastro-form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .cadastro-section-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+}
+
+/* Dark mode */
+.dark .cadastro-page {
+  background: #0F172A;
+}
+
+.dark .cadastro-title,
+.dark .cadastro-section-title,
+.dark .cadastro-card-title,
+.dark .cadastro-modal-title,
+.dark .cadastro-form-label,
+.dark .cadastro-empty-title {
+  color: #F1F5F9;
+}
+
+.dark .cadastro-subtitle,
+.dark .cadastro-section-subtitle,
+.dark .cadastro-card-category,
+.dark .cadastro-card-description,
+.dark .cadastro-empty-text,
+.dark .cadastro-form-hint {
+  color: #94A3B8;
+}
+
+.dark .cadastro-tabs {
+  background: #1E293B;
+}
+
+.dark .cadastro-tab {
+  color: #94A3B8;
+}
+
+.dark .cadastro-tab:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #F1F5F9;
+}
+
+.dark .cadastro-tab.active {
+  background: #0F172A;
+  color: #F1F5F9;
+}
+
+.dark .cadastro-card,
+.dark .cadastro-modal {
+  background: #1E293B;
+  border-color: #334155;
+}
+
+.dark .cadastro-card:hover {
+  border-color: #94A3B8;
+}
+
+.dark .cadastro-card-tag {
+  background: #0F172A;
+  color: #94A3B8;
+  border-color: #334155;
+}
+
+.dark .cadastro-card-tag.highlight {
+  background: rgba(26, 61, 97, 0.3);
+  color: #94A3B8;
+  border-color: rgba(26, 61, 97, 0.5);
+}
+
+.dark .cadastro-card-footer {
+  border-top-color: #334155;
+}
+
+.dark .cadastro-card-btn {
+  border-color: #334155;
+  color: #94A3B8;
+}
+
+.dark .cadastro-card-btn:hover {
+  border-color: #94A3B8;
+  color: #F1F5F9;
+  background: #0F172A;
+}
+
+.dark .cadastro-empty {
+  background: #1E293B;
+  border-color: #334155;
+}
+
+.dark .cadastro-empty-icon {
+  background: #0F172A;
+  color: #64748B;
+}
+
+.dark .cadastro-search input,
+.dark .cadastro-form-input,
+.dark .cadastro-form-textarea,
+.dark .cadastro-form-select,
+.dark .cadastro-filter-btn {
+  background: #0F172A;
+  border-color: #334155;
+  color: #F1F5F9;
+}
+
+.dark .cadastro-search input:focus,
+.dark .cadastro-form-input:focus,
+.dark .cadastro-form-textarea:focus,
+.dark .cadastro-form-select:focus {
+  border-color: #64748B;
+  box-shadow: 0 0 0 3px rgba(100, 116, 139, 0.2);
+}
+
+.dark .cadastro-modal-header,
+.dark .cadastro-modal-footer {
+  border-color: #334155;
+}
+
+.dark .cadastro-modal-close,
+.dark .cadastro-btn-cancel {
+  border-color: #334155;
+  color: #94A3B8;
+}
+
+.dark .cadastro-modal-close:hover,
+.dark .cadastro-btn-cancel:hover {
+  background: #0F172A;
+  color: #F1F5F9;
+}
+
+.dark .cadastro-form-toggle {
+  background: #0F172A;
+  border-color: #334155;
+}
+
+.dark .cadastro-form-toggle-text {
+  color: #F1F5F9;
+}
+
+.dark .cadastro-form-toggle-star {
+  color: #334155;
+}
+
+.dark .cadastro-modal-overlay {
+  background: rgba(0, 0, 0, 0.6);
+}
