@@ -3500,9 +3500,13 @@ function FavoritesPanel({
 }
 
 function SuplemementacaoSection({
-  consultaId
+  consultaId,
+  userId,
+  patientName,
 }: {
   consultaId: string;
+  userId?: string;
+  patientName?: string;
 }) {
   const { showError } = useNotifications();
 
@@ -3711,21 +3715,59 @@ function SuplemementacaoSection({
                 <h4 className="suplementacao-item-title" style={{ margin: 0 }}>
                   Item {index + 1}
                 </h4>
-                <button
-                  onClick={() => handleDeleteItem(category, index)}
-                  disabled={deletingItem === `${category}-${index}`}
-                  title="Excluir item"
-                  style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    width: '32px', height: '32px', borderRadius: '8px',
-                    border: '1.5px solid #E2E8F0', background: 'transparent',
-                    color: '#94A3B8', cursor: 'pointer', transition: 'all 0.2s',
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = '#ef4444'; e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.background = '#fef2f2'; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = '#E2E8F0'; e.currentTarget.style.color = '#94A3B8'; e.currentTarget.style.background = 'transparent'; }}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-                </button>
+                <div style={{ display: 'flex', gap: '4px' }}>
+                  <button
+                    onClick={async () => {
+                      try {
+                        const { gerarReceitaItemPdf } = await import('@/lib/receitaPdf');
+                        const { data: medicoData } = await supabase
+                          .from('medicos')
+                          .select('name, crm, especialidade, phone, email, endereco')
+                          .eq('user_auth', userId || '')
+                          .maybeSingle();
+                        gerarReceitaItemPdf({
+                          item,
+                          category,
+                          medico: {
+                            nome: medicoData?.name || '',
+                            crm: medicoData?.crm || '',
+                            especialidade: medicoData?.especialidade || '',
+                            telefone: medicoData?.phone || '',
+                            email: medicoData?.email || '',
+                            endereco: medicoData?.endereco || '',
+                          },
+                          paciente: { nome: patientName || '' },
+                        });
+                      } catch (err) { console.error('Erro ao gerar PDF:', err); }
+                    }}
+                    title="Baixar prescricao deste item"
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      width: '32px', height: '32px', borderRadius: '8px',
+                      border: '1.5px solid #E2E8F0', background: 'transparent',
+                      color: '#94A3B8', cursor: 'pointer', transition: 'all 0.2s',
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = '#1A3D61'; e.currentTarget.style.color = '#1A3D61'; e.currentTarget.style.background = '#F1F5F9'; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = '#E2E8F0'; e.currentTarget.style.color = '#94A3B8'; e.currentTarget.style.background = 'transparent'; }}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="M12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>
+                  </button>
+                  <button
+                    onClick={() => handleDeleteItem(category, index)}
+                    disabled={deletingItem === `${category}-${index}`}
+                    title="Excluir item"
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      width: '32px', height: '32px', borderRadius: '8px',
+                      border: '1.5px solid #E2E8F0', background: 'transparent',
+                      color: '#94A3B8', cursor: 'pointer', transition: 'all 0.2s',
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = '#ef4444'; e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.background = '#fef2f2'; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = '#E2E8F0'; e.currentTarget.style.color = '#94A3B8'; e.currentTarget.style.background = 'transparent'; }}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                  </button>
+                </div>
               </div>
               <div className="anamnese-subsection">
                 <DataField
@@ -9637,13 +9679,15 @@ function ConsultasPageContent() {
                 onMouseLeave={e => { e.currentTarget.style.background = '#1A3D61'; }}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="M12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>
-                Gerar Receita PDF
+                Gerar Prescricao
               </button>
             </div>
 
             <div className="anamnese-content">
               <SuplemementacaoSection
                 consultaId={consultaDetails?.id || consultaId || ''}
+                userId={user?.id}
+                patientName={consultaDetails?.patient_name}
               />
             </div>
           </div>
