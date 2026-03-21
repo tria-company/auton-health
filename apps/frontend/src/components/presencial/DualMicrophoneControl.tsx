@@ -13,13 +13,17 @@ interface DualMicrophoneControlProps {
     doctorLevel?: number;
     patientLevel?: number;
     disabled?: boolean;
+    initialDoctorMic?: string;
+    initialPatientMic?: string;
 }
 
 export function DualMicrophoneControl({
     onMicrophonesSelected,
     doctorLevel = 0,
     patientLevel = 0,
-    disabled = false
+    disabled = false,
+    initialDoctorMic,
+    initialPatientMic
 }: DualMicrophoneControlProps) {
     const [devices, setDevices] = useState<AudioDevice[]>([]);
     const [doctorMic, setDoctorMic] = useState('');
@@ -46,38 +50,45 @@ export function DualMicrophoneControl({
 
             setDevices(audioInputs);
 
-            // Tentar carregar seleções salvas do localStorage
-            const savedDoctorMic = localStorage.getItem('presencial_doctor_mic');
-            const savedPatientMic = localStorage.getItem('presencial_patient_mic');
-
             let doctorMicId = '';
             let patientMicId = '';
 
-            // Verificar se os dispositivos salvos ainda existem
-            const doctorMicExists = savedDoctorMic && audioInputs.some(d => d.deviceId === savedDoctorMic);
-            const patientMicExists = savedPatientMic && audioInputs.some(d => d.deviceId === savedPatientMic);
+            // Prioridade: 1) props iniciais, 2) localStorage, 3) primeiros dispositivos
+            const propDoctorExists = initialDoctorMic && audioInputs.some(d => d.deviceId === initialDoctorMic);
+            const propPatientExists = initialPatientMic && audioInputs.some(d => d.deviceId === initialPatientMic);
 
-            if (doctorMicExists && patientMicExists) {
-                // Usar seleções salvas
-                doctorMicId = savedDoctorMic;
-                patientMicId = savedPatientMic;
-                console.log('✅ Microfones salvos carregados do localStorage');
+            if (propDoctorExists && propPatientExists) {
+                doctorMicId = initialDoctorMic;
+                patientMicId = initialPatientMic;
+                console.log('✅ Microfones carregados das props iniciais');
             } else {
-                // Fallback para primeiros dois dispositivos
-                if (audioInputs.length >= 2) {
-                    doctorMicId = audioInputs[0].deviceId;
-                    patientMicId = audioInputs[1].deviceId;
-                } else if (audioInputs.length === 1) {
-                    // Apenas 1 microfone - usar o mesmo para ambos
-                    doctorMicId = audioInputs[0].deviceId;
-                    patientMicId = audioInputs[0].deviceId;
+                const savedDoctorMic = localStorage.getItem('presencial_doctor_mic');
+                const savedPatientMic = localStorage.getItem('presencial_patient_mic');
+                const doctorMicExists = savedDoctorMic && audioInputs.some(d => d.deviceId === savedDoctorMic);
+                const patientMicExists = savedPatientMic && audioInputs.some(d => d.deviceId === savedPatientMic);
+
+                if (doctorMicExists && patientMicExists) {
+                    doctorMicId = savedDoctorMic;
+                    patientMicId = savedPatientMic;
+                    console.log('✅ Microfones salvos carregados do localStorage');
+                } else {
+                    if (audioInputs.length >= 2) {
+                        doctorMicId = audioInputs[0].deviceId;
+                        patientMicId = audioInputs[1].deviceId;
+                    } else if (audioInputs.length === 1) {
+                        doctorMicId = audioInputs[0].deviceId;
+                        patientMicId = audioInputs[0].deviceId;
+                    }
+                    console.log('📌 Usando microfones padrão (primeiros 2 dispositivos)');
                 }
-                console.log('📌 Usando microfones padrão (primeiros 2 dispositivos)');
             }
 
             if (doctorMicId && patientMicId) {
                 setDoctorMic(doctorMicId);
                 setPatientMic(patientMicId);
+                // Salvar no localStorage para persistir entre instâncias
+                localStorage.setItem('presencial_doctor_mic', doctorMicId);
+                localStorage.setItem('presencial_patient_mic', patientMicId);
                 onMicrophonesSelected(doctorMicId, patientMicId);
             }
 

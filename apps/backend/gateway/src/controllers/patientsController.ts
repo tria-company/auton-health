@@ -914,6 +914,7 @@ export async function syncPatientUser(req: AuthenticatedRequest, res: Response) 
     let emailError: any = null;
     let whatsappSent = false;
     let whatsappError: string | null = null;
+    let whatsappUsedDefaultDevice = false;
     let generatedPassword: string | null = null;
 
     // Função para gerar senha temporária segura
@@ -989,9 +990,10 @@ export async function syncPatientUser(req: AuthenticatedRequest, res: Response) 
         console.log('📱 [USER] Telefone do paciente:', patientPhone ? `presente (***${patientPhone.slice(-4)})` : 'ausente');
         if (patientPhone) {
           try {
-            const result = await sendAccessLinkWhatsApp(patientPhone, patient.name, patient.email!, accessLink);
+            const result = await sendAccessLinkWhatsApp(patientPhone, patient.name, patient.email!, accessLink, patient.doctor_id);
             whatsappSent = result.success;
             whatsappError = result.error || null;
+            whatsappUsedDefaultDevice = result.usedDefaultDevice || false;
             if (result.success) console.log('✅ [USER] Link de acesso enviado por WhatsApp para:', patientPhone.slice(-4) + '****');
             else console.warn('⚠️ [USER] WhatsApp não enviado:', result.error);
           } catch (err: any) {
@@ -1072,6 +1074,7 @@ export async function syncPatientUser(req: AuthenticatedRequest, res: Response) 
       emailError: emailError ? emailError.message : null,
       whatsappSent: whatsappSent || false,
       whatsappError: whatsappError || null,
+      usedDefaultDevice: whatsappUsedDefaultDevice,
       password: generatedPassword || undefined // Retornar senha para debug (remover em produção se necessário)
     });
 
@@ -1260,15 +1263,17 @@ export async function resendPatientCredentials(req: AuthenticatedRequest, res: R
     console.log('📱 [REENVIO-CRED] Etapa WhatsApp (Evolution API)...');
     let whatsappSent = false;
     let whatsappError: string | null = null;
+    let whatsappUsedDefault = false;
     const rawPhoneResend = (patient as { phone?: string; telefone?: string }).phone ?? (patient as { telefone?: string }).telefone;
     const patientPhoneResend = (rawPhoneResend || '').trim();
     if (!patientPhoneResend) console.log('📱 [REENVIO-CRED] WhatsApp: telefone ausente. Campos:', { phone: (patient as any).phone, telefone: (patient as any).telefone });
     else console.log('📱 [REENVIO-CRED] WhatsApp: Evolution API (não Resend). Telefone presente (***' + patientPhoneResend.slice(-4) + ')');
     if (patientPhoneResend) {
       try {
-        const result = await sendAccessLinkWhatsApp(patientPhoneResend, patient.name, authUser.user.email!, accessLink);
+        const result = await sendAccessLinkWhatsApp(patientPhoneResend, patient.name, authUser.user.email!, accessLink, patient.doctor_id);
         whatsappSent = result.success;
         whatsappError = result.error || null;
+        whatsappUsedDefault = result.usedDefaultDevice || false;
         if (result.success) console.log('✅ [REENVIO-CRED] Link enviado por WhatsApp (Evolution API) para:', patientPhoneResend.slice(-4) + '****');
         else console.warn('⚠️ [REENVIO-CRED] WhatsApp não enviado:', result.error);
       } catch (err: any) {
@@ -1286,7 +1291,8 @@ export async function resendPatientCredentials(req: AuthenticatedRequest, res: R
       emailSent: emailSent,
       emailError: emailError ? emailError.message : null,
       whatsappSent: whatsappSent,
-      whatsappError: whatsappError || null
+      whatsappError: whatsappError || null,
+      usedDefaultDevice: whatsappUsedDefault,
     });
 
   } catch (error: any) {

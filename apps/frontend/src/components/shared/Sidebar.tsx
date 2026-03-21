@@ -16,6 +16,7 @@ import {
   LayoutDashboard,
   Building2,
   ClipboardList,
+  Smartphone,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
@@ -34,6 +35,7 @@ const menuItems = [
   { icon: Calendar, label: 'Agenda', href: '/agenda' },
   { icon: User, label: 'Pacientes', href: '/pacientes' },
   { icon: ClipboardList, label: 'Cadastro', href: '/cadastro' },
+  { icon: Smartphone, label: 'Conexão', href: '/conexao' },
   { icon: Settings, label: 'Configurações', href: '/configuracoes' },
 ];
 

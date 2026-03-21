@@ -55,25 +55,20 @@ export function ActiveConsultationBanner() {
     };
   }, []);
 
-  // Polling adicional quando há consulta ativa para atualizar status mais rapidamente
+  // Polling mais rápido enquanto há consulta ativa em RECORDING
   useEffect(() => {
     if (!activeConsultation) return;
 
-    const status = activeConsultation.status;
-    
-    // Para status que mudam frequentemente, fazer polling mais rápido
-    if (['PROCESSING', 'RECORDING'].includes(status)) {
-      fastIntervalRef.current = setInterval(() => {
-        if (pollingActiveRef.current) {
+    fastIntervalRef.current = setInterval(() => {
+      if (pollingActiveRef.current) {
         checkActiveConsultation();
-        }
-      }, 5000); // ✅ Aumentado para 5 segundos (era 3)
+      }
+    }, 5000);
 
-      return () => {
-        if (fastIntervalRef.current) clearInterval(fastIntervalRef.current);
-      };
-    }
-  }, [activeConsultation?.status]);
+    return () => {
+      if (fastIntervalRef.current) clearInterval(fastIntervalRef.current);
+    };
+  }, [activeConsultation?.id]);
 
   const checkActiveConsultation = async () => {
     // ✅ Verificar se polling ainda está ativo
@@ -117,16 +112,14 @@ export function ActiveConsultationBanner() {
         return;
       }
       
-      // Buscar consultas não finalizadas do médico logado
+      // Buscar consultas ativas (RECORDING = consulta em andamento na sala)
       const { data: consultations, error: queryError } = await supabase
         .from('consultations')
         .select('*')
         .eq('doctor_id', medico.id)
-        .or('consulta_finalizada.is.null,consulta_finalizada.eq.false')
-        .not('status', 'in', '("AGENDAMENTO","CREATED")')
-        .neq('andamento', 'CANCELADO')
+        .eq('status', 'RECORDING')
         .order('created_at', { ascending: false })
-        .limit(10);
+        .limit(1);
 
       if (queryError) {
         // ✅ Se já existe consulta ativa, não remover em caso de erro temporário
@@ -142,19 +135,15 @@ export function ActiveConsultationBanner() {
       const active = consultations?.[0] || null;
 
       if (active) {
-        // ✅ Só atualizar se for uma consulta diferente (mudança de ID)
+        // Só atualizar state se for uma consulta diferente (evita re-render desnecessário)
         if (!activeConsultationRef.current || activeConsultationRef.current.id !== active.id) {
           activeConsultationRef.current = active;
           setActiveConsultation(active);
         }
-        // Se for a mesma consulta, não atualizar o estado (evita re-render desnecessário)
       } else {
-        // ✅ Só remover se realmente não houver consulta ativa
-        // Isso evita que o banner desapareça temporariamente durante o polling
-        if (!activeConsultationRef.current) {
-          activeConsultationRef.current = null;
-          setActiveConsultation(null);
-        }
+        // Consulta não está mais em RECORDING — remover banner
+        activeConsultationRef.current = null;
+        setActiveConsultation(null);
       }
     } catch (error) {
       console.error('Erro ao verificar consulta em andamento:', error);
@@ -273,22 +262,8 @@ export function ActiveConsultationBanner() {
   }
 
   const getStatusText = (status: string) => {
-    switch (status) {
-      case 'RECORDING':
-        return 'Gravando';
-      case 'PROCESSING':
-        return 'Processando';
-      case 'VALID_ANAMNESE':
-        return 'Validação Análise';
-      case 'VALID_DIAGNOSTICO':
-        return 'Validação Diagnóstico';
-      case 'VALID_SOLUCAO':
-        return 'Validação Solução';
-      case 'VALIDATION':
-        return 'Em Validação';
-      default:
-        return 'Em Andamento';
-    }
+    if (status === 'RECORDING') return 'Gravando';
+    return 'Em Andamento';
   };
 
   const patientName = activeConsultation.patients?.name || activeConsultation.patient_name;
