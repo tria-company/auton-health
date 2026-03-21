@@ -1,15 +1,18 @@
 import { Request, Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { whatsappService } from '../services/whatsapp.service';
+import { createClient } from '@supabase/supabase-js';
+import { config } from '../config';
 import { z } from 'zod';
 
-/**
- * WhatsApp: usa APENAS Evolution API (mesmo fluxo da anamnese).
- * Resend é usado somente para e-mail (emailController / sendAccessLinkEmail).
- */
+const supabase = createClient(
+  config.SUPABASE_URL,
+  config.SUPABASE_SERVICE_ROLE_KEY,
+  { auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false } }
+);
+
 const EVOLUTION_API_URL = (process.env.EVOLUTION_API_URL || process.env.EVO_SERVICE_URL || 'https://evo.triacompany.com.br').trim().replace(/\/$/, '');
 const EVOLUTION_API_KEY = (process.env.EVOLUTION_API_KEY || process.env.EVO_APIKEY || '').trim();
-const EVOLUTION_INSTANCE = (process.env.EVOLUTION_INSTANCE || process.env.EVO_INSTANCE_NAME || 'omnilink_05').trim();
 
 /**
  * Normaliza número de telefone para formato E.164 (apenas dígitos, Brasil 55 + DDD + número).
@@ -19,6 +22,22 @@ function normalizePhoneToE164(phone: string): string {
   if (digits.length >= 12 && digits.startsWith('55')) return digits;
   if (digits.length === 11 || digits.length === 10) return '55' + digits;
   return digits;
+}
+
+/**
+ * Busca o doctor_id do médico logado (user_auth → medicos.id)
+ */
+async function getDoctorId(userAuthId: string): Promise<string | undefined> {
+  try {
+    const { data } = await supabase
+      .from('medicos')
+      .select('id')
+      .eq('user_auth', userAuthId)
+      .single();
+    return data?.id || undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -55,8 +74,13 @@ export async function sendAnamneseWhatsApp(req: AuthenticatedRequest, res: Respo
       return;
     }
 
+    // Resolver instância do médico logado
+    const doctorId = req.user?.id ? await getDoctorId(req.user.id) : undefined;
+    const resolved = await whatsappService.resolveInstanceDetailed(doctorId);
+    const instanceName = resolved.instanceName;
+
     // Verificar se o número possui WhatsApp
-    const checkUrl = `${EVOLUTION_API_URL}/chat/whatsappNumbers/${EVOLUTION_INSTANCE}`;
+    const checkUrl = `${EVOLUTION_API_URL}/chat/whatsappNumbers/${instanceName}`;
     try {
       const checkResponse = await fetch(checkUrl, {
         method: 'POST',
@@ -82,7 +106,6 @@ export async function sendAnamneseWhatsApp(req: AuthenticatedRequest, res: Respo
       }
     } catch (checkError) {
       console.warn('⚠️ [WHATSAPP] Erro ao verificar número, continuando envio:', checkError);
-      // Se falhar a verificação, continua com o envio (melhor tentar enviar do que bloquear)
     }
 
     const text = `Olá *${patientName}*! 👋
@@ -98,8 +121,8 @@ ${anamneseLink}
 Em caso de dúvidas, entre em contato com seu médico.
 Esta é uma mensagem automática.`;
 
-    const url = `${EVOLUTION_API_URL}/message/sendText/${EVOLUTION_INSTANCE}`;
-    console.log('📱 [WHATSAPP] Enviando anamnese via Evolution API...', { url: url.replace(EVOLUTION_API_KEY, '***'), number: number.slice(-4) + '****' });
+    const url = `${EVOLUTION_API_URL}/message/sendText/${instanceName}`;
+    console.log(`📱 [WHATSAPP] Enviando anamnese via "${instanceName}"...`, { number: number.slice(-4) + '****' });
 
     const response = await fetch(url, {
       method: 'POST',
@@ -124,10 +147,11 @@ Esta é uma mensagem automática.`;
       return;
     }
 
-    console.log('✅ [WHATSAPP] Mensagem enviada com sucesso');
+    console.log(`✅ [WHATSAPP] Mensagem enviada com sucesso via "${instanceName}"${resolved.isDefault ? ' (dispositivo padrão)' : ''}`);
     res.json({
       success: true,
-      message: 'Mensagem enviada por WhatsApp com sucesso'
+      message: 'Mensagem enviada por WhatsApp com sucesso',
+      usedDefaultDevice: resolved.isDefault,
     });
   } catch (error) {
     console.error('❌ [WHATSAPP] Erro inesperado:', error);
@@ -140,16 +164,16 @@ Esta é uma mensagem automática.`;
 
 
 /**
- * Envia link de acesso por WhatsApp via Evolution API (sem senha em texto plano).
- * Mesmo canal da anamnese: Evolution API only.
- * Usado internamente ao criar/reenviar usuário do paciente.
+ * Envia link de acesso por WhatsApp via Evolution API.
+ * Aceita doctorId opcional para usar a instância do médico.
  */
 export async function sendAccessLinkWhatsApp(
   phone: string,
   patientName: string,
   userEmail: string,
-  accessLink: string
-): Promise<{ success: boolean; error?: string; code?: string }> {
+  accessLink: string,
+  doctorId?: string
+): Promise<{ success: boolean; error?: string; code?: string; usedDefaultDevice?: boolean }> {
   const rawPhone = (phone || '').trim();
   if (!rawPhone) {
     console.log('📱 [WHATSAPP] Link de acesso: telefone vazio, não enviando');
@@ -167,7 +191,11 @@ export async function sendAccessLinkWhatsApp(
     return { success: false, error: 'Número de telefone inválido. Use DDD + número (ex: 11999999999)' };
   }
 
-  console.log('📱 [WHATSAPP] Link de acesso: enviando para número', number.slice(0, 4) + '****' + number.slice(-4));
+  // Resolver instância do médico (se tiver conectada, usa a dele)
+  const resolved = await whatsappService.resolveInstanceDetailed(doctorId);
+  const instanceName = resolved.instanceName;
+
+  console.log(`📱 [WHATSAPP] Link de acesso: enviando via "${instanceName}"${resolved.isDefault ? ' (dispositivo padrão)' : ''} para número ${number.slice(0, 4)}****${number.slice(-4)}`);
 
   const appName = process.env.APP_NAME || 'Auton Health';
 
@@ -183,8 +211,8 @@ ${accessLink}
 ⏱️ Este link é válido por tempo limitado. Se expirar, solicite um novo ao seu médico.
 Esta é uma mensagem automática.`;
 
-  // Verificar se o número possui WhatsApp (mesmo fluxo da anamnese)
-  const checkUrl = `${EVOLUTION_API_URL}/chat/whatsappNumbers/${EVOLUTION_INSTANCE}`;
+  // Verificar se o número possui WhatsApp
+  const checkUrl = `${EVOLUTION_API_URL}/chat/whatsappNumbers/${instanceName}`;
   try {
     const checkResponse = await fetch(checkUrl, {
       method: 'POST',
@@ -203,8 +231,7 @@ Esta é uma mensagem automática.`;
     console.warn('⚠️ [WHATSAPP] Erro ao verificar número, continuando envio:', checkError);
   }
 
-  const url = `${EVOLUTION_API_URL}/message/sendText/${EVOLUTION_INSTANCE}`;
-  console.log('📱 [WHATSAPP] Enviando link de acesso via Evolution API...', { number: number.slice(-4) + '****' });
+  const url = `${EVOLUTION_API_URL}/message/sendText/${instanceName}`;
   try {
     const response = await fetch(url, {
       method: 'POST',
@@ -218,8 +245,8 @@ Esta é uma mensagem automática.`;
       console.error('❌ [WHATSAPP] Erro Evolution API (link de acesso):', response.status, errMsg);
       return { success: false, error: errMsg };
     }
-    console.log('✅ [WHATSAPP] Link de acesso enviado por WhatsApp com sucesso');
-    return { success: true };
+    console.log(`✅ [WHATSAPP] Link de acesso enviado por WhatsApp via "${instanceName}"${resolved.isDefault ? ' (dispositivo padrão)' : ''}`);
+    return { success: true, usedDefaultDevice: resolved.isDefault };
   } catch (err: any) {
     console.error('❌ [WHATSAPP] Erro ao enviar link de acesso:', err);
     return { success: false, error: err?.message || 'Erro ao enviar WhatsApp' };
@@ -229,18 +256,25 @@ Esta é uma mensagem automática.`;
 // Schema de validação para envio de mensagem genérica
 const sendTextSchema = z.object({
   number: z.string().min(1, 'Número é obrigatório'),
-  text: z.string().min(1, 'Texto da mensagem é obrigatório')
+  text: z.string().min(1, 'Texto da mensagem é obrigatório'),
+  doctorId: z.string().optional()
 });
 
 /**
  * POST /whatsapp/send
  * Envia uma mensagem de texto genérica via WhatsApp (Evolution API)
  */
-export async function sendTextWhatsApp(req: Request, res: Response, next: NextFunction) {
+export async function sendTextWhatsApp(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   try {
-    const { number, text } = sendTextSchema.parse(req.body);
+    const { number, text, doctorId: bodyDoctorId } = sendTextSchema.parse(req.body);
 
-    const whatsappCheck = await whatsappService.checkWhatsappNumber(number);
+    // Resolver doctor_id: do body ou do usuário logado
+    let doctorId = bodyDoctorId;
+    if (!doctorId && req.user?.id) {
+      doctorId = await getDoctorId(req.user.id);
+    }
+
+    const whatsappCheck = await whatsappService.checkWhatsappNumber(number, doctorId);
     if (!whatsappCheck.exists) {
       return res.status(400).json({
         success: false,
@@ -250,12 +284,13 @@ export async function sendTextWhatsApp(req: Request, res: Response, next: NextFu
       });
     }
 
-    const result = await whatsappService.sendText({ number, text });
+    const result = await whatsappService.sendText({ number, text, doctorId });
 
     res.status(200).json({
       success: true,
       data: result,
-      message: 'Mensagem enviada com sucesso'
+      message: 'Mensagem enviada com sucesso',
+      usedDefaultDevice: result?.usedDefaultDevice ?? false,
     });
   } catch (error) {
     next(error);

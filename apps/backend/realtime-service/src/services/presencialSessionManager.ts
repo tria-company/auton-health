@@ -228,11 +228,14 @@ class PresencialSessionManager {
                 sequence: sequence
             };
 
-            // Adicionar à sessão
+            // Adicionar à sessão (memória)
             session.transcriptions.push(transcription);
             session.totalTranscriptions++;
 
             console.log(`📝 [PRESENCIAL] Transcrição ${speaker} #${sequence} salva: "${result.text}" (Total: ${session.totalTranscriptions})`);
+
+            // Salvar incrementalmente no banco (mesmo processo da consulta online)
+            await this.saveTranscriptionIncrementally(session, transcription);
 
             return transcription;
 
@@ -332,6 +335,48 @@ class PresencialSessionManager {
         session.totalTranscriptions++;
 
         console.log(`📝 [PRESENCIAL] Transcrição ${chunk.speaker} #${chunk.sequence} salva na sessão: "${result.text}" (Total: ${session.totalTranscriptions})`);
+
+        // Salvar incrementalmente no banco (mesmo processo da consulta online)
+        await this.saveTranscriptionIncrementally(session, transcription);
+    }
+
+    /**
+     * Salva uma transcrição incrementalmente nas tabelas transcriptions_med e transcriptions
+     * (mesmo processo usado na consulta online)
+     */
+    private async saveTranscriptionIncrementally(session: PresencialSession, transcription: Transcription): Promise<void> {
+        try {
+            const speakerId = transcription.speaker === 'doctor' ? session.doctorId : session.patientId;
+            const timestamp = transcription.timestamp.toISOString().substring(11, 19); // HH:mm:ss
+
+            // 1. Salvar em transcriptions_med (array de conversas por sessão)
+            const saved = await db.addTranscriptionToSession(session.callSessionId, {
+                speaker: transcription.speaker,
+                speaker_id: speakerId,
+                text: transcription.text,
+                doctor_name: session.doctorName,
+            });
+
+            if (saved) {
+                console.log(`💾 [PRESENCIAL] Transcrição salva em transcriptions_med (session: ${session.callSessionId})`);
+            }
+
+            // 2. Salvar em transcriptions (raw_text append)
+            const speakerLabel = transcription.speaker === 'doctor' ? 'MEDICO' : 'PACIENTE';
+            const appended = await db.appendConsultationTranscription(
+                session.consultationId,
+                transcription.text,
+                speakerLabel,
+                timestamp
+            );
+
+            if (appended) {
+                console.log(`💾 [PRESENCIAL] Transcrição appendada em transcriptions (consultation: ${session.consultationId})`);
+            }
+        } catch (error) {
+            // Não bloquear o fluxo se falhar o save incremental
+            console.error(`⚠️ [PRESENCIAL] Erro ao salvar transcrição incrementalmente (não bloqueia):`, error);
+        }
     }
 
     /**

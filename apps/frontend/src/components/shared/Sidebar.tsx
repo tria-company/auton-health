@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   LayoutDashboard,
   Building2,
+  Smartphone,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
@@ -32,6 +33,7 @@ const menuItems = [
   { icon: MessageCircle, label: 'Consultas', href: '/consultas' },
   { icon: Calendar, label: 'Agenda', href: '/agenda' },
   { icon: User, label: 'Pacientes', href: '/pacientes' },
+  { icon: Smartphone, label: 'Conexão', href: '/conexao' },
   { icon: Settings, label: 'Configurações', href: '/configuracoes' },
 ];
 

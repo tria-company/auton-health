@@ -45,7 +45,7 @@ export function CreateConsultationRoom({
 }: CreateConsultationRoomProps) {
   const router = useRouter();
   const { theme, systemTheme } = useTheme();
-  const { showError, showSuccess, showWarning } = useNotifications();
+  const { showError, showSuccess, showWarning, showInfo } = useNotifications();
   const [mounted, setMounted] = useState(false);
 
   // Determinar se está em modo dark
@@ -695,6 +695,9 @@ export function CreateConsultationRoom({
 
       if (response.success) {
         showSuccess('Mensagem enviada com sucesso para o WhatsApp do paciente!', 'Envio Concluído');
+        if ((response as any).usedDefaultDevice) {
+          showInfo('Mensagem enviada pelo dispositivo padrão. Conecte seu WhatsApp em Conexão para enviar pelo seu número.', 'WhatsApp');
+        }
       } else {
       }
     } catch (error) {

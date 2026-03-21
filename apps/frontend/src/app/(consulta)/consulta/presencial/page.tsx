@@ -526,6 +526,8 @@ function PresencialConsultationContent() {
               disabled={true}
               doctorLevel={doctorLevel}
               patientLevel={patientLevel}
+              initialDoctorMic={doctorMicrophoneId}
+              initialPatientMic={patientMicrophoneId}
             />
 
             <div className="finish-button">

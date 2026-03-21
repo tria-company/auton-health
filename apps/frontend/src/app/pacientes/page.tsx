@@ -69,7 +69,7 @@ interface PatientsResponse {
 }
 
 export default function PatientsPage() {
-  const { showSuccess, showError, showWarning } = useNotifications();
+  const { showSuccess, showError, showWarning, showInfo } = useNotifications();
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -210,6 +210,9 @@ export default function PatientsPage() {
             parts.push(` WhatsApp não enviado: ${response.whatsappError}`);
           }
           showSuccess(parts.join(' '), 'Sucesso');
+          if (response.whatsappSent && response.usedDefaultDevice) {
+            showInfo('Mensagem enviada pelo dispositivo padrão. Conecte seu WhatsApp em Conexão para enviar pelo seu número.', 'WhatsApp');
+          }
         } else {
           showWarning(
             `${response.message || 'Usuário criado com sucesso!'}\n\n⚠️ Link de acesso não foi enviado: ${response.emailError || 'Erro desconhecido'}\n\nUse o botão "Reenviar Credenciais" para tentar novamente.`,
@@ -280,6 +283,9 @@ export default function PatientsPage() {
           parts.push(` WhatsApp não enviado: ${response.whatsappError}`);
         }
         showSuccess(parts.join(' '), 'Link Enviado');
+        if (response.whatsappSent && response.usedDefaultDevice) {
+          showInfo('Mensagem enviada pelo dispositivo padrão. Conecte seu WhatsApp em Conexão para enviar pelo seu número.', 'WhatsApp');
+        }
       } else {
         showWarning(
           `Link de acesso não foi enviado: ${response.emailError || 'Erro desconhecido'}`,
@@ -469,6 +475,9 @@ export default function PatientsPage() {
           whatsappOk = false;
         } else {
           whatsappOk = !!whatsappResponse.success;
+          if (whatsappOk && (whatsappResponse as any).usedDefaultDevice) {
+            showInfo('Mensagem enviada pelo dispositivo padrão. Conecte seu WhatsApp em Conexão para enviar pelo seu número.', 'WhatsApp');
+          }
         }
       }
 

@@ -33,6 +33,7 @@ import consultasAdminRoutes from './routes/consultas-admin';
 import emailRoutes from './routes/email';
 import whatsappRoutes from './routes/whatsapp';
 import aiRoutes from './routes/ai';
+import conexaoRoutes from './routes/conexao';
 
 // Rotas de Proxy
 import proxyRoutes from './routes/proxy';
@@ -182,6 +183,7 @@ app.use('/ai', aiRoutes);
 app.use('/admin/consultations', consultasAdminRoutes);
 app.use('/email', emailRoutes);
 app.use('/whatsapp', whatsappRoutes);
+app.use('/conexao', conexaoRoutes);
 
 // Health check do Gateway (para Cloud Run e Docker)
 app.get('/health', (req, res) => {
